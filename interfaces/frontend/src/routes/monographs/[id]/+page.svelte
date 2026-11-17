@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { sectionLabels } from '#lib/labels.js';
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { page } from '$app/state';
@@ -26,7 +27,7 @@
 	});
 </script>
 
-<EntityBreadcrumb section={{ label: 'Monographies', path: 'monographs' }} name={titleText(monograph?.title)} fallback="Monographie" />
+<EntityBreadcrumb section={{ label: sectionLabels.monographs, path: 'monographs' }} name={titleText(monograph?.title)} fallback="Monographie" />
 
 {#if error || !monograph}
 	<EntityStatus {error} notFound="Monographie introuvable" />

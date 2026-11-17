@@ -43,6 +43,8 @@ class DoiClusterCase(StrEnum):
     """Volume d'actes et documents d'autres titres partageant son DOI : ces communications perdent le DOI."""
     NUMERO_VS_ARTICLE = "NUMERO_VS_ARTICLE"
     """Numéro de revue et documents d'autres titres partageant son DOI : ces articles perdent le DOI."""
+    AVIS_VS_ARTICLE = "AVIS_VS_ARTICLE"
+    """Erratum ou avis de rétractation et documents d'autres types partageant son DOI : ces documents, l'article corrigé le plus souvent, perdent le DOI."""
     DOI_D_UNE_AUTRE_OEUVRE = "DOI_D_UNE_AUTRE_OEUVRE"
     """Enregistrement source dont le DOI est celui d'une autre œuvre (`_records_of_another_work`) : il le perd."""
     UNRESOLVED_DOI_TO_NULL = "UNRESOLVED_DOI_TO_NULL"
@@ -134,6 +136,7 @@ _DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
         DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS,
         DoiClusterCase.ACTES_VS_COMMUNICATION,
         DoiClusterCase.NUMERO_VS_ARTICLE,
+        DoiClusterCase.AVIS_VS_ARTICLE,
         DoiClusterCase.DOI_D_UNE_AUTRE_OEUVRE,
     }
 )
@@ -145,8 +148,11 @@ _CONTAINER_CASES: dict[str, DoiClusterCase] = {
 }
 """Types de conteneur, et cas de retrait du DOI aux membres d'un autre titre que le conteneur."""
 
+_NOTICE_DOC_TYPES = frozenset({DocType.ERRATUM, DocType.RETRACTION})
+"""Types d'un erratum ou d'un avis : leurs DOI sont retirés aux documents d'autres types (`AVIS_VS_ARTICLE`)."""
+
 CLUSTER_CANDIDATE_DOC_TYPES: frozenset[str] = frozenset(
-    {DocType.BOOK, DocType.BOOK_CHAPTER, *_CONTAINER_CASES}
+    {DocType.BOOK, DocType.BOOK_CHAPTER, *_CONTAINER_CASES, *_NOTICE_DOC_TYPES}
 )
 """Types dont la présence dans un groupe de même DOI le rend candidat au retrait du DOI."""
 
@@ -376,6 +382,7 @@ def resolve_cluster_doi_corrections(
     - **Chapitres seuls, de titres différents, sans membre qui détient le DOI en propre** : tous les `book_chapter` perdent le DOI, celui de l'ouvrage absent.
     - **Volume d'actes + communications** : les membres dont le titre diffère de celui du volume (`proceedings`) perdent le DOI, quel que soit leur type. Les membres au titre du volume le gardent.
     - **Numéro de revue + articles** : même règle avec le numéro (`journal_issue`).
+    - **Erratum ou avis + autres documents** : les membres d'un autre type que l'avis perdent le DOI, quel que soit leur titre. Le titre de l'avis contient souvent celui de l'article corrigé.
     - **DOI d'une autre œuvre** (`_records_of_another_work`) : un enregistrement source sans nom d'auteur commun avec l'enregistrement source Crossref du DOI, et de titre éloigné du sien, perd le DOI. S'ajoute aux cas précédents.
     - **Clé propre d'un membre qui perd le DOI** (`_co_owners_of_lost_keys`) : un membre qui détient aussi cette clé en propre perd le DOI.
     """
@@ -422,6 +429,10 @@ def _divergence_decisions(group: list[DoiClusterMember]) -> list[DoiClusterDecis
     for container_type, case in _CONTAINER_CASES.items():
         for m in _container_contents(group, references, container_type):
             decisions.setdefault(m.id, case)
+    if any(m.doc_type in _NOTICE_DOC_TYPES for m in references):
+        for m in group:
+            if m.doc_type not in _NOTICE_DOC_TYPES:
+                decisions.setdefault(m.id, DoiClusterCase.AVIS_VS_ARTICLE)
     return [DoiClusterDecision(member_id, case) for member_id, case in decisions.items()]
 
 

@@ -1,6 +1,6 @@
 """Données du statut open access d'un lot de publications, lues en base, et calcul du statut (`domain.publications.open_access`).
 
-La consolidation des publications et la phase `oa_status` lisent ces données par `oa_inputs`.
+La consolidation des publications lit ces données par `oa_inputs`.
 """
 
 from collections.abc import Mapping, Sequence

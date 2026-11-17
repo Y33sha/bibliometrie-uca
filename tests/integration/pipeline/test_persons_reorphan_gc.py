@@ -216,6 +216,33 @@ def test_une_fiche_rh_ou_une_contribution_du_perimetre_conserve_la_personne(sa_s
     assert _person_exists(conn, rh) is True
 
 
+def test_une_contribution_de_jury_ne_conserve_pas_la_personne(sa_sync_conn):
+    """Une contribution du périmètre aux seuls rôles sans création de personne (rapporteur, inventeur) laisse supprimer la personne ; un rôle d'auteur la conserve."""
+    conn = sa_sync_conn
+    rapporteur = insert_person(conn, "Externe", first_name="E")
+    jury = _contribution(conn, form="e externe", person_id=rapporteur, mode="orcid")
+    inventeur = insert_person(conn, "Inventeur", first_name="I")
+    brevet = _contribution(conn, form="i inventeur", person_id=inventeur, mode="orcid")
+    auteur = insert_person(conn, "Auteur", first_name="A")
+    mixte = _contribution(conn, form="a auteur", person_id=auteur, mode="orcid")
+    for contribution, roles in (
+        (jury, ["rapporteur", "jury_member"]),
+        (brevet, ["inventor"]),
+        (mixte, ["author", "jury_member"]),
+    ):
+        conn.execute(
+            text("UPDATE contributions SET roles = :r WHERE id = :g"),
+            {"r": roles, "g": contribution},
+        )
+
+    delete_persons_out_of_perimeter(conn)
+
+    assert _person_exists(conn, rapporteur) is False
+    assert _person_exists(conn, inventeur) is False
+    assert _person_exists(conn, auteur) is True
+    assert contribution_person(conn, jury) == (None, None)
+
+
 def test_une_decision_humaine_conserve_la_personne(sa_sync_conn):
     """Rejet, épinglage, non-doublon ou exclusion conservent une personne sans contribution ; une confirmation d'identifiant non."""
     conn = sa_sync_conn

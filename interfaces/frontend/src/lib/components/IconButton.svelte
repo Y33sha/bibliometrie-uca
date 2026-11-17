@@ -1,4 +1,16 @@
+<script module lang="ts">
+	import Check from '@lucide/svelte/icons/check';
+	import PanelRight from '@lucide/svelte/icons/panel-right';
+	import Pencil from '@lucide/svelte/icons/pencil';
+	import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+	import Trash from '@lucide/svelte/icons/trash';
+	import X from '@lucide/svelte/icons/x';
+
+	const ICONS = { edit: Pencil, delete: Trash, panel: PanelRight, reject: X, confirm: Check, reset: RotateCcw };
+</script>
+
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	// Bouton d'action réduit à son icône : crayon pour modifier, corbeille pour supprimer, panneau latéral pour ouvrir un volet, croix pour rejeter, coche pour valider, flèche circulaire pour réinitialiser. Le libellé sert d'infobulle et de nom accessible.
 	let {
 		icon,
@@ -8,7 +20,7 @@
 		pressed,
 		small = false
 	}: {
-		icon: 'edit' | 'delete' | 'panel' | 'reject' | 'confirm' | 'reset';
+		icon: keyof typeof ICONS;
 		label: string;
 		onclick: () => void;
 		disabled?: boolean;
@@ -17,6 +29,8 @@
 		/** Version compacte, logée dans une étiquette. */
 		small?: boolean;
 	} = $props();
+
+	const Icon = $derived(ICONS[icon]);
 </script>
 
 <button
@@ -25,25 +39,11 @@
 	class:icon-btn-danger={icon === 'delete' || icon === 'reject'}
 	class:icon-btn-success={icon === 'confirm'}
 	class:icon-btn-sm={small}
-	title={label}
+	use:tooltip={label}
 	aria-label={label}
 	aria-pressed={pressed}
 	{disabled}
 	{onclick}
 >
-	<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-		{#if icon === 'edit'}
-			<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" />
-		{:else if icon === 'panel'}
-			<rect width="18" height="18" x="3" y="3" rx="2" /><path d="M15 3v18" />
-		{:else if icon === 'reject'}
-			<path d="M18 6 6 18" /><path d="m6 6 12 12" />
-		{:else if icon === 'confirm'}
-			<path d="M20 6 9 17l-5-5" />
-		{:else if icon === 'reset'}
-			<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" />
-		{:else}
-			<path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-		{/if}
-	</svg>
+	<Icon size={15} />
 </button>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatNumber } from "#lib/utils.js";
   import PageHeader from "#lib/components/PageHeader.svelte";
   import ListToolbar from "#lib/components/ListToolbar.svelte";
   import SortChevron from "#lib/components/SortChevron.svelte";
@@ -11,11 +12,9 @@
   import { useFacets } from "#lib/composables/useFacets.svelte.js";
   import { useFilteredList } from "#lib/composables/useFilteredList.svelte.js";
   import { facetDefs } from "#lib/filterRegistry.js";
-  import { subjectVocabularyLabels } from "#lib/labels.js";
-  import { withBase } from "#lib/paths.js";
+  import { subjectVocabularyLabels, sectionLabels } from "#lib/labels.js";
   import { nextSort, sortDirection } from "#lib/sort.js";
   import { SUBJECT_FILTER_GROUPS, SUBJECT_FILTERS } from "#lib/subjectFilters.js";
-  import { paramsToQuery } from "#lib/utils.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
   import type { components } from "#lib/api/schema.js";
@@ -41,12 +40,6 @@
       }),
   });
 
-  function exportCsvUrl(): string {
-    const params = list.filterParams();
-    params.set("sort", list.sort);
-    return withBase(`/api/subjects/export.csv?${paramsToQuery(params)}`);
-  }
-
   function setSort(column: "label" | "publications") {
     list.setSort(nextSort(list.sort, column, column === "label" ? "asc" : "desc"));
   }
@@ -54,9 +47,9 @@
   onMount(list.restore);
 </script>
 
-<PageHeader title="Sujets" hidden />
+<PageHeader title={sectionLabels.subjects} hidden />
 
-<ListToolbar bind:search={list.search} placeholder="Rechercher dans les libellés" onsearch={list.onSearchInput} list={list.listing} one="sujet" many="sujets" exportUrl={exportCsvUrl()} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher dans les libellés" onsearch={list.onSearchInput} list={list.listing} one="sujet" many="sujets" exportUrl={list.exportUrl("/api/subjects/export.csv")} countBelow>
   {#snippet leading()}
     <FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
   {/snippet}
@@ -87,7 +80,7 @@
             </td>
             <td class="muted">{s.vocabularies.map((v) => subjectVocabularyLabels[v]).join(", ")}</td>
             <!-- Un décompte non nul mène à l'onglet Publications de la fiche. -->
-            <td class="num">{#if s.usage_count}<a href={resolve(`subjects/${s.label_normalized}?tab=publications`)}>{s.usage_count.toLocaleString("fr-FR")}</a>{:else}0{/if}</td>
+            <td class="num">{#if s.usage_count}<a href={resolve(`subjects/${s.label_normalized}?tab=publications`)}>{formatNumber(s.usage_count)}</a>{:else}0{/if}</td>
           </tr>
         {/each}
       </tbody>

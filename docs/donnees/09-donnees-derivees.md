@@ -30,7 +30,8 @@ Certaines colonnes dupliquent une information calculable, pour éviter une joint
 |---|---|---|
 | `perimeter_evidence`, d'où `in_perimeter` | `source_contributions` | phase `affiliations` |
 | `perimeter_evidence`, d'où `in_perimeter` | `publications` | phase `finalize` |
-| `countries[]` | `addresses`, `source_contributions`, `source_records`, `publications` | phase `countries` |
+| `countries[]` | `addresses`, `source_contributions`, `source_records` | phase `affiliations` |
+| `countries[]`, `oa_status` | `publications` | consolidation de la publication |
 | `author_positions`, `roles`, `perimeter_evidence` | `contributions` | phase `author_grouping` |
 | `publication_count` | `serials`, `publishers` | phase `finalize` |
 | `publisher_id` | `serials` | phase `finalize`, d'après les publications |

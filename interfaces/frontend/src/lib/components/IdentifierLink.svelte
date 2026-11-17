@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import { asset } from "$app/paths";
   import type { AssetPath } from "$app/types";
   import { identifierTypeLabel } from "#lib/labels.js";
@@ -64,7 +65,7 @@
     href={meta.url(id_value)}
     target="_blank"
     rel="noopener"
-    title="{meta.label} : {id_value}"
+    use:tooltip={`${meta.label} : ${id_value}`}
   >
     <img src={asset(meta.icon)} alt={meta.label} />
   </a>

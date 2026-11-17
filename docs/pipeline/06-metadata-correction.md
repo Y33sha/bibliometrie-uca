@@ -1,6 +1,6 @@
 # Correction des métadonnées
 
-*À jour le 2026-11-01.*
+*À jour le 2026-11-16.*
 
 La phase `metadata_correction` prépare les `source_records` pour que le [rattachement des publications](07-publications.md) s'appuie sur des valeurs propres. Elle tourne après [`publishing`](05-publishing.md) : le typage des revues alimente les règles dépendantes de la revue.
 
@@ -16,6 +16,6 @@ Les corrections sont écrites sur les colonnes des `source_records` ; la valeur 
 - **`remove_identifiers`** — retire un DOI des enregistrements sources qui l'ont à tort. Un groupe réunit les enregistrements sources qui ont un même DOI.
 
    - **Documents distincts** — un chapitre d'un autre titre a le DOI de son ouvrage, une communication celui de son volume d'actes, un article celui de son numéro de revue. Un enregistrement source a parfois celui d'une autre œuvre. Le DOI reste aux seuls documents désignés. Un enregistrement source qui détient le DOI en `primary` ou `derived` le garde toujours. Un enregistrement source désigne une autre œuvre que l'enregistrement source Crossref du DOI s'il a un titre éloigné du sien et aucun nom d'auteur commun.
-   - **DOI inexistant** — un DOI que doi.org ne connaît pas (`failed_lookups`, source `doi_org`) est retiré de tous les enregistrements sources qui le citent.
+   - **DOI inexistant** — un DOI inconnu de doi.org (`dois.registered`, posé par la phase [dois](05-publishing.md#référentiel-des-doi-dois)) est retiré de tous les enregistrements sources qui le citent.
 
 - **`matchable`** — calcule `is_matchable` d'après les valeurs corrigées. Un enregistrement source écarté reste hors de la [réconciliation](07-publications.md) : préfixe DOI exclu, titre de paratexte, enregistrement DataCite d'une forme secondaire, enregistrement OpenAlex ou ScanR sans DOI, lien ni clé de confirmation.

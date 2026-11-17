@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishing` : fusion des autres noms d'un éditeur.
+"""Tâche de la phase `publishing` : fusion des autres noms d'un éditeur.
 
 Un éditeur nommé par les sources, sans préfixe DOI, rejoint le titulaire des préfixes DOI de ses enregistrements sources quand leurs noms sont compatibles (`domain.publishers.aliases`). Les préfixes des plateformes d'éditeurs sont écartés : ils désignent la plateforme. Les éditeurs de même nom réduit fusionnent ensuite (`same_name_merges`). La fusion est celle de l'administration des éditeurs, sans les revues homonymes : les formes de nom passent à l'éditeur gardé, retrouvé ensuite par ce nom. Le journal garde les deux noms.
 """
@@ -21,7 +21,7 @@ from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 LABEL = "Autres noms des éditeurs"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 MergePublishers = Callable[[int, int], None]
 """`(cible, source)` : fusionne l'éditeur source dans la cible et valide la transaction."""

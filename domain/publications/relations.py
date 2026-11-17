@@ -1,4 +1,4 @@
-"""Relations entre publications distinctes : types, et traduction des vocabulaires de DataCite (`relationType`) et de Crossref (clés de `relation`).
+"""Relations entre publications distinctes : types, traduction des vocabulaires de DataCite (`relationType`) et de Crossref (clés de `relation`, types de mise à jour).
 
 Restent hors du vocabulaire, et donnent `None` :
 
@@ -16,6 +16,11 @@ from domain.documents.identifiers import DOI
 from domain.source_records.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     declares_same_work,
+)
+from domain.source_records.notices import (
+    CROSSREF_CONCERN_UPDATE,
+    CROSSREF_CORRECTION_UPDATES,
+    CROSSREF_RETRACTION_UPDATE,
 )
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
 from domain.types import JsonValue, as_str
@@ -56,6 +61,16 @@ _PAIRS: tuple[tuple[RelationType, RelationType, str], ...] = (
     (RelationType.DESCRIBES, RelationType.IS_DESCRIBED_BY, "data paper/jeu de données"),
 )
 """Paires de types inverses, avec leur libellé commun : sur la page de B, `A is_preprint_of B` se lit `B has_preprint A`."""
+
+NOTICE_SUBJECT_RELATIONS = frozenset(
+    {RelationType.IS_CORRECTION_OF, RelationType.IS_RETRACTION_OF, RelationType.IS_CONCERN_ABOUT}
+)
+"""Relations d'un erratum ou d'un avis vers l'œuvre concernée."""
+
+NOTICE_RELATION_TYPES = NOTICE_SUBJECT_RELATIONS | frozenset(
+    {RelationType.HAS_CORRECTION, RelationType.HAS_RETRACTION, RelationType.HAS_CONCERN}
+)
+"""Relations d'une publication avec un erratum ou un avis : correction, rétractation, préoccupation. La tâche `notices` de la phase `relations` les écrit, la tâche `rebuild` écrit les autres."""
 
 RELATION_PAIR_LABELS: dict[RelationType, str] = {
     **{relation: label for a, b, label in _PAIRS for relation in (a, b)},
@@ -100,6 +115,13 @@ _CROSSREF_MAP: dict[str, RelationType] = {
     "has-part": RelationType.IS_DESCRIBED_BY,
 }
 """Clés Crossref du vocabulaire."""
+
+_CROSSREF_UPDATE_MAP: dict[str, RelationType] = {
+    **dict.fromkeys(CROSSREF_CORRECTION_UPDATES, RelationType.IS_CORRECTION_OF),
+    CROSSREF_RETRACTION_UPDATE: RelationType.IS_RETRACTION_OF,
+    CROSSREF_CONCERN_UPDATE: RelationType.IS_CONCERN_ABOUT,
+}
+"""Types de mise à jour Crossref du vocabulaire, vus depuis l'erratum ou l'avis. Restent hors du vocabulaire les nouvelles versions et éditions, formes d'une même œuvre, et les retraits (`CROSSREF_WITHDRAWAL_UPDATE`)."""
 
 
 _INVERSE_RELATIONS: dict[RelationType, RelationType] = {
@@ -152,10 +174,9 @@ def extract_datacite_distinct_works(
 
 DEPENDENT_DOC_TYPE_RELATIONS: dict[str, RelationType] = {
     DocType.PREPRINT: RelationType.IS_PREPRINT_OF,
-    DocType.ERRATUM: RelationType.IS_CORRECTION_OF,
     DocType.DATASET: RelationType.IS_SUPPLEMENT_TO,
 }
-"""Types de document dépendants, sujets d'une relation vers l'œuvre principale : preprint, erratum, jeu de données. Ils typent la relation de deux publications qui partagent une clé (`infer_shared_key_relation`) ou un titre (phase `relations`)."""
+"""Types de document dépendants, sujets d'une relation vers l'œuvre principale : preprint, jeu de données. Ils typent la relation de deux publications qui partagent une clé (`infer_shared_key_relation`) ou un titre (phase `relations`)."""
 
 
 def infer_shared_key_relation(
@@ -199,3 +220,49 @@ def extract_crossref_relations(
             if target:
                 out.append((canonical, target))
     return out
+
+
+def _crossref_updates(
+    source_extras: dict[str, JsonValue] | None, key: SourceExtra
+) -> Iterator[tuple[RelationType, str]]:
+    """Renvoie les mises à jour du vocabulaire rangées sous `key` : `(type vu depuis l'erratum ou l'avis, DOI)`, DOI normalisé à l'ingestion."""
+    updates = (source_extras or {}).get(key)
+    if not isinstance(updates, list):
+        return
+    for item in updates:
+        if (
+            isinstance(item, dict)
+            and (relation := _CROSSREF_UPDATE_MAP.get(as_str(item.get("type")) or ""))
+            and (doi := as_str(item.get("doi")))
+        ):
+            yield relation, doi
+
+
+def extract_crossref_update_relations(
+    source_extras: dict[str, JsonValue] | None,
+) -> list[tuple[RelationType, str]]:
+    """Renvoie les relations tirées des mises à jour déclarées par un enregistrement source Crossref : `(type, DOI cible)`.
+
+    Un erratum ou un avis déclare l'œuvre mise à jour (`update_to`) : `is_correction_of`, `is_retraction_of`, `is_concern_about`. Une œuvre déclare ses mises à jour (`updated_by`) : relation inverse. Une déclaration vers le DOI de l'enregistrement source lui-même, comme une rétractation sur place, donne une auto-relation, écartée à l'insertion.
+    """
+    return [
+        *_crossref_updates(source_extras, SourceExtra.UPDATE_TO),
+        *(
+            (inverse_relation(relation), doi)
+            for relation, doi in _crossref_updates(source_extras, SourceExtra.UPDATED_BY)
+        ),
+    ]
+
+
+def notice_relation(
+    relation: RelationType, subject_doc_type: str | None, object_doc_type: str | None
+) -> RelationType:
+    """Renvoie le type d'une relation déclarée, corrigé par le type de l'avis : une correction dont l'avis est de type `retraction` devient une rétractation.
+
+    Certains éditeurs (Elsevier) déclarent un avis de rétractation comme un erratum. L'avis est le sujet de `is_correction_of`, l'objet de `has_correction`.
+    """
+    if relation is RelationType.IS_CORRECTION_OF and subject_doc_type == DocType.RETRACTION:
+        return RelationType.IS_RETRACTION_OF
+    if relation is RelationType.HAS_CORRECTION and object_doc_type == DocType.RETRACTION:
+        return RelationType.HAS_RETRACTION
+    return relation

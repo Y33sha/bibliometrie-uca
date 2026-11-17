@@ -1,8 +1,8 @@
 <script lang="ts" generics="Group">
 	import { untrack, type Snippet } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { errorMessage } from '#lib/api/index.js';
-	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
+	import { columnLabels } from '#lib/labels.js';
+	import { confirmDialog, toastError } from '#lib/dialogs.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 	import { mergeSerial } from '#lib/components/serials/mergeSerial.js';
 	import ListStatus from '#lib/components/ListStatus.svelte';
@@ -39,7 +39,7 @@
 		try {
 			groups = await fetchGroups();
 		} catch (e) {
-			toast('Erreur lors du chargement de la file : ' + errorMessage(e), 'error');
+			toastError(e, "Chargement de la file impossible");
 		} finally {
 			loading = false;
 		}
@@ -83,7 +83,7 @@
 			<col class="col-action" />
 		</colgroup>
 		<thead>
-			<tr><th>Publication en série</th><th>Éditeur</th><th>ISSN</th><th class="num">Publications</th><th></th></tr>
+			<tr><th>Publication en série</th><th>{columnLabels.publisher}</th><th>ISSN</th><th class="num">{columnLabels.publications}</th><th></th></tr>
 		</thead>
 		{#each groups as group (keyOf(group))}
 			<tbody class="group">

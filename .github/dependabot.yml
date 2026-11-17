@@ -79,6 +79,12 @@ updates:
       images-de-base:
         patterns: ["*"]
         group-by: "dependency-name"
+    # Changer de version de Python engage aussi `.python-version`, `requires-python` et les wheels
+    # des dépendances compilées : ce changement se fait à la main. Les nouvelles images de la même
+    # version mineure restent suivies.
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   # Les descriptions de composition portent l'image de la base, que l'écosystème `docker`
   # ci-dessus ne lit pas : il ne parcourt que les descriptions de construction.

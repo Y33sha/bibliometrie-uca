@@ -6,20 +6,20 @@
 import { cssColor, oaStatusColor } from '#lib/components/charts/cssVar.js';
 import { chartColor } from '#lib/components/charts/palette.js';
 import { docTypeFamilies, docTypeGroupColorVar, docTypePluralLabels } from '#lib/docTypes.svelte.js';
-import { licenseOrder, oaStatusDescriptions, oaStatusLabel } from '#lib/labels.js';
+import { citationTopLabels, licenseOrder, oaLabelsMap, oaStatusDescriptions, oaStatusLabel } from '#lib/labels.js';
 
 const OA_VOIE_ORDER = ['diamond', 'gold', 'hybrid', 'bronze', 'green', 'embargoed', 'closed', 'unknown'];
 const OA_ACCESS_ORDER = ['ouvert', 'embargo', 'ferme', 'indetermine'];
 const OA_ACCESS_LABELS: Record<string, string> = {
 	ouvert: 'Ouvert',
-	embargo: 'Sous embargo',
-	ferme: 'Fermé',
-	indetermine: 'Indéterminé',
+	embargo: oaLabelsMap.embargoed,
+	ferme: oaLabelsMap.closed,
+	indetermine: oaLabelsMap.unknown,
 };
 // Classes de citation, exclusives : une barre empilée compte le top 10 % en deux segments. Couleur dans `--citation-<valeur>`.
 const CITATION_CLASS_ORDER = ['top_1_percent', 'top_10_percent', 'below'];
 const CITATION_CLASS_LABELS: Record<string, string> = {
-	top_1_percent: 'Top 1 %',
+	top_1_percent: citationTopLabels.top_1_percent,
 	top_10_percent: 'Top 10 % hors top 1 %',
 	below: 'Hors top 10 %',
 };

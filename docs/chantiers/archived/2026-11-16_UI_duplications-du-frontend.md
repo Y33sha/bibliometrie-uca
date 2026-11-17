@@ -84,6 +84,7 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 - Étiquettes : une seule classe, teintée par la propriété `--tag-color`. Le fond, le texte et le survol en dérivent en OKLCH relatif, à luminosité fixe. Les couleurs des graphiques restent inchangées.
 - Un écart entre copies suit l'usage majoritaire. Tout changement d'apparence est validé sur planches avant et après.
 - Un design volontairement différent garde ses règles locales, par exemple `AccessButton`.
+- Icônes : SVG en ligne, tirées de Lucide (`@lucide/svelte`). Les pictogrammes Creative Commons, absents de Lucide, sont les SVG officiels de Creative Commons, rangés dans un registre local. La police Flaticon est retirée.
 
 ## Phasage
 
@@ -118,21 +119,18 @@ Une étiquette (tag, badge, pastille, chip) est un court texte sur fond clair, a
 
 ### Phase 6 — Composants
 
-- [ ] Vues de liste sur une base commune (question 1)
-- [ ] Volets sur une base commune (question 2)
+- [x] Vues de liste sur `useFilteredList` et `filterRegistry` (54af447ad)
+- [x] URL d'export CSV des vues de liste dans `useFilteredList` (23bbf938b)
+- [x] Volets : chargement au changement d'identifiant et remise à zéro dans `useDrawerEntity` (a17c88cb9)
 - [x] Pages Problèmes HAL et d'administration sur `useUrlFilters` (d932adc14)
 - [x] Pages d'entité : titre d'onglet et fil d'Ariane (d84a7b2e9), onglet actif (d7ed0eacb), carte des sujets (c0fde1cd3), états « introuvable » et « Chargement… » (87d9cfd08)
-- [ ] Balisages recopiés en composants : pastille DOAJ, liens d'éditeur et de revue, nom de personne, en-tête triable
 
 ### Phase 7 — Fonctions, libellés et icônes
 
-- [ ] Dates, nombres, pourcentages et pluriels sur `utils.ts` et `plural.ts`
-- [ ] Énumérations chargées une fois ; signalement d'erreur unique
-- [ ] Libellés sur `labels.ts` ; un nom par section
-- [ ] Un mécanisme d'icônes (question 3)
-
-## Questions ouvertes
-
-1. Vues de liste : toutes sur `filterRegistry`, ou un composable de liste qui l'englobe.
-2. Volets : un composant de base (en-tête, renommage, fusion), ou des composables partagés.
-3. Icônes : un composant `Icon` en SVG, ou la police Flaticon partout.
+- [x] Dates, nombres, pourcentages et pluriels sur `utils.ts` et `plural.ts` (f685fa620)
+- [x] Énumérations chargées une fois (99b60b63a) ; signalement d'erreur unique (675770bb5)
+- [x] Libellés sur `labels.ts` et sur les libellés servis par l'API (c774b1998)
+- [x] Un nom par section dans la navigation, l'en-tête de page et le fil d'Ariane (3e6d404c8)
+- [x] Icônes sur Lucide : navigation, `KeyFigures`, `IconButton`, `SectionLabel`, SVG en ligne (49992cb71)
+- [x] Pictogrammes Creative Commons de `LicenseBadge` en SVG ; dépendance Flaticon retirée (ab309395a)
+- [x] Infobulles sur l'action `tooltip` et `TooltipHost` : attributs `title` des éléments, composant `Tooltip`, infobulles des graphiques Chart.js (b7962b529)

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels } from '#lib/labels.js';
@@ -17,8 +18,6 @@
 	import { facetDefs } from '#lib/filterRegistry.js';
 	import { MONOGRAPH_FILTER_GROUPS, monographFilters } from '#lib/monographFilters.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
-	import { withBase } from '#lib/paths.js';
-	import { paramsToQuery } from '#lib/utils.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Monograph = components['schemas']['MonographListItem'];
@@ -71,12 +70,6 @@
 			}),
 	});
 
-	function exportCsvUrl(): string {
-		const params = list.filterParams();
-		params.set('sort', list.sort);
-		return withBase(`/api/monographs/export.csv?${paramsToQuery(params)}`);
-	}
-
 	function setSort(column: 'title' | 'year' | 'publications') {
 		list.setSort(nextSort(list.sort, column, column === 'title' ? 'asc' : 'desc'));
 	}
@@ -84,7 +77,7 @@
 	onMount(list.restore);
 </script>
 
-<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou ISBN" onsearch={list.onSearchInput} list={list.listing} one="monographie" many="monographies" exportUrl={exportCsvUrl()} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou ISBN" onsearch={list.onSearchInput} list={list.listing} one="monographie" many="monographies" exportUrl={list.exportUrl('/api/monographs/export.csv')} countBelow>
 	{#snippet leading()}
 		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
 	{/snippet}
@@ -129,7 +122,7 @@
 						</td>
 					{/if}
 					<!-- Un décompte non nul mène à la fiche, qui liste les publications. -->
-					<td class="num">{#if m.publication_count}<a href={resolve(`monographs/${m.id}`)}>{m.publication_count.toLocaleString('fr-FR')}</a>{:else}0{/if}</td>
+					<td class="num">{#if m.publication_count}<a href={resolve(`monographs/${m.id}`)}>{formatNumber(m.publication_count)}</a>{:else}0{/if}</td>
 				</tr>
 			{/each}
 			{#if list.listing.items.length === 0}

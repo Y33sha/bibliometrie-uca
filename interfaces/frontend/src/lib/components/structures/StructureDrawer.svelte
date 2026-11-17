@@ -1,11 +1,13 @@
 <script lang="ts">
   // Volet d'édition d'une structure, réservé à la session admin : identifiants, tutelles et formes de nom.
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import Drawer from "#lib/components/Drawer.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
+  import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
   import { onMount, onDestroy } from "svelte";
   import { resolve } from "$app/paths";
-  import { api, errorMessage, nameForms, structures as structuresApi } from "#lib/api/index.js";
-  import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
+  import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
+  import { confirmDialog, toast, toastError } from "#lib/dialogs.svelte.js";
   import {
     ROR_FORMAT_ERROR,
     SHORT_FORM_MAX_LENGTH,
@@ -46,7 +48,6 @@
   /* ── State ── */
 
   let allStructuresCache: Structure[] = $state([]);
-  let detail = $state<StructureDetail | null>(null);
 
   // Relation picker state
   let relationPickerOpen = $state(false);
@@ -81,13 +82,38 @@
   let mHal = $state("");
   let mApiIds: Record<string, string> = $state({});
 
-  // Forms data lookup (for context editing)
-  let formsData: Record<number, (number | string)[]> = $state({});
+  /* ── Data loading ── */
 
-  // Related IDs set for picker exclusion
-  let pickerExclude: Set<number> = $state(new Set());
+  async function refreshCache() {
+    allStructuresCache = await api<Structure[]>("/api/structures/all");
+  }
+
+  // Chaque chargement de la structure ferme les sélecteurs et l'aide des formes de nom.
+  const entity = useDrawerEntity({
+    id: () => id,
+    fetch: (id) => api<StructureDetail>("/api/structures/" + id),
+    onload(data) {
+      localStorage.setItem("admin_structure_id", String(data.structure.id));
+      relationPickerOpen = false;
+      ctxPickerOpen = false;
+      formsHelpOpen = false;
+      newFormCtx = [];
+    },
+  });
 
   /* ── Derived ── */
+
+  const detail = $derived(entity.data);
+
+  // Contextes requis par chaque forme de nom, pour l'édition des contextes.
+  const formsData = $derived(
+    Object.fromEntries((detail?.forms ?? []).map((f) => [f.id, f.requires_context_of || []])) as Record<number, (number | string)[]>,
+  );
+
+  // Structures exclues du sélecteur de tutelles : la structure elle-même et ses tutelles.
+  const pickerExclude = $derived(
+    new Set<number>(detail ? [...detail.parents.map((p) => p.id), ...detail.children.map((c) => c.id), detail.structure.id] : []),
+  );
 
   const structLookup = $derived.by(() => {
     const lookup: Record<number, string> = {};
@@ -127,40 +153,6 @@
   const tutelles = $derived(detail ? detail.parents : []);
   const tutellesDe = $derived(detail ? detail.children : []);
 
-  /* ── Data loading ── */
-
-  async function refreshCache() {
-    allStructuresCache = await api<Structure[]>("/api/structures/all");
-  }
-
-  async function loadDetail() {
-    localStorage.setItem("admin_structure_id", String(id));
-    const data = await api<StructureDetail>("/api/structures/" + id);
-    detail = data;
-
-    const fd: Record<number, (number | string)[]> = {};
-    for (const f of data.forms) {
-      fd[f.id] = f.requires_context_of || [];
-    }
-    formsData = fd;
-
-    pickerExclude = new Set<number>([
-      ...data.parents.map((p) => p.id),
-      ...data.children.map((c) => c.id),
-      data.structure.id,
-    ]);
-
-    relationPickerOpen = false;
-    ctxPickerOpen = false;
-    formsHelpOpen = false;
-    newFormCtx = [];
-  }
-
-  // Charge le détail de la structure du volet.
-  $effect(() => {
-    if (!isNaN(id)) loadDetail();
-  });
-
   /* ── Relation picker ── */
 
   function openPicker(direction: string, structId: number) {
@@ -179,14 +171,14 @@
       child_id: childId,
     });
     relationPickerOpen = false;
-    await loadDetail();
+    await entity.reload();
     refreshCache();
     onchange();
   }
 
   async function deleteTutelle(tutelleId: number) {
     await structuresApi.deleteTutelle(tutelleId);
-    await loadDetail();
+    await entity.reload();
     refreshCache();
     onchange();
   }
@@ -198,7 +190,7 @@
   /* ── Forms ── */
 
   async function reloadAfterFormChange() {
-    await loadDetail();
+    await entity.reload();
     onchange();
   }
 
@@ -216,7 +208,7 @@
         requires_context_of: ctx,
       });
     } catch (e) {
-      toast(errorMessage(e), "error");
+      toastError(e);
       return;
     }
     addFormText = "";
@@ -231,7 +223,7 @@
     try {
       await nameForms.remove(formId);
     } catch (e) {
-      toast("Erreur suppression: " + errorMessage(e), "error");
+      toastError(e, "Suppression impossible");
       return;
     }
     await reloadAfterFormChange();
@@ -387,11 +379,11 @@
     try {
       await structuresApi.update(id, data);
       editModalOpen = false;
-      await loadDetail();
+      await entity.reload();
       refreshCache();
       onchange();
     } catch (e) {
-      toast("Erreur: " + errorMessage(e), "error");
+      toastError(e);
     }
   }
 
@@ -441,7 +433,7 @@
     {#if detail}
       {@const s = detail.structure}
       <div class="drawer-head-row">
-        <a class="drawer-name-link" href={resolve(`structures/${s.id}`)} target="_blank" rel="noopener" title="Voir la fiche publique">
+        <a class="drawer-name-link" href={resolve(`structures/${s.id}`)} target="_blank" rel="noopener" use:tooltip={'Voir la fiche publique'}>
           {#if s.acronym}<span class="drawer-acronym">{s.acronym}</span>{/if}
           {s.name}
         </a>

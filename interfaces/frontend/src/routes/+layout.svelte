@@ -1,13 +1,18 @@
 <script lang="ts">
+  import BookOpen from "@lucide/svelte/icons/book-open";
+  import School from "@lucide/svelte/icons/school";
+  import User from "@lucide/svelte/icons/user";
+  import Users from "@lucide/svelte/icons/users";
+  import { sectionLabels } from "#lib/labels.js";
   import "#lib/styles/shared.css";
   import "katex/dist/katex.min.css";
-  import "@flaticon/flaticon-uicons/css/regular/rounded.css";
   import { page } from "$app/state";
   import { goto, afterNavigate } from "$app/navigation";
   import { asset, resolve } from "$app/paths";
   import type { Snippet } from "svelte";
   import { auth } from "#lib/api/index.js";
   import DialogHost from "#lib/components/DialogHost.svelte";
+  import TooltipHost from "#lib/components/TooltipHost.svelte";
   import { loadInstitution, siteTitle } from "#lib/institution.svelte.js";
   import { adminLook, isAdmin, loadSession, loginUrl, session } from "#lib/session.svelte.js";
   import { loadSources } from "#lib/sources.svelte.js";
@@ -104,11 +109,11 @@
 
 {#snippet referentielsLabel()}Référentiels{/snippet}
 {#snippet referentielsItems()}
-  <a href={resolve('theses')} class:active={isActive("/theses")}>Thèses</a>
-  <a href={resolve('publishers')} class:active={isActive("/publishers")}>Éditeurs</a>
-  <a href={resolve('journals')} class:active={isActive("/journals")}>Publications en série</a>
-  <a href={resolve('monographs')} class:active={isActive("/monographs")}>Monographies</a>
-  <a href={resolve('subjects')} class:active={isActive("/subjects")}>Sujets</a>
+  <a href={resolve('theses')} class:active={isActive("/theses")}>{sectionLabels.theses}</a>
+  <a href={resolve('publishers')} class:active={isActive("/publishers")}>{sectionLabels.publishers}</a>
+  <a href={resolve('journals')} class:active={isActive("/journals")}>{sectionLabels.journals}</a>
+  <a href={resolve('monographs')} class:active={isActive("/monographs")}>{sectionLabels.monographs}</a>
+  <a href={resolve('subjects')} class:active={isActive("/subjects")}>{sectionLabels.subjects}</a>
 {/snippet}
 {#snippet halProblemsLabel()}Problèmes HAL{/snippet}
 {#snippet halProblemsItems()}
@@ -119,13 +124,13 @@
 {/snippet}
 {#snippet adminLabel()}Administration{/snippet}
 {#snippet adminItems()}
-  <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>Configuration</a>
-  <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>Pipeline</a>
+  <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>{sectionLabels['admin/config']}</a>
+  <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>{sectionLabels['admin/pipeline']}</a>
   <span class="nav-dropdown-group">Adresses</span>
-  <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>
-  <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>Pays</a>
+  <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>{sectionLabels['admin/addresses']}</a>
+  <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>{sectionLabels['admin/countries']}</a>
 {/snippet}
-{#snippet accountLabel()}<i class="fi fi-rr-user nav-icon" aria-hidden="true"></i>{session.login}{/snippet}
+{#snippet accountLabel()}<User class="nav-icon" size="1em" />{session.login}{/snippet}
 {#snippet accountItems()}
   <button class="nav-dropdown-action" onclick={logout}>Déconnexion</button>
 {/snippet}
@@ -138,9 +143,9 @@
     <span class="site-title">{siteTitle()}</span>
   </a>
   <nav id="site-nav" class="site-nav" class:open={mobileNavOpen} aria-label="Navigation principale">
-    <a href={resolve('publications')} class="nav-link" class:active={isActive("/publications")}><i class="fi fi-rr-book-open-cover nav-icon" aria-hidden="true"></i>Publications</a>
-    <a href={resolve('structures')} class="nav-link" class:active={isActive("/structures")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>Labos</a>
-    <a href={resolve('persons')} class="nav-link" class:active={isActive("/persons")}><i class="fi fi-rr-users nav-icon" aria-hidden="true"></i>Chercheurs</a>
+    <a href={resolve('publications')} class="nav-link" class:active={isActive("/publications")}><BookOpen class="nav-icon" size="1em" />{sectionLabels.publications}</a>
+    <a href={resolve('structures')} class="nav-link" class:active={isActive("/structures")}><School class="nav-icon" size="1em" />{sectionLabels.structures}</a>
+    <a href={resolve('persons')} class="nav-link" class:active={isActive("/persons")}><Users class="nav-icon" size="1em" />{sectionLabels.persons}</a>
     {@render dropdown("referentiels", referentielsLabel, referentielsItems, { active: isPublicReferentiels })}
     {@render dropdown("hal-problems", halProblemsLabel, halProblemsItems, { active: isHalProblems, right: true })}
     {#if isAdmin()}
@@ -165,6 +170,7 @@
 </main>
 
 <DialogHost />
+<TooltipHost />
 
 <style>
   /* Logo et nom du site : lien vers l'accueil, sans soulignement. */
@@ -256,7 +262,7 @@
     color: var(--nav-fg);
     background: var(--nav-hover);
   }
-  .nav-icon {
+  .site-nav :global(.nav-icon) {
     display: inline-flex;
     margin-right: 7px;
     font-size: var(--fs-sm);
@@ -378,7 +384,7 @@
 
   /* ── Largeur intermédiaire : rubriques sans icône, plus serrées, pour tenir sur une ligne ── */
   @media (max-width: 1100px) {
-    .nav-icon {
+    .site-nav :global(.nav-icon) {
       display: none;
     }
     .nav-link {

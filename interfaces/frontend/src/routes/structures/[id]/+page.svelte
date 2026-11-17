@@ -1,4 +1,8 @@
 <script lang="ts">
+	import GraduationCap from '@lucide/svelte/icons/graduation-cap';
+	import User from '@lucide/svelte/icons/user';
+	import { sectionLabels } from '#lib/labels.js';
+	import { formatNumber } from '#lib/utils.js';
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { page } from '$app/state';
@@ -132,7 +136,7 @@
 </script>
 
 <EntityBreadcrumb
-	section={{ label: 'Labos', path: 'structures' }}
+	section={{ label: sectionLabels.structures, path: 'structures' }}
 	name={lab?.acronym || lab?.name}
 	title={lab ? structureLabel(lab) : null}
 	fallback="Structure"
@@ -177,14 +181,14 @@
 								...(ongoingThesesCount > 0
 									? [
 											{
-												value: ongoingThesesCount.toLocaleString('fr-FR'),
+												value: formatNumber(ongoingThesesCount),
 												label: plural(ongoingThesesCount, 'thèse en cours', 'thèses en cours'),
-												icon: 'graduation-cap',
+												icon: GraduationCap,
 											},
 										]
 									: []),
 								...(personsCount > 0
-									? [{ value: personsCount.toLocaleString('fr-FR'), label: plural(personsCount, 'personne'), icon: 'user' }]
+									? [{ value: formatNumber(personsCount), label: plural(personsCount, 'personne'), icon: User }]
 									: []),
 							]
 						: []}

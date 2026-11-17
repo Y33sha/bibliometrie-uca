@@ -21,10 +21,23 @@ _SAVED = """jsonb_to_recordset(:payload) AS t(
     publication_date date, publication_date_precision date_precision, doi text,
     oa_status oa_type, license license_type, deposit_license license_type, best_copy_url text,
     serial_id integer, monograph_id integer, publisher_id integer, container_title text,
-    language text, is_retracted boolean, countries text[], source_extras jsonb, impact jsonb,
+    language text, countries text[], source_extras jsonb, impact jsonb,
     corrections jsonb, abstract text, keywords text[], biblio jsonb
 )"""
 """Colonnes du lot écrit par `save` (`_save_payload`), lues par `jsonb_to_recordset`."""
+
+_MARK_CHANGED_DOIS_SQL = text(
+    enqueue_sql(
+        Queue.CONTRIBUTION_ATTRIBUTES,
+        f"""
+        SELECT c.id FROM {_SAVED}
+        JOIN publications p ON p.id = t.id
+        JOIN contributions c ON c.publication_id = p.id
+        WHERE p.doi IS DISTINCT FROM t.doi
+        """,
+    )
+).bindparams(bindparam("payload", type_=Jsonb))
+"""Marque pour la recomposition de leurs attributs les contributions des publications dont le DOI change : le DOI désigne l'enregistrement OpenAlex éditeur (`propagate_contribution_attributes_sql`)."""
 
 _RELEASE_CHANGED_DOIS_SQL = text(f"""
     UPDATE publications p SET doi = NULL, updated_at = now()
@@ -52,7 +65,7 @@ _SAVE_CHANGED_SQL = text(f"""
         deposit_license = c.deposit_license, best_copy_url = c.best_copy_url,
         serial_id = c.serial_id, monograph_id = c.monograph_id, publisher_id = c.publisher_id,
         container_title = c.container_title, language = c.language,
-        is_retracted = c.is_retracted, countries = c.countries,
+        countries = c.countries,
         source_extras = c.source_extras, impact = c.impact, corrections = c.corrections,
         sources = c.sources, updated_at = now()
     FROM computed c
@@ -60,13 +73,13 @@ _SAVE_CHANGED_SQL = text(f"""
       AND (p.title, p.title_normalized, p.doc_type, p.publication_date,
            p.publication_date_precision, p.doi, p.oa_status, p.license, p.deposit_license,
            p.best_copy_url, p.serial_id, p.monograph_id, p.publisher_id, p.container_title,
-           p.language, p.is_retracted, p.countries, p.source_extras, p.impact, p.corrections,
+           p.language, p.countries, p.source_extras, p.impact, p.corrections,
            p.sources)
           IS DISTINCT FROM
           (c.title, c.title_normalized, c.doc_type, c.kept_date,
            c.kept_precision, c.doi, c.oa_status, c.license, c.deposit_license,
            c.best_copy_url, c.serial_id, c.monograph_id, c.publisher_id, c.container_title,
-           c.language, c.is_retracted, c.countries, c.source_extras, c.impact, c.corrections,
+           c.language, c.countries, c.source_extras, c.impact, c.corrections,
            c.sources)
 """).bindparams(bindparam("payload", type_=Jsonb))
 
@@ -124,7 +137,7 @@ class PublicationStore:
                        CAST(p.license AS text) AS license,
                        CAST(p.deposit_license AS text) AS deposit_license,
                        p.best_copy_url, p.serial_id, p.monograph_id, p.publisher_id, p.container_title, p.language,
-                       d.abstract, p.is_retracted, p.countries, d.keywords,
+                       d.abstract, p.countries, d.keywords,
                        d.biblio, p.source_extras, p.impact, p.corrections
                 FROM publications p
                 LEFT JOIN publications_detail d ON d.publication_id = p.id
@@ -137,7 +150,7 @@ class PublicationStore:
     def save(self, publications: Sequence[Publication]) -> None:
         """Enregistre les champs modifiables de publications déjà insérées, et recalcule `sources` depuis leurs enregistrements sources.
 
-        Seules les lignes dont une valeur change sont réécrites, avec leur date de mise à jour. Une date de publication absente garde la date en base. Toutes les publications reçues repassent à ingérer par la phase subjects (`subjects_ingested_at` vidé) : leurs enregistrements sources ont pu changer de sujets.
+        Seules les lignes dont une valeur change sont réécrites, avec leur date de mise à jour. Une date de publication absente garde la date en base. Toutes les publications reçues repassent à ingérer par la phase subjects (`subjects_ingested_at` vidé) : leurs enregistrements sources ont pu changer de sujets. Les contributions d'une publication dont le DOI change sont marquées pour la recomposition de leurs attributs.
         """
         if not publications:
             return
@@ -145,6 +158,7 @@ class PublicationStore:
             raise ValueError("save : chaque publication doit avoir un id (create pour insérer)")
         payload = [_save_payload(p) for p in publications]
         params = {"payload": payload}
+        self._conn.execute(_MARK_CHANGED_DOIS_SQL, params)
         # Un index unique couvre le DOI, contrôlé ligne à ligne : un DOI qui passe d'une publication du lot à une autre est d'abord retiré de la première.
         self._conn.execute(_RELEASE_CHANGED_DOIS_SQL, params)
         self._conn.execute(_SAVE_CHANGED_SQL, params)
@@ -255,7 +269,6 @@ def _publication_from_row(m: RowMapping) -> Publication:
         container_title=m["container_title"],
         language=m["language"],
         abstract=m["abstract"],
-        is_retracted=m["is_retracted"],
         countries=tuple(m["countries"]) if m["countries"] else (),
         keywords=tuple(m["keywords"]) if m["keywords"] else (),
         biblio=m["biblio"],
@@ -285,7 +298,6 @@ def _save_payload(publication: Publication) -> dict[str, JsonValue]:
         "publisher_id": publication.publisher_id,
         "container_title": publication.container_title,
         "language": publication.language,
-        "is_retracted": publication.is_retracted,
         "countries": list(publication.countries) if publication.countries else None,
         "source_extras": publication.source_extras,
         "impact": publication.impact,

@@ -1,4 +1,9 @@
 <script lang="ts">
+	import BookOpen from '@lucide/svelte/icons/book-open';
+	import Globe from '@lucide/svelte/icons/globe';
+	import GraduationCap from '@lucide/svelte/icons/graduation-cap';
+	import LockOpen from '@lucide/svelte/icons/lock-open';
+	import Star from '@lucide/svelte/icons/star';
 	import type { Snippet } from 'svelte';
 	import { api } from '#lib/api/index.js';
 	import type { components } from '#lib/api/schema.js';
@@ -13,7 +18,7 @@
 	import { orderedPivotValues, pivotValueColor, pivotValueDescription, pivotValueLabel } from '#lib/pivotValues.js';
 	import { contextParams, type PublicationListContext } from '#lib/publicationListContext.js';
 	import { plural } from '#lib/plural.js';
-	import { paramsToQuery } from '#lib/utils.js';
+	import { formatNumber, formatPercent, paramsToQuery } from '#lib/utils.js';
 
 	type PivotResponse = components['schemas']['PivotResponse'];
 	type CollaborationsResponse = components['schemas']['CollaborationsResponse'];
@@ -125,7 +130,7 @@
 	});
 
 	const sum = (rows: Row[]) => rows.reduce((total, r) => total + Number(r.value ?? 0), 0);
-	const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)} %`;
+	const percent = (part: number, whole: number) => formatPercent(part / whole);
 
 	const total = $derived(sum(byYear));
 	const openAccess = $derived(sum(byYear.filter((r) => r.oa_access === 'ouvert')));
@@ -137,17 +142,17 @@
 	const withCitationClass = $derived(sum(citationClasses));
 
 	const keyFigures = $derived<KeyFigure[]>([
-		{ value: total.toLocaleString('fr-FR'), label: plural(total, 'publication'), icon: 'book-open-cover' },
+		{ value: formatNumber(total), label: plural(total, 'publication'), icon: BookOpen },
 		...(total > 0
-			? [{ value: percent(openAccess, total), label: 'en open access', tone: 'open' as const, icon: 'unlock' }]
+			? [{ value: percent(openAccess, total), label: 'en open access', tone: 'open' as const, icon: LockOpen }]
 			: []),
 		...(withCitationClass > 0
 			? [
 					{
 						value: percent(topCited, withCitationClass),
 						label: 'dans le top 10 % des plus citées',
-						icon: 'star',
-						tooltip: `D'après OpenAlex, sur les ${withCitationClass.toLocaleString('fr-FR')} publications pourvues de l'indicateur (${percent(withCitationClass, total)} du corpus)`,
+						icon: Star,
+						tooltip: `D'après OpenAlex, sur les ${formatNumber(withCitationClass)} publications pourvues de l'indicateur (${percent(withCitationClass, total)} du corpus)`,
 					},
 				]
 			: []),
@@ -156,12 +161,12 @@
 					{
 						value: percent(collab.international_count, collab.total_count),
 						label: 'en collaboration internationale',
-						icon: 'globe',
+						icon: Globe,
 					},
 				]
 			: []),
 		...(thesesFigure && theses > 0
-			? [{ value: theses.toLocaleString('fr-FR'), label: plural(theses, 'thèse'), icon: 'graduation-cap' }]
+			? [{ value: formatNumber(theses), label: plural(theses, 'thèse'), icon: GraduationCap }]
 			: []),
 		...figures,
 	]);

@@ -16,14 +16,14 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, text
 
 from domain.types import JsonValue, as_sequence
-from pipeline.graph import Task
+from pipeline.graph import Block, Phase, Task
 from pipeline.ingestion.common.lookup import LookupChannel, by_native_id, look_up
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.ingestion.openalex.api import fetch_work
 from pipeline.ingestion.openalex.fields import extract_openalex_id
 from pipeline.ingestion.openalex.payload import BULK_AUTHORSHIPS_CAP
 from pipeline.runtime.context import PhaseContext
-from pipeline.runtime.observability.log_format import inflect, quantity, step
+from pipeline.runtime.observability.log_format import inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 """Plafond OpenAlex 10 req/s."""
@@ -61,14 +61,7 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
     truncated = list(conn.execute(_SELECT_TRUNCATED_SQL).scalars())
     if not truncated:
         return PhaseMetrics()
-    step(
-        log,
-        "%s de %d auteurs, potentiellement %s",
-        quantity(len(truncated), "document"),
-        BULK_AUTHORSHIPS_CAP,
-        inflect(len(truncated), "tronqué"),
-    )
-    return await look_up(
+    metrics = await look_up(
         conn,
         log,
         LookupChannel(
@@ -82,9 +75,14 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
         ),
         truncated,
     )
+    metrics.report = (
+        f"{quantity(len(truncated), 'document')} de {BULK_AUTHORSHIPS_CAP} auteurs,"
+        f" potentiellement {inflect(len(truncated), 'tronqué')} : {metrics.as_summary()}"
+    )
+    return metrics
 
 
-TASKS = (
+_CHILDREN = (
     Task(
         "refetch_openalex",
         reads=("staging",),
@@ -92,8 +90,17 @@ TASKS = (
         previous_run=("staging",),
         network="openalex",
         run=_refetch,
-        label="Bilan",
+        section="Listes d'auteurs tronquées",
+        silent_when_empty=True,
         # La tâche tourne dans tous les modes, si le run interroge OpenAlex.
         when=lambda ctx: "openalex" in ctx.options.queried_sources,
     ),
+)
+
+
+PHASE = Phase(
+    "fetch_truncated",
+    "Complétion des listes d'auteurs OpenAlex tronquées",
+    _CHILDREN,
+    Block.HARVESTING,
 )

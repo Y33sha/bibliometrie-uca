@@ -159,7 +159,7 @@ services:
       db:
         condition: service_healthy
 
-  # ---- Pipeline (collecte et traitement) ----
+  # ---- Pipeline (moissonnage et traitement) ----
   #
   # Même image que l'application, environnement distinct. Lui seul porte le mot de passe du
   # propriétaire du schéma — il modifie la structure, rafraîchit les vues matérialisées et vide

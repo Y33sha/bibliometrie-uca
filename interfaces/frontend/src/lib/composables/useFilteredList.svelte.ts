@@ -7,6 +7,8 @@ import { page as appPage } from '$app/state';
 import { useFilterPanel } from '#lib/composables/useFilterPanel.svelte.js';
 import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 import { useUrlFilters, type FilterDef as UrlFilterDef } from '#lib/composables/useUrlFilters.svelte.js';
+import { withBase } from '#lib/paths.js';
+import { paramsToQuery } from '#lib/utils.js';
 import {
 	activeCount,
 	appendFilterParams,
@@ -105,9 +107,14 @@ export function useFilteredList<T, F extends Facets>(config: {
 	function onFilterChange() {
 		listing.page = 1;
 		syncUrl();
+		reload();
+		config.onchange?.();
+	}
+
+	/** Après une modification des données : liste et décomptes rechargés, page courante conservée. */
+	function reload() {
 		listing.load();
 		facets.load();
-		config.onchange?.();
 	}
 
 	/** Change le tri : première page, URL et liste rechargée ; les décomptes ne dépendent pas du tri. */
@@ -116,6 +123,14 @@ export function useFilteredList<T, F extends Facets>(config: {
 		listing.page = 1;
 		syncUrl();
 		listing.load();
+	}
+
+	/** URL de l'export CSV de la liste filtrée et triée. `columns` restreint le fichier aux colonnes affichées. */
+	function exportUrl(path: string, columns?: string[]): string {
+		const params = filterParams();
+		params.set('sort', sort);
+		if (columns) params.set('columns', columns.join(','));
+		return withBase(`${path}?${paramsToQuery(params)}`);
 	}
 
 	/** Change de page. */
@@ -164,10 +179,12 @@ export function useFilteredList<T, F extends Facets>(config: {
 		filterParams,
 		syncUrl,
 		onFilterChange,
+		reload,
 		/** Recherche saisie : `onFilterChange` après une pause de frappe. */
 		onSearchInput: url.debouncedSearch(onFilterChange),
 		setSort,
 		goToPage,
+		exportUrl,
 		restore,
 	};
 }

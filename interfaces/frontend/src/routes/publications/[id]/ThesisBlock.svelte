@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatDate } from "#lib/utils.js";
   import { resolve } from "$app/paths";
   import { CONTRIBUTION_ROLE_ORDER, contributionRoleLabels } from "#lib/labels.js";
   import DetailTable from "./DetailTable.svelte";
@@ -47,17 +48,13 @@
       <dd>
         {#if thesisMeta?.date_inscription}
           <span
-            >Inscription en doctorat le {new Date(
-              thesisMeta.date_inscription,
-            ).toLocaleDateString("fr-FR")}</span
+            >Inscription en doctorat le {formatDate(thesisMeta.date_inscription)}</span
           >
         {/if}
         {#if thesisMeta?.date_inscription && thesisMeta?.date_soutenance}<br />{/if}
         {#if thesisMeta?.date_soutenance}
           <span
-            >Soutenance le {new Date(thesisMeta.date_soutenance).toLocaleDateString(
-              "fr-FR",
-            )}</span
+            >Soutenance le {formatDate(thesisMeta.date_soutenance)}</span
           >
         {/if}
       </dd>

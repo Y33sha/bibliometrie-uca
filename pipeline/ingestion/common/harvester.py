@@ -1,13 +1,13 @@
 """Socle des moissonneurs : patron commun et écriture d'un document dans `staging`.
 
-Le patron gère l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur source indisponible. Chaque source hérite de `SourceHarvester` et implémente `run()`. La pagination reste propre à chaque source.
+Le patron gère l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur source indisponible. Chaque source hérite de `SourceHarvester` et implémente `run()`.
 """
 
 from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import ClassVar, Protocol
 
@@ -29,10 +29,12 @@ from pipeline.runtime.observability.log_format import (
     quantity,
     source_branch,
 )
-from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
-from pipeline.runtime.observability.signals import signal_source_unconfigured
+from pipeline.runtime.observability.signals import (
+    signal_harvest_error,
+    signal_source_unconfigured,
+)
 
 __all__ = [
     "HarvestConfigError",
@@ -42,6 +44,9 @@ __all__ = [
     "SourceHarvester",
     "run_harvest",
     "stage_document",
+    "stage_pages",
+    "stage_records",
+    "year_range",
 ]
 
 
@@ -65,6 +70,13 @@ _SUMMARY_FORMS: dict[bool, tuple[Forms, Forms, Forms, Forms]] = {
 """Mots du bilan d'une source, au masculin puis au féminin."""
 
 
+def year_range(years: list[int]) -> str:
+    """Renvoie le libellé d'une liste d'années triée : « 2020-2025 », l'année seule, ou une chaîne vide."""
+    if len(years) > 1:
+        return f"{years[0]}-{years[-1]}"
+    return str(years[0]) if years else ""
+
+
 def stage_document(
     conn: Connection,
     metrics: PhaseMetrics,
@@ -81,20 +93,25 @@ def stage_document(
     return True
 
 
-def stage_page(
+def stage_records(
     conn: Connection,
     metrics: PhaseMetrics,
     source: str,
-    page: Page,
+    records: Iterable[Mapping[str, JsonValue]],
     *,
     keep: Callable[[Mapping[str, JsonValue]], bool] | None = None,
     entry_mode: StagingEntryMode = StagingEntryMode.BULK,
 ) -> None:
-    """Écrit dans `staging` les documents d'une page, puis commite. `keep` écarte des documents."""
-    for record in page.records:
+    """Écrit des documents dans `staging`, puis commite. `keep` écarte des documents.
+
+    Les écritures entrent dans `metrics` après le commit : une erreur en cours de lot laisse `metrics` intact, et l'appelant annule les écritures du lot.
+    """
+    written = PhaseMetrics()
+    for record in records:
         if keep is None or keep(record):
-            stage_document(conn, metrics, source=source, record=record, entry_mode=entry_mode)
+            stage_document(conn, written, source=source, record=record, entry_mode=entry_mode)
     conn.commit()
+    metrics.merge(written)
 
 
 def stage_pages(
@@ -115,7 +132,7 @@ def stage_pages(
     token: str | None = None
     while True:
         page = fetch_page(token)
-        stage_page(conn, metrics, source, page, keep=keep, entry_mode=entry_mode)
+        stage_records(conn, metrics, source, page.records, keep=keep, entry_mode=entry_mode)
         received += len(page.records)
         if progress is not None:
             progress.advance(len(page.records))
@@ -183,7 +200,7 @@ class SourceHarvester[ClientT](ABC):
 
         `count_year` donne le volume d'une année : la barre connaît son total dès le départ. `harvest_step` compte ses écritures dans les métriques reçues. Une coupure laisse sur la barre l'année interrompue, et les précédentes sont terminées.
 
-        Une erreur sur une année est journalisée, la page en cours est annulée, et la boucle passe à l'année suivante. Une source indisponible (`SourceUnavailableError`) arrête la boucle et coupe la source : les années restantes repartent au prochain run. Les métriques des pages écrites sont gardées.
+        Une erreur sur une année annule la page en cours et émet un signal `harvest_error`, puis la boucle passe à l'année suivante. Une source indisponible (`SourceUnavailableError`) arrête la boucle et coupe la source : les années restantes repartent au prochain run. Les métriques des pages écrites sont gardées.
         """
         metrics = PhaseMetrics()
         if not years:
@@ -199,12 +216,16 @@ class SourceHarvester[ClientT](ABC):
                     break
                 except Exception as e:
                     self.conn.rollback()
-                    scoped_logger(self.logger, self.SOURCE, str(year)).error(
-                        "erreur : %s — passage à l'année suivante", e
+                    signal_harvest_error(
+                        metrics,
+                        self.SOURCE,
+                        str(year),
+                        e,
+                        next_step="passage à l'année suivante",
+                        logger=self.logger,
                     )
             else:
-                year_range = f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])
-                progress.relabel(self._label(year_range))
+                progress.relabel(self._label(year_range(years)))
         self._write_summary(metrics)
         return metrics
 
@@ -223,10 +244,11 @@ class SourceHarvester[ClientT](ABC):
         total: int,
         harvest_step: Callable[[Progress], PhaseMetrics],
         *,
+        scope: str | None = None,
         by: str | None = None,
     ) -> PhaseMetrics:
-        """Moissonne un périmètre d'un seul tenant sous la barre de la source, puis écrit le bilan."""
-        with track_progress(total, self._label(), self.logger) as progress:
+        """Moissonne un périmètre d'un seul tenant sous la barre de la source, puis écrit le bilan. `scope` remplit la colonne du périmètre."""
+        with track_progress(total, self._label(scope), self.logger) as progress:
             metrics = harvest_step(progress)
         self._write_summary(metrics, by=by)
         return metrics

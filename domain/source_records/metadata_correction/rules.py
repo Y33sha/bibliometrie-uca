@@ -15,6 +15,7 @@ from domain.platforms.registry import preprint_servers_of_doi
 from domain.publishers.publisher import PublisherType
 from domain.serials.serial import SerialType
 from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierType
+from domain.source_records.notices import notice_doc_type, wos_corrected_article
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +45,8 @@ class MetadataForCorrection:
     source: str | None = None
     author_count: int | None = None
     """`source_records.author_count` : contributions sources d'auteur non collectives."""
+    crossref_update_types: list[str] | None = None
+    """Types des mises à jour déclarées par l'enregistrement source vers une autre œuvre (Crossref `update-to`)."""
 
     @classmethod
     def for_publication(
@@ -97,6 +100,11 @@ class MetadataCorrectionRule(StrEnum):
     TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET = "TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET"
     TITLE_ERRATUM_PREFIX_TO_ERRATUM = "TITLE_ERRATUM_PREFIX_TO_ERRATUM"
     TITLE_RETRACTION_PREFIX_TO_RETRACTION = "TITLE_RETRACTION_PREFIX_TO_RETRACTION"
+    CROSSREF_RETRACTION_UPDATE_TO_RETRACTION = "CROSSREF_RETRACTION_UPDATE_TO_RETRACTION"
+    CROSSREF_CORRECTION_UPDATE_TO_ERRATUM = "CROSSREF_CORRECTION_UPDATE_TO_ERRATUM"
+    WOS_REFERENCE_TITLE_TO_ERRATUM = "WOS_REFERENCE_TITLE_TO_ERRATUM"
+    RETRACTED_TITLE_TO_ARTICLE = "RETRACTED_TITLE_TO_ARTICLE"
+    NOTICE_DOI_TO_NOTICE_TYPE = "NOTICE_DOI_TO_NOTICE_TYPE"
     TITLE_EDITORIAL_PREFIX_TO_EDITORIAL = "TITLE_EDITORIAL_PREFIX_TO_EDITORIAL"
     TITLE_LETTER_PREFIX_TO_LETTER = "TITLE_LETTER_PREFIX_TO_LETTER"
     TITLE_SYSTEMATIC_REVIEW_TO_REVIEW = "TITLE_SYSTEMATIC_REVIEW_TO_REVIEW"
@@ -143,8 +151,30 @@ _ERRATUM_TITLE_PREFIXES = (
 )
 """Débuts de titre normalisé d'un erratum."""
 
+_ERRATUM_TITLE_PATTERN = re.compile(
+    r"^\s*(?:withdrawn\s*:\s*)?(?:"
+    r"(?:(?:author|publisher)\s+)?(?:corrections?|erratum|errata|corrigendum|addendum)\s*(?:(?:to|for|of)\s*)?[:“\"‘'«]"
+    r"|corrections?\s+for\s+[^,:]+\bet\s+al\b"
+    r"|publisher['’]s\s+note\s*:"
+    r"|corrections?\s*$"
+    r"|department\s+of\s+error\b"
+    r")",
+    re.IGNORECASE,
+)
+"""Titre brut d'un erratum, avec ou sans « WITHDRAWN: » devant : « Correction: … », « Publisher Erratum: … », « Correction(s) to “… », « Correction for X et al. », « Publisher's note: … », « Correction » seul, « Department of Error » (The Lancet). Un deux-points ou un guillemet suit le mot : « Correction of hallux valgus » est un article."""
+
 _RETRACTION_TITLE_PREFIXES = ("retraction notice", "retraction note")
 """Débuts de titre normalisé d'un avis de rétractation. « Retraction of consent in clinical trials » est un article."""
+
+_RETRACTION_TITLE_PATTERN = re.compile(
+    r"^\s*retraction(?:\s+(?:notice|note))?(?:\s+(?:to|of|for))?\s*[:“\"‘'«]", re.IGNORECASE
+)
+"""Titre brut d'un avis de rétractation : « RETRACTION: … » (WoS), « Retraction Note to: … »."""
+
+_RETRACTED_TITLE_PATTERN = re.compile(
+    r"^\s*(?:retracted(?:\s+article)?|withdrawn)\s*:", re.IGNORECASE
+)
+"""Titre brut d'un article rétracté ou retiré sur place : « RETRACTED: … », « WITHDRAWN: … »."""
 
 _EDITORIAL_PREFIX_PATTERN = re.compile(r"^\s*editorial\s*:", re.IGNORECASE)
 """« Editorial: <titre> » (Frontiers). Le deux-points écarte « Editorial Board » ; `normalize_text` l'efface, d'où un motif sur le titre brut."""
@@ -224,6 +254,20 @@ class _Rule(NamedTuple):
 
 _ARTICLE_OR_OTHER = frozenset({DocType.ARTICLE, DocType.OTHER})
 """Types qu'une règle de titre peut corriger."""
+
+_NOTICE_CANDIDATE_TYPES = frozenset(
+    {
+        DocType.ARTICLE,
+        DocType.PREPRINT,
+        DocType.REVIEW,
+        DocType.CONFERENCE_PAPER,
+        DocType.DATA_PAPER,
+        DocType.LETTER,
+        DocType.BOOK_CHAPTER,
+        DocType.OTHER,
+    }
+)
+"""Types qu'une règle d'erratum ou d'avis de rétractation peut corriger."""
 
 
 _RULES: dict[MetadataCorrectionRule, _Rule] = {
@@ -350,27 +394,47 @@ _RULES: dict[MetadataCorrectionRule, _Rule] = {
         lambda f: _title_starts_with(f, _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES),
         DocType.DATASET,
     ),
-    # Titre d'erratum ⇒ `erratum`. OpenAlex type souvent les errata `article`, `preprint` ou `data_paper`.
+    # Titre d'erratum ⇒ `erratum`. OpenAlex type souvent les errata `article`, `preprint` ou `data_paper`, Crossref et ScanR `article`, Springer `book_chapter` la correction d'un chapitre.
     MetadataCorrectionRule.TITLE_ERRATUM_PREFIX_TO_ERRATUM: _Rule(
-        frozenset(
-            {
-                DocType.ARTICLE,
-                DocType.PREPRINT,
-                DocType.REVIEW,
-                DocType.CONFERENCE_PAPER,
-                DocType.DATA_PAPER,
-                DocType.LETTER,
-                DocType.OTHER,
-            }
+        _NOTICE_CANDIDATE_TYPES,
+        lambda f: (
+            _title_starts_with(f, _ERRATUM_TITLE_PREFIXES)
+            or _title_matches(f, _ERRATUM_TITLE_PATTERN)
         ),
-        lambda f: _title_starts_with(f, _ERRATUM_TITLE_PREFIXES),
         DocType.ERRATUM,
     ),
     # Titre d'avis de rétractation + doc_type ∈ {article, other} ⇒ `retraction`.
     MetadataCorrectionRule.TITLE_RETRACTION_PREFIX_TO_RETRACTION: _Rule(
         _ARTICLE_OR_OTHER,
-        lambda f: _title_starts_with(f, _RETRACTION_TITLE_PREFIXES),
+        lambda f: (
+            _title_starts_with(f, _RETRACTION_TITLE_PREFIXES)
+            or _title_matches(f, _RETRACTION_TITLE_PATTERN)
+        ),
         DocType.RETRACTION,
+    ),
+    # Rétractation déclarée à Crossref vers une autre œuvre ⇒ `retraction`. Crossref type les avis `journal-article`.
+    MetadataCorrectionRule.CROSSREF_RETRACTION_UPDATE_TO_RETRACTION: _Rule(
+        _NOTICE_CANDIDATE_TYPES,
+        lambda f: notice_doc_type(f.crossref_update_types or ()) == DocType.RETRACTION,
+        DocType.RETRACTION,
+    ),
+    # Correction déclarée à Crossref vers une autre œuvre ⇒ `erratum`. Évaluée après la règle de titre des avis de rétractation : Elsevier déclare ses avis de rétractation comme des errata.
+    MetadataCorrectionRule.CROSSREF_CORRECTION_UPDATE_TO_ERRATUM: _Rule(
+        _NOTICE_CANDIDATE_TYPES,
+        lambda f: notice_doc_type(f.crossref_update_types or ()) == DocType.ERRATUM,
+        DocType.ERRATUM,
+    ),
+    # Titre WoS terminé par la référence de l'article corrigé + doc_type `other` ⇒ `erratum`. WoS type `other` une partie de ses corrections.
+    MetadataCorrectionRule.WOS_REFERENCE_TITLE_TO_ERRATUM: _Rule(
+        frozenset({DocType.OTHER}),
+        lambda f: f.source == "wos" and wos_corrected_article(f.title) is not None,
+        DocType.ERRATUM,
+    ),
+    # Titre « RETRACTED: » ou « WITHDRAWN: » + doc_type `retraction` ⇒ `article`. OpenAlex type `retraction` l'article rétracté sur place.
+    MetadataCorrectionRule.RETRACTED_TITLE_TO_ARTICLE: _Rule(
+        frozenset({DocType.RETRACTION}),
+        lambda f: _title_matches(f, _RETRACTED_TITLE_PATTERN),
+        DocType.ARTICLE,
     ),
     # Titre « Editorial: … » + doc_type ∈ {article, other, journal_issue} ⇒ `editorial`. Les sources typent souvent ces éditoriaux `article`. HAL type parfois `ISSUE` l'éditorial d'un numéro thématique.
     MetadataCorrectionRule.TITLE_EDITORIAL_PREFIX_TO_EDITORIAL: _Rule(
@@ -458,3 +522,28 @@ def origin_doc_type_correction(
     if origin_doc_type is None or origin_doc_type == doc_type:
         return None
     return Correction(origin_doc_type, MetadataCorrectionRule.SCANR_FROM_HAL_TO_HAL_TYPE)
+
+
+class NoticeOfDoi(NamedTuple):
+    """Erratum ou avis de rétractation Crossref d'un DOI : son type corrigé et son titre normalisé."""
+
+    doc_type: str
+    title_normalized: str | None
+
+
+def notice_doi_correction(
+    doc_type: str | None, facts: MetadataForCorrection, notice: NoticeOfDoi | None
+) -> Correction | None:
+    """Renvoie la correction de type d'un enregistrement source au DOI d'un avis Crossref : il prend le type de l'avis s'il en est une copie, de même titre, ou s'il vient de WoS. WoS indexe l'avis sous son DOI, avec le titre de l'article corrigé.
+
+    Un autre enregistrement source, d'un autre titre, est l'article corrigé : il garde son type.
+
+    Args:
+        doc_type: type de l'enregistrement source après les autres règles.
+        notice: avis Crossref de l'un des DOI propres de l'enregistrement source.
+    """
+    if notice is None or facts.source == "crossref" or doc_type not in _NOTICE_CANDIDATE_TYPES:
+        return None
+    if facts.source == "wos" or facts.title_normalized == notice.title_normalized:
+        return Correction(notice.doc_type, MetadataCorrectionRule.NOTICE_DOI_TO_NOTICE_TYPE)
+    return None

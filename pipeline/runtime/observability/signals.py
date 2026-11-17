@@ -5,6 +5,7 @@ from collections.abc import Callable, Mapping
 
 from domain.pipeline_runs import PhaseStatus
 from domain.sources.registry import LOOKUP_SOURCES, source_label
+from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
@@ -51,6 +52,51 @@ def signal_source_unavailable(
     logger.warning("%s", message)
     metrics.signals.append(
         {"level": PhaseStatus.WARNING, "code": "source_unavailable", "message": message}
+    )
+
+
+def signal_harvest_error(
+    metrics: PhaseMetrics,
+    source: str,
+    scope: str,
+    error: Exception,
+    *,
+    next_step: str,
+    logger: logging.Logger,
+) -> None:
+    """Marque l'échec d'une partie d'un moissonnage, comme une année ou un lot de personnes, et le compte en erreur.
+
+    Le moissonnage passe à la partie suivante. La phase se termine en avertissement : le moissonnage quotidien suivant repart de la même date.
+
+    Args:
+        scope: partie en échec, au journal et dans le signal.
+        next_step: suite du moissonnage, au journal : « passage à l'année suivante ».
+    """
+    scoped_logger(logger, source, scope).error("erreur : %s — %s", error, next_step)
+    metrics.add(errors=1)
+    metrics.signals.append(
+        {
+            "level": PhaseStatus.WARNING,
+            "code": "harvest_error",
+            "message": f"{source_label(source)} {scope} : {error}",
+        }
+    )
+
+
+def signal_harvest_incomplete(
+    metrics: PhaseMetrics, source: str, scope: str, *, received: int, announced: int
+) -> None:
+    """Marque un moissonnage arrêté avant le nombre de documents annoncé par la source. La phase se termine en avertissement. Le journal de la source donne le point d'arrêt.
+
+    Args:
+        scope: partie moissonnée, comme une année.
+    """
+    metrics.signals.append(
+        {
+            "level": PhaseStatus.WARNING,
+            "code": "harvest_incomplete",
+            "message": f"{source_label(source)} {scope} : {received} documents reçus sur {announced} annoncés",
+        }
     )
 
 

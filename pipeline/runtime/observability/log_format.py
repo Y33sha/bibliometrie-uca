@@ -1,20 +1,40 @@
-"""Formatage des messages de journal : quantités accordées, sous-étapes d'une phase."""
+"""Formatage des messages de journal : bannière du run, cadre des phases, sections d'une phase, quantités accordées."""
 
 from __future__ import annotations
 
+import sys
+import textwrap
 from collections.abc import Iterable
 
 from domain.sources.registry import LOOKUP_SOURCES, source_label
+from infrastructure.observability.log import PHASE_MARKER
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger
 
-STEP = "▶ "
-"""Ouvre une sous-étape d'une phase."""
+__all__ = [
+    "BRANCH",
+    "BRANCH_CONTINUATION",
+    "LAST_BRANCH",
+    "PHASE_TITLE_WIDTH",
+    "SECTION",
+    "banner",
+    "breakdown",
+    "inflect",
+    "nothing_to_do",
+    "phase_title",
+    "quantity",
+    "open_section",
+    "setting",
+    "source_branch",
+]
+
+SECTION = "▶ "
+"""Ouvre une section d'une phase."""
 
 BRANCH = "  ├─ "
-"""Rattache une ligne à la sous-étape ouverte au-dessus."""
+"""Rattache une ligne à la section ouverte au-dessus."""
 
 LAST_BRANCH = "  └─ "
-"""Ferme la sous-étape : rattache sa dernière ligne."""
+"""Ferme la section : rattache sa dernière ligne."""
 
 BRANCH_CONTINUATION = "  │  "
 """Rattache une ligne à la branche ouverte au-dessus, le trait vertical se prolongeant."""
@@ -60,24 +80,20 @@ def breakdown(
         logger.info("%s", margin.rstrip())
 
 
-def step(logger: ScopedOrPlainLogger, title: str, *args: object) -> None:
-    """Ouvre une sous-étape : une ligne vide, puis son titre.
+def open_section(logger: ScopedOrPlainLogger, title: str, *args: object) -> None:
+    """Ouvre une section : une ligne vide, puis son titre.
 
     Args:
         args: champs de `title`, comme pour tout message de journal.
     """
-    line = f"{STEP}{title}"
+    line = f"{SECTION}{title}"
     logger.info("")
     logger.info(line, *args)
 
 
-def nothing_to_do(logger: ScopedOrPlainLogger, subject: str | None = None) -> None:
-    """Ferme une sous-étape sans rien à traiter.
-
-    Args:
-        subject: nomme la sous-étape quand l'étape compte plusieurs sous-étapes.
-    """
-    logger.info("%s%s", LAST_BRANCH, f"{subject} : rien à faire" if subject else "Rien à faire")
+def nothing_to_do(logger: ScopedOrPlainLogger) -> None:
+    """Ferme une section sans rien à traiter."""
+    logger.info("%sRien à faire", LAST_BRANCH)
 
 
 def inflect(n: int, singular: str, plural: str | None = None) -> str:
@@ -96,14 +112,72 @@ def quantity(n: int, singular: str, plural: str | None = None) -> str:
     return f"{n} {inflect(n, singular, plural)}"
 
 
-__all__ = [
-    "BRANCH",
-    "BRANCH_CONTINUATION",
-    "LAST_BRANCH",
-    "STEP",
-    "inflect",
-    "nothing_to_do",
-    "quantity",
-    "source_branch",
-    "step",
-]
+PHASE_TITLE_WIDTH = 48
+"""Largeur du texte dans le cadre d'un titre, la même pour tous."""
+
+
+def _framed(lines: list[str]) -> list[str]:
+    """Encadre `lines`, chacune repliée à la largeur du cadre.
+
+    Un terminal reçoit un cadre de largeur constante, une sortie capturée deux filets horizontaux.
+    """
+    if not sys.stdout.isatty():
+        return ["─" * 40, *lines, "─" * 40]
+
+    wrapped_lines = [
+        wrapped for line in lines for wrapped in textwrap.wrap(line, PHASE_TITLE_WIDTH)
+    ]
+    width = PHASE_TITLE_WIDTH + 4
+    return [
+        f"╔{'═' * width}╗",
+        *[f"║  {line.ljust(width - 2)}║" for line in wrapped_lines],
+        f"╚{'═' * width}╝",
+    ]
+
+
+def phase_title(name: str, label: str) -> list[str]:
+    """Renvoie les lignes d'ouverture d'une phase : son nom et son libellé."""
+    return _framed([f"{PHASE_MARKER}{name}", label])
+
+
+PIPELINE_TITLE = (
+    "┏┓ ╻┏┓ ╻  ╻┏━┓┏┳┓┏━╸╺┳╸┏━┓╻┏━╸",
+    "┣┻┓┃┣┻┓┃  ┃┃ ┃┃┃┃┣╸  ┃ ┣┳┛┃┣╸",
+    "┗━┛╹┗━┛┗━╸╹┗━┛╹ ╹┗━╸ ╹ ╹┗╸╹┗━╸",
+)
+"""« BIBLIOMETRIE » en caractères de filets, en tête de la bannière d'une exécution."""
+
+_SETTING_KEY_WIDTH = 9
+"""Largeur d'une clé de réglage et de ses points de conduite, dans la bannière."""
+
+
+def setting(key: str, value: str) -> list[str]:
+    """Renvoie les lignes « clé ···· valeur » de la bannière, la valeur repliée sous elle-même."""
+    head = f"{key} {'·' * (_SETTING_KEY_WIDTH - len(key))} "
+    wrapped = textwrap.wrap(value, PHASE_TITLE_WIDTH - len(head)) or [""]
+    return [head + wrapped[0], *(" " * len(head) + continuation for continuation in wrapped[1:])]
+
+
+def banner(settings: list[str]) -> list[str]:
+    """Encadre le titre et les réglages d'une exécution, avec une ombre.
+
+    Un terminal reçoit le cadre, au moins aussi large que celui d'une phase. Une sortie capturée reçoit deux filets et le titre en texte.
+    """
+    if not sys.stdout.isatty():
+        return ["─" * 40, "PIPELINE BIBLIOMÉTRIQUE", *settings, "─" * 40]
+
+    settings = [f"  {setting}" for setting in settings]
+    drawing_width = max(map(len, PIPELINE_TITLE))
+    width = max(
+        PHASE_TITLE_WIDTH + 4, drawing_width + 4, *(len(setting) + 2 for setting in settings)
+    )
+    # Un même retrait pour toutes les lignes du dessin : centrées une à une, elles se décaleraient.
+    indent = " " * ((width - drawing_width) // 2)
+    body = ["", *(indent + line for line in PIPELINE_TITLE), "", *settings, ""]
+    tab = "┤ PIPELINE ├"
+    return [
+        f"┌───{tab}{'─' * (width - 3 - len(tab))}┐",
+        *(f"│{line.ljust(width)}│▒" for line in body),
+        f"└{'─' * width}┘▒",
+        f" {'▒' * (width + 2)}",
+    ]

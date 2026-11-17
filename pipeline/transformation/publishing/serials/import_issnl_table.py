@@ -23,7 +23,7 @@ from pipeline.runtime.observability.signals import (
 )
 
 LABEL = "Import de la table ISSN-L"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 DownloadTable = Callable[[], AbstractContextManager[Iterable[tuple[str, str]]]]
 """Télécharge la table ISSN-L et renvoie ses couples (ISSN, ISSN-L), le temps du bloc."""

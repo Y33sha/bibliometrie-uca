@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { sectionLabels } from '#lib/labels.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api/index.js';
@@ -40,7 +41,7 @@
 	});
 </script>
 
-<PageHeader title="Publications en série" hidden />
+<PageHeader title={sectionLabels.journals} hidden />
 
 {#if isAdmin()}
 	<HubTabs

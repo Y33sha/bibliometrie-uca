@@ -68,6 +68,21 @@ export async function api<T>(url: string, opts?: { key?: string }): Promise<T> {
 	return res.json();
 }
 
+const onceResponses = new Map<string, Promise<unknown>>();
+
+/** GET d'un référentiel fixe pendant la session (énumération, libellés), envoyé une seule fois par URL. Un échec autorise un nouvel essai. */
+export function apiOnce<T>(url: string): Promise<T> {
+	let response = onceResponses.get(url) as Promise<T> | undefined;
+	if (!response) {
+		response = api<T>(url).catch((e) => {
+			onceResponses.delete(url);
+			throw e;
+		});
+		onceResponses.set(url, response);
+	}
+	return response;
+}
+
 /**
  * GET du détail d'une entité, pour sa page. L'API redirige l'identifiant d'une entité absorbée par une fusion vers l'identifiant conservé : le navigateur recharge alors la page sur cet identifiant, dernier segment de l'URL, et la promesse reste en suspens.
  *

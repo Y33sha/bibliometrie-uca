@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import { asset } from '$app/paths';
 
 	// Lien vers la page du DOI : logo qui grossit au survol, ou DOI écrit en entier, en texte discret.
@@ -8,7 +9,7 @@
 {#if text}
 	<a href="https://doi.org/{doi}" target="_blank" rel="noopener" class="doi-text">{doi}</a>
 {:else}
-	<a href="https://doi.org/{doi}" target="_blank" rel="noopener" class="doi-link" title={doi}>
+	<a href="https://doi.org/{doi}" target="_blank" rel="noopener" class="doi-link" use:tooltip={doi}>
 		<img src={asset('icons/doi.svg')} alt="DOI" />
 	</a>
 {/if}

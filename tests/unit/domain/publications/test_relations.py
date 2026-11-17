@@ -5,10 +5,12 @@ from domain.publications.relations import (
     _DATACITE_MAP,
     RelationType,
     extract_crossref_relations,
+    extract_crossref_update_relations,
     extract_datacite_distinct_works,
     extract_datacite_relations,
     infer_shared_key_relation,
     inverse_relation,
+    notice_relation,
 )
 
 
@@ -188,6 +190,79 @@ class TestExtractCrossref:
         assert extract_crossref_relations(source_extras) == [(RelationType.DESCRIBES, "10.1/ds")]
 
 
+class TestExtractCrossrefUpdateRelations:
+    def test_notice_declares_the_updated_work(self):
+        """Cas réel : avis de rétractation 10.1016/j.biortech.2024.131679, déclaré par Retraction Watch."""
+        source_extras = {
+            "update_to": [
+                {
+                    "doi": "10.1016/j.biortech.2018.03.127",
+                    "type": "retraction",
+                    "source": "retraction-watch",
+                }
+            ]
+        }
+        assert extract_crossref_update_relations(source_extras) == [
+            (RelationType.IS_RETRACTION_OF, "10.1016/j.biortech.2018.03.127")
+        ]
+
+    def test_work_declares_its_updates(self):
+        source_extras = {
+            "updated_by": [
+                {"doi": "10.1/erratum", "type": "erratum", "source": "publisher"},
+                {"doi": "10.1/concern", "type": "expression_of_concern", "source": "publisher"},
+            ]
+        }
+        assert extract_crossref_update_relations(source_extras) == [
+            (RelationType.HAS_CORRECTION, "10.1/erratum"),
+            (RelationType.HAS_CONCERN, "10.1/concern"),
+        ]
+
+    def test_new_version_and_withdrawal_out_of_vocabulary(self):
+        """Un retrait Elsevier vise l'article dont l'enregistrement source déclarant est le doublon."""
+        source_extras = {
+            "update_to": [
+                {"doi": "10.1/x", "type": "new_version", "source": "publisher"},
+                {"doi": "10.1/y", "type": "withdrawal", "source": "publisher"},
+            ]
+        }
+        assert extract_crossref_update_relations(source_extras) == []
+
+    def test_no_update(self):
+        assert extract_crossref_update_relations({}) == []
+        assert extract_crossref_update_relations(None) == []
+
+
+class TestNoticeRelation:
+    def test_retraction_notice_declared_as_erratum(self):
+        """Cas réel : Elsevier déclare l'avis de rétractation 10.1016/j.joca.2026.08.003 comme un erratum."""
+        assert (
+            notice_relation(RelationType.IS_CORRECTION_OF, "retraction", "poster")
+            is RelationType.IS_RETRACTION_OF
+        )
+        assert (
+            notice_relation(RelationType.HAS_CORRECTION, "poster", "retraction")
+            is RelationType.HAS_RETRACTION
+        )
+
+    def test_erratum_keeps_the_correction(self):
+        assert (
+            notice_relation(RelationType.IS_CORRECTION_OF, "erratum", "article")
+            is RelationType.IS_CORRECTION_OF
+        )
+        assert (
+            notice_relation(RelationType.HAS_CORRECTION, "article", None)
+            is RelationType.HAS_CORRECTION
+        )
+
+    def test_retracted_article_typed_retraction_keeps_the_correction(self):
+        """L'avis est le sujet de `is_correction_of` : le type de l'objet est sans effet."""
+        assert (
+            notice_relation(RelationType.IS_CORRECTION_OF, "erratum", "retraction")
+            is RelationType.IS_CORRECTION_OF
+        )
+
+
 class TestInferSharedKeyRelation:
     def test_peer_review_out_of_scope(self):
         assert infer_shared_key_relation("article", "peer_review") is None
@@ -204,11 +279,7 @@ class TestInferSharedKeyRelation:
             False,
         )
 
-    def test_erratum_and_dataset(self):
-        assert infer_shared_key_relation("erratum", "article") == (
-            RelationType.IS_CORRECTION_OF,
-            False,
-        )
+    def test_dataset(self):
         assert infer_shared_key_relation("article", "dataset") == (
             RelationType.IS_SUPPLEMENT_TO,
             True,

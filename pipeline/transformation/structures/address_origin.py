@@ -9,13 +9,7 @@ from sqlalchemy import Connection, text
 from domain.addresses.address_origin import AddressOrigin, OriginReferentials, address_origin
 from domain.countries import PlaceNameKind
 from infrastructure.db.scalars import scalar_int
-from pipeline.runtime.observability.log_format import (
-    BRANCH,
-    LAST_BRANCH,
-    inflect,
-    nothing_to_do,
-    quantity,
-)
+from pipeline.runtime.observability.log_format import BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.countries.place_names import load_country_names, load_place_forms
@@ -56,7 +50,6 @@ def classify_addresses(
     """Pose l'origine du texte des adresses sans origine, tranche par tranche. L'appelant commite."""
     total = scalar_int(conn.execute(_COUNT_UNCLASSIFIED))
     if not total:
-        nothing_to_do(logger)
         return PhaseMetrics()
 
     referentials = load_referentials(conn)
@@ -76,13 +69,10 @@ def classify_addresses(
             progress.advance(len(rows))
 
     classified = counts.total()
-    logger.info(
-        "%s%s %s : %s, %s, %s",
-        LAST_BRANCH,
-        quantity(classified, "adresse"),
-        inflect(classified, "classée"),
-        quantity(counts[AddressOrigin.RAW], "adresse brute", "adresses brutes"),
-        quantity(counts[AddressOrigin.HAL_LABEL], "libellé HAL", "libellés HAL"),
-        quantity(counts[AddressOrigin.NAME_ONLY], "nom seul", "noms seuls"),
+    report = (
+        f"{quantity(classified, 'adresse')} {inflect(classified, 'classée')} :"
+        f" {quantity(counts[AddressOrigin.RAW], 'adresse brute', 'adresses brutes')},"
+        f" {quantity(counts[AddressOrigin.HAL_LABEL], 'libellé HAL', 'libellés HAL')},"
+        f" {quantity(counts[AddressOrigin.NAME_ONLY], 'nom seul', 'noms seuls')}"
     )
-    return PhaseMetrics(seen=classified, updated=classified)
+    return PhaseMetrics(seen=classified, updated=classified, report=report)

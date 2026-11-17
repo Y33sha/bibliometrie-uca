@@ -1,9 +1,11 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import RhCheck from "#lib/components/RhCheck.svelte";
   import StatusToggles from "#lib/components/StatusToggles.svelte";
   import { untrack } from "svelte";
   import { persons as personsApi } from "#lib/api/index.js";
   import { titleCase } from "#lib/utils.js";
+  import { formatCount } from "#lib/plural.js";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
@@ -63,13 +65,13 @@
       <div class="triage-item">
         <div class="form-head">
           <span class="form-name">{form.name_form}</span>
-          <span class="muted-small">{form.persons.length} personnes</span>
+          <span class="muted-small">{formatCount(form.persons.length, "personne")}</span>
         </div>
         <div class="form-persons">
           {#each form.persons as p (p.person_id)}
             <div class="person-row" class:incompatible={!p.compatible}>
               {#if p.canonical}
-                <span class="tag" title="Forme dérivée du nom de la personne, confirmée d'office"
+                <span class="tag" use:tooltip={"Forme dérivée du nom de la personne, confirmée d'office"}
                   >nom</span
                 >
               {:else}
@@ -83,7 +85,7 @@
               </button>
               {#if p.has_rh}<RhCheck />{/if}
               {#if !p.compatible}
-                <span class="incompat-tag" title="Nom canonique incompatible avec la forme">
+                <span class="incompat-tag" use:tooltip={'Nom canonique incompatible avec la forme'}>
                   incompatible
                 </span>
               {/if}

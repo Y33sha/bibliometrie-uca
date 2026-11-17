@@ -24,7 +24,7 @@ from sqlalchemy import Connection
 from domain.source_records.inspire_author_lists import WITHHELD_AUTHORS_SOURCE
 from domain.sources.registry import SOURCE_PRIORITY, Source, source_label
 from infrastructure.raw_store import NullRawStore, get_raw_store
-from pipeline.graph import Step, Task, TaskRun
+from pipeline.graph import Block, Phase, Step, Task, TaskRun
 from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.embargoes import EmbargoStore
 from pipeline.ingestion.common.inspire_author_lists import withhold_covered_source_contributions
@@ -214,14 +214,13 @@ _BY_SOURCE = tuple(
         ),
         run=_normalize(source),
         label=source_label(source),
-        progress_bar=True,
         when=lambda ctx, source=source: source in ctx.options.sources,
     )
     for source in SOURCE_PRIORITY
 )
 
 
-STEPS = (
+_CHILDREN = (
     Step(
         "by_source",
         "documents bruts de chaque source → enregistrements sources, contributions sources, adresses",
@@ -318,7 +317,7 @@ STEPS = (
                 label="Adresses orphelines",
             ),
         ),
-        label="Maintenance des tables",
+        section="Maintenance des tables",
     ),
 )
 
@@ -337,3 +336,12 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
         "disappeared", 0
     )
     return metrics
+
+
+PHASE = Phase(
+    "normalize",
+    "Normalisation des documents bruts",
+    _CHILDREN,
+    Block.SOURCE_RECORDS,
+    assemble=assemble,
+)

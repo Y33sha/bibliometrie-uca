@@ -625,7 +625,7 @@ class TestAssignmentOfOrphans:
         assert plan.groups == ()
 
     def test_one_member_able_to_found_a_publication_creates(self):
-        """Un enregistrement source du périmètre, d'un type admissible, suffit ; le type de la publication est arbitré au recalcul des métadonnées."""
+        """Un enregistrement source du périmètre, d'un type admissible, suffit. Le mémoire reste hors de la publication."""
         key = [("hal_id", "dumas-01234567")]
         plan = plan_reconciliation(
             [
@@ -633,7 +633,19 @@ class TestAssignmentOfOrphans:
                 _m(2, None, tokens=key, in_perimeter=True, doc_type="article"),
             ]
         )
-        assert len(plan.groups) == 1
+        assert _groups(plan) == {None: (2,)}
+
+    def test_out_of_scope_member_leaves_the_publication(self):
+        """Cas réel : l'erratum WoS partage une clé avec l'article (176106). Il quitte la publication, l'article la garde."""
+        key = [("doi", "10.1007/jhep11(2022)094")]
+        plan = plan_reconciliation(
+            [
+                _m(1, 10, doi="10.1007/jhep11(2022)094", tokens=key, in_perimeter=True),
+                _m(2, 10, tokens=key, in_perimeter=True, doc_type="erratum"),
+            ]
+        )
+        assert _groups(plan) == {10: (1,)}
+        assert plan.detached == (2,)
 
     def test_untyped_member_in_perimeter_creates(self):
         plan = plan_reconciliation(

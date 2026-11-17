@@ -25,10 +25,16 @@ from domain.contributions.author_grouping import (
     plan_contribution_ids,
     with_known_first_name,
 )
-from pipeline.graph import Task
+from pipeline.graph import Block, Phase, Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.cpu import available_cpus
-from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do, quantity, step
+from pipeline.runtime.observability.log_format import (
+    BRANCH,
+    LAST_BRANCH,
+    nothing_to_do,
+    open_section,
+    quantity,
+)
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress, waiting
 from pipeline.transformation.publications.author_grouping.store import (
@@ -255,10 +261,10 @@ def build_contributions(
     if rebuild:
         marked = store.mark_all()
         conn.commit()
-        step(logger, "%s marquées à réaligner", quantity(marked, "publication"))
+        open_section(logger, "%s marquées à réaligner", quantity(marked, "publication"))
     dirty = store.snapshot_queued_publications()
     publication_ids = [publication_id for publication_id, _ in dirty]
-    step(logger, "auteurs à aligner dans %s", quantity(len(publication_ids), "publication"))
+    open_section(logger, "auteurs à aligner dans %s", quantity(len(publication_ids), "publication"))
     if not publication_ids:
         store.delete_processed_marks()
         store.drop_snapshot()
@@ -270,17 +276,18 @@ def build_contributions(
     workers = min(available_cpus(), len(publication_ids))
     with (
         ProcessPoolExecutor(max_workers=workers) if workers > 1 else nullcontext() as pool,
-        track_progress(len(publication_ids), LAST_BRANCH.rstrip(), logger) as progress,
+        track_progress(len(publication_ids), BRANCH.rstrip(), logger) as progress,
     ):
         mapper: Mapper = pool_mapper(pool, workers) if pool is not None else map
         for batch in publication_batches(dirty):
             contribution_count += realign(store, batch, methods, progress.advance, mapper)
             store.delete_processed_marks(batch)
             conn.commit()
+    logger.info("%s%s", LAST_BRANCH, quantity(contribution_count, "contribution"))
     # Marquages relevés des publications supprimées.
     store.delete_processed_marks()
     store.drop_snapshot()
-    step(logger, "Recouvrement des listes d'auteurs")
+    open_section(logger, "Recouvrement des listes d'auteurs")
     t0 = time.perf_counter()
     with waiting(LAST_BRANCH, logger) as line:
         store.refresh_alignment()
@@ -292,7 +299,6 @@ def build_contributions(
         "groups": contribution_count,
         **{str(method): count for method, count in methods.items()},
     }
-    metrics.report = f"{quantity(len(publication_ids), 'publication')}, {quantity(contribution_count, 'contribution')}"
     return metrics
 
 
@@ -304,22 +310,21 @@ def _build(ctx: PhaseContext) -> PhaseMetrics:
 
 def _attributes(ctx: PhaseContext) -> PhaseMetrics:
     """Recalcule les attributs des contributions en file. Les attributs ont leur propre file : l'affiliation d'une contribution source change sans changer sa contribution."""
-    step(ctx.logger, "Attributs des contributions")
     t0 = time.perf_counter()
     with (
-        waiting(f"{LAST_BRANCH}en cours", ctx.logger) as line,
+        waiting(f"{BRANCH}en cours", ctx.logger) as line,
         ctx.open_tx() as conn,
     ):
         queued, updated = AuthorGroupingStore(conn).propagate_attributes()
-        line.conclude(
-            f"{LAST_BRANCH}{quantity(queued, 'contribution examinée', 'contributions examinées')},"
-            f" {quantity(updated, 'mise à jour', 'mises à jour')}"
-            f" en {time.perf_counter() - t0:.1f} s"
-        )
-    return PhaseMetrics(seen=queued, updated=updated)
+        line.erase()
+    report = (
+        f"{quantity(queued, 'contribution examinée', 'contributions examinées')},"
+        f" {quantity(updated, 'mise à jour', 'mises à jour')} en {time.perf_counter() - t0:.1f} s"
+    )
+    return PhaseMetrics(seen=queued, updated=updated, report=report)
 
 
-TASKS = (
+_CHILDREN = (
     Task(
         "build",
         reads=(
@@ -367,7 +372,6 @@ TASKS = (
             "source_contributions.neutralized_identifiers",
         ),
         run=_build,
-        label="Bilan",
     ),
     Task(
         "attributes",
@@ -384,6 +388,10 @@ TASKS = (
             # Copie scanR d'un dépôt HAL, écartée du vote des listes d'auteurs.
             "source_records.source",
             "source_records.source_id",
+            # Enregistrement OpenAlex éditeur, au DOI de la publication : seul à donner des indices d'affiliation OpenAlex.
+            "source_contributions.source",
+            "source_record_identifiers",
+            "publications.doi",
             "contributions.id",
             "contributions.publication_id",
             "contributions.author_positions",
@@ -400,13 +408,15 @@ TASKS = (
             # Une contribution rattachée sans épinglage qui quitte le périmètre est marquée pour la redécision de sa personne.
             "contribution_resolution_queue",
         ),
-        # Personnes des contributions, écrites par la phase `persons` ; contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
+        # Personnes des contributions, écrites par la phase `persons` ; contributions et alignements supprimés, enregistrements sources détachés, publications supprimées par `finalize.purge_publications`.
         previous_run=(
             "contributions",
             "aligned_source_contributions",
             "source_records.publication_id",
+            "publications.doi",
         ),
         run=_attributes,
+        section="Attributs des contributions",
     ),
 )
 
@@ -416,3 +426,12 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     metrics = by_task["build"]
     metrics.details["attributes_updated"] = by_task["attributes"].updated
     return metrics
+
+
+PHASE = Phase(
+    "author_grouping",
+    "Alignement des auteurs d'une publication entre ses sources",
+    _CHILDREN,
+    Block.ENTITIES,
+    assemble=assemble,
+)

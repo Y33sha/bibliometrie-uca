@@ -1,12 +1,14 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import IconButton from "#lib/components/IconButton.svelte";
   import RhCheck from "#lib/components/RhCheck.svelte";
   import { resolve } from "$app/paths";
   import { api } from "#lib/api/index.js";
-  import { titleCase } from "#lib/utils.js";
+  import { formatNumber, titleCase } from "#lib/utils.js";
   import { personExclusionLabels, staffCategoryLabels } from "#lib/labels.js";
   import { autofocus } from "#lib/actions/focus.js";
   import Drawer from "#lib/components/Drawer.svelte";
+  import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
   import type { Person, IdFormState, PersonSearchResult } from "./types";
   import type { components } from "#lib/api/schema.js";
   import IdentifierEditor from "./IdentifierEditor.svelte";
@@ -72,50 +74,39 @@
     onopenPerson: (personId: number) => void;
   } = $props();
 
-  // Personnes partageant ≥1 forme de nom (candidates à l'absorption).
-  let sharing = $state<SharingPerson[]>([]);
-  // Personnes déclarées distinctes de celle-ci.
-  let distinct = $state<DistinctPerson[]>([]);
-  // Les formes de nom se chargent ici : la liste ne les porte pas, seul ce tiroir les montre. `null` tant qu'elles chargent.
-  let nameForms = $state<NameFormSummary[] | null>(null);
-  // Personne des données affichées : à un changement de personne, les données de la précédente disparaissent pendant le chargement ; après une écriture sur la même personne, elles restent affichées.
-  let loadedId: number | null = null;
+  let editing = $state(false);
 
-  async function loadDetails() {
-    const id = person.id;
-    if (id !== loadedId) {
-      sharing = [];
-      distinct = [];
-      nameForms = null;
-      loadedId = id;
-    }
-    const [s, d, f] = await Promise.all([
-      api<SharingPerson[]>(`/api/persons/${id}/sharing-name-forms`),
-      api<DistinctPerson[]>(`/api/persons/${id}/distinct-persons`),
-      api<NameFormSummary[]>(`/api/persons/${id}/name-forms`)
-    ]);
-    if (id !== person.id) return;
-    sharing = s;
-    distinct = d;
-    nameForms = f;
-  }
-
-  $effect(() => {
-    void person.id; // re-fetch quand le drawer change de personne
-    loadDetails();
+  const details = useDrawerEntity({
+    id: () => person.id,
+    fetch: async (id) => {
+      const [sharing, distinct, nameForms] = await Promise.all([
+        api<SharingPerson[]>(`/api/persons/${id}/sharing-name-forms`),
+        api<DistinctPerson[]>(`/api/persons/${id}/distinct-persons`),
+        api<NameFormSummary[]>(`/api/persons/${id}/name-forms`),
+      ]);
+      return { sharing, distinct, nameForms };
+    },
+    onreset() {
+      editing = false;
+    },
   });
+  // Personnes partageant ≥1 forme de nom (candidates à l'absorption).
+  const sharing = $derived(details.data?.sharing ?? []);
+  // Personnes déclarées distinctes de celle-ci.
+  const distinct = $derived(details.data?.distinct ?? []);
+  // Les formes de nom se chargent ici : la liste ne les porte pas, seul ce tiroir les montre. `null` tant qu'elles chargent.
+  const nameForms = $derived(details.data?.nameForms ?? null);
 
   async function absorb(otherId: number) {
     await onabsorb(otherId);
-    await loadDetails();
+    await details.reload();
   }
 
   async function unmarkDistinct(otherId: number) {
     await onunmarkDistinct(otherId);
-    await loadDetails();
+    await details.reload();
   }
 
-  let editing = $state(false);
   let lastName = $state("");
   let firstName = $state("");
 
@@ -153,7 +144,7 @@
           href={resolve(`persons/${person.id}`)}
           target="_blank"
           rel="noopener"
-          title="Voir la fiche publique"
+          use:tooltip={'Voir la fiche publique'}
         >
           <span class="drawer-last">{titleCase(person.last_name)}</span>
           {titleCase(person.first_name)}
@@ -165,7 +156,7 @@
         <select
           class="select exclusion-select"
           class:excluded={!!person.exclusion}
-          title="Exclusion de la personne"
+          use:tooltip={'Exclusion de la personne'}
           aria-label="Exclusion de la personne"
           value={person.exclusion ?? ""}
           onchange={(e) =>
@@ -185,8 +176,8 @@
   {/snippet}
 
     <div class="drawer-meta">
-      <span>{person.contribution_count ?? 0} publications</span>
-      <span>{person.in_perimeter_contribution_count ?? 0} dans le périmètre</span>
+      <span>{formatCount(person.contribution_count ?? 0, "publication")}</span>
+      <span>{formatNumber(person.in_perimeter_contribution_count ?? 0)} dans le périmètre</span>
       {#if person.exclusion}<span class="tag tag-pill tag-danger">{personExclusionLabels[person.exclusion]}</span>{/if}
     </div>
 
@@ -239,7 +230,7 @@
               {#if !sp.has_rh}
                 <button
                   class="btn btn-sm"
-                  title="Fusionner cette personne dans celle-ci"
+                  use:tooltip={'Fusionner cette personne dans celle-ci'}
                   onclick={() => absorb(sp.person_id)}>Absorber</button
                 >
               {/if}
@@ -248,7 +239,7 @@
                 {titleCase(sp.first_name)}
               </button>
               {#if sp.has_rh}<RhCheck />{/if}
-              <span class="muted-small" title={sp.shared_forms.join(", ")}>
+              <span class="muted-small" use:tooltip={sp.shared_forms.join(", ")}>
                 {formatCount(sp.shared_forms.length, "forme")}
               </span>
             </div>
@@ -265,7 +256,7 @@
             <div class="sharing-row">
               <button
                 class="btn btn-sm"
-                title="Annuler la décision : les files de triage peuvent de nouveau présenter la paire"
+                use:tooltip={'Annuler la décision : les files de triage peuvent de nouveau présenter la paire'}
                 onclick={() => unmarkDistinct(dp.person_id)}>Annuler</button
               >
               <button class="triage-person" onclick={() => onopenPerson(dp.person_id)}>

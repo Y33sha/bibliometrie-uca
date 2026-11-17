@@ -358,7 +358,7 @@ def test_scanr_from_hal_takes_corrected_hal_type():
     hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="poster")
     scanr = _source_record(id=2, source="scanr", source_id="halhal-04565713", doc_type="other")
 
-    updates = compute_updates([hal, scanr], {"hal-04565713": hal}, frozenset())
+    updates = compute_updates([hal, scanr], {"hal-04565713": hal}, frozenset(), [])
 
     (scanr_update,) = [u for u in updates if u.id == 2]
     assert scanr_update.corrected.columns.doc_type == "poster"
@@ -370,13 +370,38 @@ def test_scanr_from_hal_takes_corrected_hal_type():
 
 def test_scanr_without_hal_deposit_keeps_its_type():
     scanr = _source_record(id=2, source="scanr", source_id="halhal-04565713", doc_type="other")
-    assert compute_updates([scanr], {}, frozenset()) == []
+    assert compute_updates([scanr], {}, frozenset(), []) == []
 
 
 def test_scanr_from_another_origin_keeps_its_type():
     scanr = _source_record(id=2, source="scanr", source_id="doi10.1/x", doc_type="other")
     hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="poster")
-    assert [u.id for u in compute_updates([scanr], {"hal-04565713": hal}, frozenset())] == []
+    assert [u.id for u in compute_updates([scanr], {"hal-04565713": hal}, frozenset(), [])] == []
+
+
+# Enregistrements sources au DOI d'un erratum Crossref
+
+
+def test_copy_of_a_crossref_notice_takes_its_type():
+    """Cas réel : copies OpenAlex et ScanR de l'avis Crossref 10.1016/j.kint.2018.08.009, titré par sa citation. Le dépôt HAL de l'article, d'un autre titre, garde son type."""
+    title = "Grams ME, Sang Y, Ballew SH, et al. Predicting timing of clinical outcomes"
+    crossref = _source_record(
+        id=1,
+        source="crossref",
+        source_id="10.1016/j.kint.2018.08.009",
+        doi="10.1016/j.kint.2018.08.009",
+        title=title,
+        crossref_update_types=["erratum"],
+    )
+    copy = _source_record(id=2, source="openalex", doi="10.1016/j.kint.2018.08.009", title=title)
+    article = _source_record(
+        id=3,
+        source="hal",
+        doi="10.1016/j.kint.2018.08.009",
+        title="Predicting timing of clinical outcomes",
+    )
+    updates = compute_updates([crossref, copy, article], {}, frozenset(), [crossref])
+    assert {u.id: u.corrected.columns.doc_type for u in updates} == {1: "erratum", 2: "erratum"}
 
 
 def test_hal_origin_ids():

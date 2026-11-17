@@ -14,6 +14,9 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 - Le moissonnage demande seulement les champs utiles : ni nombre de citations, ni références.
 - L'adresse d'une contribution source INSPIRE est le nom de l'institution rattachée par INSPIRE, avec son ROR quand INSPIRE le donne. L'affiliation brute est écartée : elle reproduit les décalages d'affiliations de l'éditeur. 0,2 % des auteurs ont une affiliation brute sans institution.
 - L'identifiant CDS est un type d'identifiant d'enregistrement source et une clé de confirmation de la réconciliation. La normalisation d'OpenAlex le reprend des URL de localisation.
+- Une adresse concaténée, à au moins deux groupes d'initiales d'auteurs, est sans indice de périmètre.
+- Quand une contribution a une contribution source dans l'enregistrement OpenAlex éditeur, au DOI de la publication, les indices d'adresse et de ROR de ses autres enregistrements OpenAlex sont écartés. La décision porte sur la contribution, à la recomposition de ses attributs. Les indices des contributions sources restent ceux de leur enregistrement.
+- Une affiliation contraire dans un autre enregistrement OpenAlex de la contribution laisse ses indices en place.
 - Un enregistrement source OpenAlex est sans contributions sources quand il partage un DOI, un DOI arXiv, un hal-id ou un identifiant CDS (CERN Document Server) avec un enregistrement source INSPIRE. La condition se décide sur les identifiants des enregistrements sources, connus dès la normalisation, de rôle autre que `related`, quel que soit leur statut.
 
 ## Phasage
@@ -76,8 +79,10 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
   | seul l'enregistrement éditeur compte | 71 | 0 |
   | les deux règles | 89 | 0 |
   | OpenAlex jamais seul | 309 | 12 |
-- [ ] Enregistrements sources OpenAlex dont toutes les contributions sources ont les mêmes affiliations, confrontés aux autres sources de la publication.
-- [ ] Adresses issues d'une erreur de parsing (publication 106296).
+- [x] Enregistrements sources OpenAlex dont toutes les contributions sources ont les mêmes adresses, le 2026-11-16 (`openalex_same_addresses.sql`). Sur 63 502 enregistrements OpenAlex de plusieurs auteurs, 3 670 donnent à tous la même adresse et 1 216 le même ensemble de plusieurs adresses. Ils ont presque tous 10 auteurs au plus. Une autre source de la contribution confirme leurs indices de périmètre dans 89 % et 92 % des cas, contre 90 % pour les autres enregistrements OpenAlex. Ce motif est sans lien avec les erreurs d'affiliation.
+- [x] Adresses concaténées par une erreur de parsing, le 2026-11-16 (`concatenated_addresses.sql`). Dans la publication 106296, l'adresse OpenAlex est la note d'affiliations entière, avec les initiales des auteurs (« (D.S., P.C.) »). Elle met 28 auteurs dans le périmètre. Une adresse à au moins deux groupes d'initiales est concaténée : 178 adresses, dans Crossref, OpenAlex et scanR.
+  - Dans 420 contributions de 30 publications, une contribution source est du périmètre par une adresse concaténée seule. Une autre source, sans adresse concaténée, en confirme 142.
+  - 278 contributions restent sans confirmation. Elles sont le seul appui au périmètre de 234 personnes hors RH. Les 30 publications sont du périmètre par d'autres indices.
 
 ### Phase 2 — INSPIRE-HEP
 
@@ -130,7 +135,7 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 - [x] Profil de la source, adaptateur, client de l'API, moissonnage par institution. 8763385ca
 - [x] Normalisation : enregistrement source (DOI, DOI arXiv, identifiant CDS), contributions sources (nom, ORCID, institution). 8763385ca
 - [x] Relecture par numéro de fiche (`fetch_stale`). 8763385ca
-- [x] Numéros d'institution INSPIRE dans `api_ids` et noms d'institution INSPIRE dans les formes de nom des structures du périmètre, le 2026-11-07 sur la base locale. À reproduire sur la base de prod.
+- [x] Numéros d'institution INSPIRE dans `api_ids` et noms d'institution INSPIRE dans les formes de nom des structures du périmètre.
 
   | Structure | Numéros d'institution INSPIRE (nom INSPIRE) |
   |---|---|
@@ -158,8 +163,44 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 
 ### Phase 4 — Règles
 
-- [ ] Règles de confirmation des indices de périmètre, choisies d'après les phases 1 et 2.
+- [x] Audit des désaccords entre sources, le 2026-11-16 (`audit_population.py`, `audit_sample.py`), après un instantané du périmètre (`perimeter_20261116_1148.json.gz`). 7 511 contributions reposent sur une seule source du périmètre, contredite par une autre source, sans indice RH. 120 cas jugés, 15 par source du périmètre (OpenAlex, HAL, WoS, scanR) et par situation de la personne : 34 justes, 6 douteux, 80 faux. Aucune fonction de décision générale.
+  - La personne a une autre contribution confirmée par plusieurs sources : 30 justes sur 60. La confirmation est elle-même faussée par les grandes collaborations (centaines de contributions « confirmées » de fausses personnes) et par des homonymes fusionnés.
+  - La personne est sans autre contribution confirmée : 52 faux sur 60, soit 3 132 contributions et 2 504 personnes. Les justes sont des personnes peu publiantes (doctorant CIFRE, ancien du LASMEA).
+  - Causes des faux : tutelle multisite atteinte par la hiérarchie HAL (LBBE et TIMC par VetAgro Sup), formes de nom en collision, adresses concaténées hors de la règle, LPC donné par WoS dans les grandes collaborations.
+  - Faux désaccords : l'autre source donne la même structure, par une adresse ou une structure HAL non rattachée (CHU, QuaPA, TSCF).
+- [x] Formes de nom en collision : `gred` (iGReD), `u1095` (GDEC), `umr 547` (PIAF), `umr 6024` (LAPSCO), `umr 1019` (UNH).
+- [x] Faux désaccords, structures existantes : formes de nom du CHU, du LASMEA (Institut Pascal), de SEESIB (ICCF) et abréviations du WoS (UNH, QuaPA, MEDIS, UMRH, UCA), structures HAL de QuaPA (1 450 contributions), forme « clermont school of business » (ESC, hors périmètre). Les adresses réduites à « Clermont-Ferrand 1 » ou « Clermont-Ferrand 2 » reçoivent un lien confirmé à l'UCA. Une forme de nom capterait les adresses postales (« 63038 Clermont-Ferrand 1 »). `add_missing_structure_forms`, f83083cfd, e144c113a.
+- [ ] Faux désaccords, nouvelles structures ou rattachements à décider : TSCF (HAL 1002486 et 182206, 194 contributions), FERDI, ONAPS, unité expérimentale Herbipôle, Chaire UNESCO de Chamalières, CICS, centres INRAE de Clermont.
+  - La PFEM, plateforme partagée par l'UNH, QuaPA et l'ICCF, reste sans structure. Seule dans une adresse, elle concerne 416 contributions, dont 415 sont du périmètre par ailleurs.
+- [ ] Détection élargie des adresses concaténées. Simulation le 2026-11-16 (`concat_v2.py`, `simulate_concat_v2.py`).
+  - Motifs ajoutés : au moins deux groupes de noms entre parenthèses (« (Ms Serole, Mr Prunet) »), au moins deux groupes d'initiales sans points dont un à plusieurs codes (« (MC, FL, PJ, A-LC, EF) »), liste numérotée « 1… 2… 3… », au moins cinq villes. Les initiales espacées n'ajoutent rien. La longueur seule ne discrimine pas.
+  - 120 adresses de plus, dont 84 du périmètre. 276 contributions et 205 personnes hors RH sortent du périmètre, et 4 publications.
+  - Pertes justes : 5 contributions de 3 personnes RH, dans des listes multicentriques qui contiennent leur vrai centre (Centre Jean Perrin, CHU).
+  - OpenAlex découpe une note d'affiliations en une adresse par affiliation, chacune suivie de son groupe d'initiales. La règle, jugée adresse par adresse, laisse passer ces cas.
+  - Piste : garder l'indice de l'auteur dont le nom ou les initiales figurent dans la partie de l'adresse du périmètre. La décision se prend alors par contribution source.
+- [ ] Adresse concaténée comme indice du document : la publication entre dans le périmètre, la contribution se rattache par le nom ou l'identifiant sans créer de personne. Étude le 2026-11-16 (`doc_evidence.py`).
+  - Mise en œuvre : un indice `concatenated_address` parmi les indices liés au document, hors des structures des contributions et de l'union des indices de la contribution, et un troisième état de la décision du rattachement.
+  - 103 publications recevraient l'indice. 93 contributions sans personne se rattacheraient par le nom à une personne existante, souvent une fausse personne du périmètre à une, deux ou trois contributions, ou un homonyme. Garde-fou possible : rattachement limité aux personnes à fiche RH ou à identifiant confirmé.
+- [x] Une contribution aux seuls rôles sans création de personne (jury de thèse, inventeur) laisse supprimer sa personne. 84a6e6e53. Le prochain run supprime au plus 109 personnes hors RH.
+- [x] Audit des affiliations décalées, le 2026-11-16 (`shift.py`, `shift_sample.py`). Pas de règle dédiée.
+  - Signal testé : un voisin de liste (position ±1) est une personne RH sans indice dans le même enregistrement. Il touche 0,5 à 0,9 % des contributions sources, chez les personnes RH comme chez les autres. Le vrai auteur clermontois d'un article médical est souvent un praticien du CHU, sans fiche RH.
+  - 7 901 personnes hors RH ont une à trois contributions du périmètre, dont une par adresse dans un enregistrement de 2 à 500 auteurs. 40 tirées au hasard : 24 justes, 6 décalages, 5 unités multisites, 3 adresses concaténées, 2 douteuses.
+  - Dans 3 décalages, une seule source décale et les autres la contredisent (registre RIETE dans OpenAlex, Centre Jean Perrin dans WoS). Dans les 3 autres, toutes les sources reprennent le décalage de l'éditeur (UNH, LMBP).
+- [x] Adresse concaténée sans indice de périmètre : colonne `addresses.is_concatenated`, tâche `affiliations.detect_concatenated_addresses`. 0dd031ae5. Simulation le 2026-11-16 (`concat_rule.py`) : 365 contributions de 29 publications sortent du périmètre, et aucune publication.
+  - 301 personnes hors RH sortent du périmètre. L'adresse place les initiales de 189 d'entre elles dans une affiliation hors périmètre. Les initiales des 112 autres sont absentes de l'adresse, tronquée par la source à 500 ou 1 000 caractères.
+  - Une personne RH perd une contribution : celle d'une homonyme toulousaine.
+  - 5 contributions justes sortent. 3 sont sans personne. Les 2 autres personnes restent du périmètre par d'autres contributions.
+- [x] Règle « OpenAlex écarté quand il se contredit », non retenue. Simulation le 2026-11-16 (`contradiction.sql`) : 645 contributions où une contribution source OpenAlex est du périmètre et une autre donne une affiliation hors périmètre.
+  - 151 contributions sortent, avec 85 personnes hors RH et 10 publications. Un nom seul non rattaché (« Territoires ») compte comme affiliation contraire.
+  - Sans les adresses en nom seul : 116 contributions, 67 personnes hors RH, 4 publications. Environ 5 pertes justes sûres et 8 douteuses sur une soixantaine de cas lus : mobilité et doubles affiliations (LMBP puis Caen, LMV et IPGP).
+- [x] Seul l'enregistrement OpenAlex éditeur donne des indices d'affiliation OpenAlex. a75d604b4, 6d0d1ddb9. Simulation le 2026-11-16 (`publisher.sql`) : 3 234 contributions ont un indice d'un enregistrement OpenAlex non éditeur. 88 sortent du périmètre, avec 50 personnes hors RH, aucune personne RH et 5 publications.
+  - Les sorties relues sont presque toutes fausses : affiliation d'un coauteur dans une prépublication, liste d'affiliations réunies, enregistrement de dépôt LHCb ou ATLAS, membre de jury de thèse. 3 ou 4 cas sont douteux.
+  - Dans 3 des 5 publications sortantes, un coauteur clermontois existe probablement, sans indice dans aucune source : un article d'ATLAS sans affiliations dans l'enregistrement éditeur, un article de l'ICCF déposé dans HAL, un jeu de données Zenodo.
+  - Le rattachement des personnes lit le périmètre de la contribution (`contributions.in_perimeter`), seul calcul de ce périmètre. Une publication dont le DOI change met ses contributions en file de recomposition.
+  - La variante qui écarte toujours les enregistrements OpenAlex non éditeurs ferait sortir 2 877 contributions dans 1 107 publications, surtout des prépublications sans enregistrement éditeur.
+- [x] Recomposition des contributions du stock concernées par la règle de l'enregistrement OpenAlex éditeur (`requeue_openalex_preprint_evidence`), le 2026-11-16. Le run applique aussi la règle des adresses concaténées : 687 contributions sources sortent du périmètre, 350 personnes sont supprimées, 71 publications sont purgées, dont les 5 annoncées par la simulation. Les résidus des deux règles sont nuls après le run.
 - [ ] File d'administration des contributions aux affiliations conflictuelles. Elle dépend du chantier [résolution des personnes](archived/2026-10-24_DATA_resolution-personnes.md).
+- [ ] Tutelles et unités multisites : VetAgro Sup, EHIC, LIMOS (site de Saint-Étienne), IHRIM, GEOLAB, EPIA, LMV (site de Saint-Étienne). Une tutelle multisite fait-elle entrer tous ses laboratoires, et une unité multisite tous ses sites ?
 
 ### Phase 5 — Fin de chantier
 
@@ -172,3 +213,5 @@ Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs
 - Un acte publié au nom d'une collaboration est-il une publication du périmètre, quand WoS donne toute la liste d'auteurs et INSPIRE seulement l'orateur ?
 - Les enregistrements sources scanR rattachés à un enregistrement source INSPIRE sont-ils aussi sans contributions sources ? Et ceux des autres sources (HAL, WoS, Crossref, DataCite) ? Cela réduit le stockage et la durée de l'alignement des auteurs.
 - Les enregistrements OpenAlex de dépôt, rattachés à la publication par le titre seul, échappent à la condition sur les identifiants.
+- Doublons de personnes, relevés pendant l'audit des affiliations décalées. Un nom normalisé à espaces sépare deux personnes : 20 paires de même initiale de prénom (Le Roy et Leroy, D'Incan et Dincan, Nsambu et N'Sambu), dont une quinzaine de vrais doublons. Une coquille de l'éditeur reprise par OpenAlex et Crossref crée une personne à part (Malpeuch, à côté de Malpuech). Cela relève de la résolution des personnes.
+- La phase `affiliations` pose les indices des contributions sources. Les décisions entre enregistrements sources portent sur la contribution, à la fin d'`author_grouping`. Faut-il scinder `affiliations` en une phase par niveau ?

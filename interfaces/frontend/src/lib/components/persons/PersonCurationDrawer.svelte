@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
 	import { api, errorMessage, persons as personsApi } from '#lib/api/index.js';
-	import { toast } from '#lib/dialogs.svelte.js';
+	import { toast, toastError } from '#lib/dialogs.svelte.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
+	import { useDrawerEntity } from '#lib/composables/useDrawerEntity.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 	import type {
 		DetachModalState,
@@ -35,7 +35,6 @@
 		onopenPerson: (personId: number) => void;
 	} = $props();
 
-	let person: Person | null = $state(null);
 	let idForms: Record<number, IdFormState> = $state({});
 	let detachModal: DetachModalState | null = $state(null);
 
@@ -47,23 +46,18 @@
 		transform: (results) => results.filter((r) => r.id !== activeMergePersonId && !r.has_rh),
 	});
 
-	async function loadPerson() {
-		person = await api<Person>(`/api/persons/${personId}/curation`);
-	}
-
 	// Chaque personne ouverte repart d'une recherche de fusion fermée.
-	$effect(() => {
-		void personId;
-		untrack(() => {
-			closeMergeSearch();
-			void loadPerson();
-		});
+	const entity = useDrawerEntity({
+		id: () => personId,
+		fetch: (id) => api<Person>(`/api/persons/${id}/curation`),
+		onreset: closeMergeSearch,
 	});
+	const person = $derived(entity.data);
 
 	// Après une écriture : relit la personne du volet et prévient la page hôte.
 	async function refreshAfterChange() {
 		onchange?.();
-		await loadPerson();
+		await entity.reload();
 	}
 
 	/* ── Identifiants ── */
@@ -112,7 +106,7 @@
 		try {
 			await personsApi.rename(id, lastName, firstName);
 		} catch (e) {
-			toast(errorMessage(e), 'error');
+			toastError(e);
 			return false;
 		}
 		await refreshAfterChange();
@@ -195,7 +189,7 @@
 		try {
 			await personsApi.merge(personId, otherId);
 		} catch (e) {
-			toast(`Fusion impossible : ${errorMessage(e)}`, 'error');
+			toastError(e, 'Fusion impossible');
 			return;
 		}
 		await refreshAfterChange();

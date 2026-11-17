@@ -1,4 +1,4 @@
-"""Phase `resolve_ra` : résolution préfixe DOI → Registration Agency.
+"""Agence d'enregistrement de chaque préfixe DOI, tâche de la phase `dois`.
 
 Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) de tous les DOI connus absents de `doi_prefixes`, et insère `(prefix, ra)`. Un préfixe inconnu de doi.org est inséré avec `ra='unknown'`. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
 
@@ -18,11 +18,9 @@ from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.doi_org import fetch_registration_agencies
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
-    LAST_BRANCH,
+    BRANCH,
     inflect,
-    nothing_to_do,
     quantity,
-    step,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
@@ -60,15 +58,8 @@ def resolve(
         for prefix in prefix_store.get_prefixes_to_resolve()
         if str(DoiPrefix.try_parse(prefix)) == prefix
     ]
-    step(log, "Agences d'enregistrement des préfixes DOI")
-    if not prefixes:
-        nothing_to_do(log)
-    else:
-        log.info(
-            "%s%s à résoudre",
-            LAST_BRANCH,
-            quantity(len(prefixes), "préfixe DOI", "préfixes DOI"),
-        )
+    if prefixes:
+        log.info("%s%s à résoudre", BRANCH, quantity(len(prefixes), "préfixe DOI", "préfixes DOI"))
 
     new_by_ra: dict[str, int] = {}
     try:
@@ -96,9 +87,12 @@ def resolve(
             for ra, dois, n_prefixes in prefix_store.breakdown_by_registration_agency()
         ]
     }
-    resolved = metrics.extras.get("resolved", 0)
-    total = metrics.total
-    metrics.report = f"{resolved}/{total} {inflect(total, 'préfixe')} {inflect(total, 'résolu')}"
+    if prefixes:
+        resolved = metrics.extras.get("resolved", 0)
+        total = metrics.total
+        metrics.report = (
+            f"{resolved}/{total} {inflect(total, 'préfixe')} {inflect(total, 'résolu')}"
+        )
     return metrics
 
 
@@ -114,6 +108,7 @@ TASKS = (
         previous_run=("source_records", "source_record_identifiers", "publication_relations"),
         network=DOI_ORG,
         run=resolve_prefixes,
-        label="Bilan",
+        section="Agences d'enregistrement des préfixes DOI",
+        silent_when_empty=True,
     ),
 )

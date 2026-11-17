@@ -7,15 +7,11 @@ import sys
 
 import pytest
 
-from pipeline.graph import Phase
+from pipeline.graph import Block, Phase
 from pipeline.phases import PHASES
 from pipeline.public import PHASE_ORDER
-from pipeline.run import (
-    PHASE_TITLE_WIDTH,
-    _build_arg_parser,
-    _phase_title,
-    _run_title,
-)
+from pipeline.run import _build_arg_parser, _run_title
+from pipeline.runtime.observability.log_format import PHASE_TITLE_WIDTH, phase_title
 
 _PHASES = {phase.name: phase for phase in PHASES}
 
@@ -31,7 +27,7 @@ def sortie_capturee(monkeypatch):
 
 
 def _titre(name: str) -> list[str]:
-    return _phase_title(name, _PHASES[name].label)
+    return phase_title(name, _PHASES[name].label)
 
 
 @pytest.mark.parametrize("phase", PHASE_ORDER)
@@ -73,7 +69,7 @@ def _texte(lines: list[str]) -> str:
 
 
 def _phase(name: str) -> Phase:
-    return Phase(name, "Libellé", ())
+    return Phase(name, "Libellé", (), Block.ENTITIES)
 
 
 class TestTitreDuRun:

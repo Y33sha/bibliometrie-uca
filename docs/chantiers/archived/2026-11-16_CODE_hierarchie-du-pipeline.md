@@ -20,7 +20,8 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 - L'arborescence donne l'ordre d'exécution. Les tests vérifient sa compatibilité avec les dépendances déclarées par les tâches.
 - Les phases d'une seule tâche rejoignent une phase voisine. `finalize` recalcule les données dérivées des entités : périmètre des publications, purges, vues, compteurs.
 - `countries` rejoint `affiliations` : structures, pays, puis indices de périmètre des contributions sources.
-- La consolidation de la publication est seule à calculer les champs de la publication. Les phases `countries` et `oa_status` produisent les faits : pays des adresses, réponses d'Unpaywall. Un changement de pays d'une adresse déclenche la consolidation des publications liées à cette adresse. Un changement de réponse d'Unpaywall déclenche la consolidation des publications du DOI.
+- La consolidation de la publication est seule à calculer les champs de la publication. L'étape des pays et la phase `oa_status` produisent les faits : pays des enregistrements sources, réponses de doi.org et d'Unpaywall. Un fait modifié met en file de consolidation les publications concernées.
+- `dois` est le référentiel des DOI connus. Il contient l'existence et l'URL de résolution chez doi.org de tous les DOI actifs des enregistrements sources rattachés ou du périmètre, et le verdict d'Unpaywall des DOI candidats au DOI d'une publication. `fetch_missing` et la correction lisent l'existence d'un DOI dans `dois`.
 
 ## Phasage
 
@@ -43,22 +44,23 @@ Deux valeurs de la publication sont calculées à deux endroits. La consolidatio
 - [x] Écriture de `publications.countries` retirée de l'étape des pays
 - [x] Écriture de `publications.oa_status` retirée de la phase `oa_status`
 - [x] `oa_status` après la correction, sur les DOI candidats des enregistrements sources (règle des ancres, hors DOI qui ont une cible) : +21 % de DOI interrogés
-- [ ] Source unique pour « DOI inexistant » : `fetch_missing` et la correction lisent `dois` au lieu d'interroger doi.org et de lire `failed_lookups`
+- [x] Migration : `dois.registered` (DOI connu ou inconnu de doi.org), DOI inconnus repris de `failed_lookups`
+- [x] Phase `dois` après `affiliations`, à la place de `resolve_ra` et `oa_status` : agence des préfixes, existence et URL de tous les DOI connus (vue `known_dois` et formes sans version, 98 639 DOI), verdict d'Unpaywall des DOI candidats
+- [x] `fetch_missing` et la correction lisent `dois.registered`. `fetch_missing` cesse d'interroger doi.org.
 
 ### Phase 3 — Premier niveau
 
-- [ ] Arborescence cible ([annexe](CODE_hierarchie-du-pipeline_arborescence.md)), puis arbitrage de chaque écart avec l'exécution : réviser l'arborescence ou la logique
-- [ ] `resolve_ra` dans l'étape des préfixes DOI de `publishing` ; agence du préfixe posée à un seul endroit
-- [ ] `fetch_truncated` dans la collecte
-- [ ] `finalize` : recalcul des données dérivées
-- [ ] `fetch_missing` : étapes par source, menées en parallèle, chacune avec ses recherches par hal-id, NNT, numéro de brevet ou DOI
+- [x] Arborescence cible ([annexe](2026-11-16_CODE_hierarchie-du-pipeline_arborescence.md)), puis arbitrage de chaque écart avec l'exécution : réviser l'arborescence ou la logique
+- [x] Intitulés des phases dans les mots de l'arborescence, lisibles sans connaître le schéma ; `finalize` s'intitule « Données dérivées »
+- [x] Bloc de chaque phase (`Block`), affiché par l'aide de `run_pipeline` et par `pipeline_tree`
+- [x] `fetch_missing` : étapes par source, menées en parallèle, chacune avec ses recherches par hal-id, NNT, numéro de brevet ou DOI. Dans un groupe parallèle, les tâches d'une même source s'enchaînent dans une file.
 - [x] Relations lues au run suivant par `resolve_ra` et `fetch_missing` : délai accepté
 
 ### Phase 4 — Documentation
 
-- [ ] `docs/pipeline/01-vue-d-ensemble.md` : arborescence du pipeline
-- [ ] `docs/pipeline/04-affiliations.md` et `docs/pipeline/11-enrichissements.md` : pays dans la phase `affiliations`
-- [ ] `docs/pipeline/05-publishing.md` : `merge_duplicate_monographs` absent des tâches, `attach_publishers` et `attach_monographs` absents de la page
-- [ ] `docs/pipeline/07-publications.md` : file de consolidation et tâche `consolidate`
-- [ ] `docs/pipeline/11-enrichissements.md` et page d'`oa_status` : phase avant `publications`, DOI candidats, mise en file
-- [ ] `CLAUDE.md` : liste des phases
+- [x] `docs/pipeline/01-vue-d-ensemble.md` : arborescence du pipeline
+- [x] `docs/pipeline/04-affiliations.md` et `docs/pipeline/11-enrichissements.md` : pays dans la phase `affiliations`
+- [x] `docs/pipeline/05-publishing.md` : phase `dois`, étapes de `publishing`
+- [x] `docs/pipeline/07-publications.md` : file de consolidation, tâche `consolidate`, statut open access
+- [x] `docs/sources`, `docs/donnees` : renvois aux phases `dois` et `affiliations`
+- [x] `CLAUDE.md` : liste des phases

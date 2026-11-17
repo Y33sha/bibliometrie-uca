@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
+	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import { onMount } from 'svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
@@ -10,11 +12,12 @@
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
-	import { columnLabels, filterLabels } from '#lib/labels.js';
+	import { columnLabels, filterLabels, sectionLabels } from '#lib/labels.js';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 
 	import type { components } from '#lib/api/schema.js';
 	import { formatCount } from '#lib/plural.js';
+	import { sourceLabel } from '#lib/sources.svelte.js';
 	import IconButton from '#lib/components/IconButton.svelte';
 	type Address = components['schemas']['AddressForCountryAttribution'];
 	type Country = components['schemas']['CountryOut'];
@@ -22,17 +25,20 @@
 	type Facet = { value: string; count: number };
 	type AddressesResponse = { country_facets?: Facet[]; without_country?: number };
 
-	const METHOD_LABELS: Record<Method, string> = {
+	// Une méthode `source_<source>` reprend le pays donné par la source : elle porte le nom de la source.
+	const METHOD_LABELS: Record<Exclude<Method, `source_${string}`>, string> = {
 		manual: 'saisie',
 		country_name: 'nom de pays',
-		source_openalex: 'OpenAlex',
 		institution: 'institution',
 		city: 'ville',
-		source_scanr: 'ScanR',
 	};
 
+	function methodLabel(method: Method): string {
+		return method.startsWith('source_') ? sourceLabel(method.slice('source_'.length)) : METHOD_LABELS[method as keyof typeof METHOD_LABELS];
+	}
+
 	function methodsLabel(methods: Method[]): string {
-		return methods.map(m => METHOD_LABELS[m]).join(', ');
+		return methods.map(methodLabel).join(', ');
 	}
 
 	let countries: Country[] = $state([]);
@@ -197,7 +203,7 @@
 	});
 </script>
 
-<PageHeader title="Pays" hidden />
+<PageHeader title={sectionLabels['admin/countries']} hidden />
 
 <div class="toolbar">
 	<input type="search" placeholder="Rechercher dans les adresses" bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
@@ -220,7 +226,7 @@
 	{/if}
 	{#if batchCountry && hasActiveFilter}
 		<button class="btn" onclick={() => batchAddCountry(true)} disabled={batchApplying}>
-			Ajouter à tout le filtre ({list.total.toLocaleString('fr-FR')})
+			Ajouter à tout le filtre ({formatNumber(list.total)})
 		</button>
 	{/if}
 	{#if batchResult}
@@ -248,14 +254,14 @@
 						<div class="country-cell">
 						{#each a.countries ?? [] as c}
 							{@const found = a.found_countries.find(f => f.country_code === c)}
-							<span class="tag tag-success tag-removable" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
+							<span class="tag tag-success tag-removable" use:tooltip={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
 								{countryLabel(c)}
 								<IconButton icon="reject" small label="Retirer {countryLabel(c)}" onclick={() => removeCountry(a.id, c)} />
 							</span>
 						{/each}
 						<span class="country-actions">
 							{#each a.found_countries.filter(f => !a.countries?.includes(f.country_code)) as p}
-								<button class="tag tag-warning proposal-tag" title="Ajouter ce pays" onclick={() => addCountry(a.id, p.country_code)}>
+								<button class="tag tag-warning proposal-tag" use:tooltip={'Ajouter ce pays'} onclick={() => addCountry(a.id, p.country_code)}>
 									{countryLabel(p.country_code)} ?
 									<span class="proposal-methods">{methodsLabel(p.methods)}</span>
 								</button>

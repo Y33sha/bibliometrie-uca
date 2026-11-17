@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
+	import Gem from '@lucide/svelte/icons/gem';
+	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels } from '#lib/labels.js';
@@ -21,8 +24,6 @@
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
-	import { withBase } from '#lib/paths.js';
-	import { paramsToQuery } from '#lib/utils.js';
 	import { facetDefs, type PresenceCounts } from '#lib/filterRegistry.js';
 	import { SERIAL_FILTER_GROUPS, serialFilters } from '#lib/serialFilters.js';
 	import type { components } from '#lib/api/schema.js';
@@ -104,12 +105,6 @@
 			}),
 	});
 
-	function exportCsvUrl(): string {
-		const params = list.filterParams();
-		params.set('sort', list.sort);
-		return withBase(`/api/serials/export.csv?${paramsToQuery(params)}`);
-	}
-
 	function setSort(column: 'title' | 'publisher' | 'publications') {
 		list.setSort(nextSort(list.sort, column, column === 'publications' ? 'desc' : 'asc'));
 	}
@@ -123,7 +118,7 @@
 	onMount(list.restore);
 </script>
 
-<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou ISSN" onsearch={list.onSearchInput} list={list.listing} one="publication en série" many="publications en série" exportUrl={exportCsvUrl()} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou ISSN" onsearch={list.onSearchInput} list={list.listing} one="publication en série" many="publications en série" exportUrl={list.exportUrl('/api/serials/export.csv')} countBelow>
 	{#snippet leading()}
 		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
 	{/snippet}
@@ -167,12 +162,8 @@
 				{/if}
 				<td class="diamond-col">
 					{#if j.oa_model === 'diamond'}
-						<span class="diamond" title="Revue diamant&nbsp;: open access sans frais de publication" aria-label="Revue diamant">
-							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-								<path d="M6 3h12l4 6-10 13L2 9Z" />
-								<path d="M11 3 8 9l4 13 4-13-3-6" />
-								<path d="M2 9h20" />
-							</svg>
+						<span class="diamond" use:tooltip={'Revue diamant : open access sans frais de publication'} aria-label="Revue diamant">
+							<Gem size={15} />
 						</span>
 					{/if}
 				</td>
@@ -193,7 +184,7 @@
 				{/if}
 				<td class="muted">{serialTypeLabel(j.serial_type)}</td>
 				<!-- Un décompte non nul mène à l'onglet Publications de la fiche. -->
-				<td class="num">{#if j.publication_count}<a href={resolve(`journals/${j.id}?tab=publications`)}>{j.publication_count.toLocaleString('fr-FR')}</a>{:else}0{/if}</td>
+				<td class="num">{#if j.publication_count}<a href={resolve(`journals/${j.id}?tab=publications`)}>{formatNumber(j.publication_count)}</a>{:else}0{/if}</td>
 			</tr>
 		{/each}
 		{#if list.listing.items.length === 0}
@@ -211,8 +202,7 @@
 		id={drawer.id}
 		onclose={() => drawer.open(null)}
 		onchange={() => {
-			list.listing.load();
-			list.facets.load();
+			list.reload();
 			onchange?.();
 		}}
 	/>

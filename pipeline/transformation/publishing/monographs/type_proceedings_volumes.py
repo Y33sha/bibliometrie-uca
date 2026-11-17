@@ -1,6 +1,6 @@
-"""Sous-étape de la phase `publishing` : nature des monographies, volume d'actes ou livre.
+"""Tâche de la phase `publishing` : nature des monographies, volume d'actes ou livre.
 
-La nature se recalcule à chaque run d'après les enregistrements sources, la collection et le titre de la monographie (`is_proceedings_volume`). Elle suit les enregistrements sources quand ils changent, dans un sens comme dans l'autre. La sous-étape suit le typage des collections et lit leur type.
+La nature se recalcule à chaque run d'après les enregistrements sources, la collection et le titre de la monographie (`is_proceedings_volume`). Elle suit les enregistrements sources quand ils changent, dans un sens comme dans l'autre. La tâche suit le typage des collections et lit leur type.
 """
 
 import logging
@@ -14,7 +14,7 @@ from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 LABEL = "Nature des monographies"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 
 class MonographProceedingsFacts(NamedTuple):

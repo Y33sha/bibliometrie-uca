@@ -1,4 +1,5 @@
 <script lang="ts" generics="Pair extends { person_a: CurationPerson; person_b: CurationPerson }">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import RhCheck from "#lib/components/RhCheck.svelte";
   import { untrack, type Snippet } from "svelte";
   import { errorMessage, persons as personsApi } from "#lib/api/index.js";
@@ -100,7 +101,7 @@
               <button
                 class="btn btn-sm"
                 disabled={acting}
-                title="Garder la personne de gauche, absorber celle de droite"
+                use:tooltip={'Garder la personne de gauche, absorber celle de droite'}
                 onclick={() => merge(pair.person_a.person_id, pair.person_b.person_id)}
                 >&larr; Fusionner</button
               >
@@ -108,7 +109,7 @@
             <button
               class="btn btn-sm"
               disabled={acting}
-              title={distinctTitle}
+              use:tooltip={distinctTitle}
               onclick={() => markDistinct(pair.person_a.person_id, pair.person_b.person_id)}
               >Distinctes</button
             >
@@ -116,7 +117,7 @@
               <button
                 class="btn btn-sm"
                 disabled={acting}
-                title="Garder la personne de droite, absorber celle de gauche"
+                use:tooltip={'Garder la personne de droite, absorber celle de gauche'}
                 onclick={() => merge(pair.person_b.person_id, pair.person_a.person_id)}
                 >Fusionner &rarr;</button
               >

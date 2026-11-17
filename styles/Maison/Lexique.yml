@@ -11,6 +11,7 @@ swap:
   "authorships?": "contribution"
   "identités?": "informations du contributeur"
   "extracteurs?": "moissonneur"
+  "collectes?": "moissonnage"
   "nœuds?": "tâche"
   "fusions? forcées?": "fusion manuelle"
   "fiches? de catalogue": "page descriptive"

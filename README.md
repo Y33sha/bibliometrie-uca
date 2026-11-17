@@ -2,7 +2,7 @@
 
 Suivi de la production scientifique de l'Université Clermont Auvergne.
 
-Le pipeline collecte auprès de sources en ligne les métadonnées de publications scientifiques rattachées à l'université, les dédoublonne et les relie à leurs auteurs et structures de rattachement. L'application web les restitue sous forme de listes et de tableaux de bord.
+Le pipeline moissonne dans des sources en ligne les métadonnées de publications scientifiques rattachées à l'université, les dédoublonne et les relie à leurs auteurs et structures de rattachement. L'application web les restitue sous forme de listes et de tableaux de bord.
 
 ## Stack technique
 

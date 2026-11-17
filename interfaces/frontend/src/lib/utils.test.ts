@@ -9,6 +9,8 @@ import {
 	titleCase,
 	titleText,
 	formatDate,
+	formatNumber,
+	formatPercent,
 	formatPublicationDate,
 	deriveStructDetectionStatus,
 	paramsToQuery
@@ -136,6 +138,29 @@ describe('formatDate', () => {
 
 	it('retourne une chaîne vide pour null', () => {
 		expect(formatDate(null)).toBe('');
+	});
+
+	it('formate un horodatage en JJ/MM/AAAA', () => {
+		expect(formatDate('2026-01-02T12:00:00Z')).toBe('02/01/2026');
+	});
+});
+
+// ── formatNumber, formatPercent ────────────────────────────────
+
+describe('formatNumber', () => {
+	it('sépare les milliers et met une virgule décimale', () => {
+		expect(formatNumber(1234.5)).toBe('1 234,5');
+	});
+});
+
+describe('formatPercent', () => {
+	it('arrondit à l’unité, avec une espace insécable avant le signe', () => {
+		expect(formatPercent(0.1234)).toBe('12 %');
+	});
+
+	it('garde au plus le nombre de décimales demandé', () => {
+		expect(formatPercent(0.1234, 1)).toBe('12,3 %');
+		expect(formatPercent(0.1, 1)).toBe('10 %');
 	});
 });
 

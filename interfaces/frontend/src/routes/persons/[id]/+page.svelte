@@ -1,14 +1,15 @@
 <script lang="ts">
+	import GraduationCap from '@lucide/svelte/icons/graduation-cap';
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
-	import { columnLabels } from '#lib/labels.js';
+	import { columnLabels, sectionLabels } from '#lib/labels.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
 	import { api, apiDetail, contributions } from '#lib/api/index.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { formatCount, plural } from '#lib/plural.js';
-	import { titleCase, formatDate } from '#lib/utils.js';
+	import { formatDate, formatNumber, formatPercent, titleCase } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
 	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
@@ -82,8 +83,7 @@
 	});
 	// Publications avec adresse où figure chaque structure, et leur part.
 	const addrStructures = $derived(addrSummary?.structures ?? []);
-	const addrShare = (publications: number) =>
-		`${Math.round((100 * publications) / (addrSummary?.publications_with_address || 1))} %`;
+	const addrShare = (publications: number) => formatPercent(publications / (addrSummary?.publications_with_address || 1));
 	const publicationCount = (n: number) => formatCount(n, 'publication');
 	// Largeur réservée aux libellés des structures, à gauche de l'axe du graphique.
 	const ADDR_AXIS_WIDTH = 120;
@@ -187,7 +187,7 @@
 
 </script>
 
-<EntityBreadcrumb section={{ label: 'Chercheurs', path: 'persons' }} name={displayName} fallback="Personne" />
+<EntityBreadcrumb section={{ label: sectionLabels.persons, path: 'persons' }} name={displayName} fallback="Personne" />
 
 {#if error || !profile}
 	<EntityStatus {error} notFound="Personne introuvable" />
@@ -239,9 +239,9 @@
 					figures={thesesCount > 0
 						? [
 								{
-									value: thesesCount.toLocaleString('fr-FR'),
+									value: formatNumber(thesesCount),
 									label: plural(thesesCount, 'thèse liée', 'thèses liées'),
-									icon: 'graduation-cap',
+									icon: GraduationCap,
 								},
 							]
 						: []}

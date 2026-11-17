@@ -4,6 +4,7 @@
 	import type { components } from '#lib/api/schema.js';
 	import SerialGroupsList from './SerialGroupsList.svelte';
 	import { formatCount } from '#lib/plural.js';
+	import { formatPercent } from '#lib/utils.js';
 
 	type Response = components['schemas']['DoiNamespaceConflictsResponse'];
 	type Conflict = components['schemas']['DoiNamespaceConflict'];
@@ -24,8 +25,6 @@
 			)
 			.join(', ');
 	}
-
-	const percent = new Intl.NumberFormat('fr-FR', { style: 'percent', maximumFractionDigits: 0 });
 </script>
 
 <SerialGroupsList
@@ -40,7 +39,7 @@
 	{/snippet}
 	{#snippet groupHead(c: Conflict)}
 		<code>{c.namespace}</code> : {c.dois} DOI sur {c.documents} documents.
-		{percent.format(c.share)} des DOI désignent {c.namespace_serial.title}.<br />
+		{formatPercent(c.share)} des DOI désignent {c.namespace_serial.title}.<br />
 		Attribution concurrente : {c.record_serial.title} ({sources(c)}).
 	{/snippet}
 </SerialGroupsList>

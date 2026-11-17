@@ -10,11 +10,11 @@ function fold(char: string): string {
 	return base.length === 1 ? base : char.toLowerCase();
 }
 
-/** Découpe `text` autour des occurrences de `term`, sans tenir compte des accents ni de la casse. Un terme vide renvoie le texte entier. */
+/** Découpe `text` autour des occurrences de `term`, sans tenir compte des accents ni de la casse. Le texte et le terme sont composés (NFC) : un diacritique combinant rejoint sa lettre. Un terme vide renvoie le texte entier. */
 export function highlight(text: string, term: string): HighlightSegment[] {
-	const needle = Array.from(term.trim()).map(fold).join('');
+	const needle = Array.from(term.trim().normalize('NFC')).map(fold).join('');
 	if (!needle) return [{ text, match: false }];
-	const chars = Array.from(text);
+	const chars = Array.from(text.normalize('NFC'));
 	const haystack = chars.map(fold).join('');
 	const segments: HighlightSegment[] = [];
 	let from = 0;

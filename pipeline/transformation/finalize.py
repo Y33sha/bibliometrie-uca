@@ -15,9 +15,15 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, text
 
 from infrastructure.db.scalars import scalar_int
-from pipeline.graph import Step, Task, in_transaction
+from pipeline.graph import Block, Phase, Step, Task, in_transaction
 from pipeline.runtime.context import PhaseContext
-from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
+from pipeline.runtime.observability.log_format import (
+    BRANCH,
+    LAST_BRANCH,
+    inflect,
+    open_section,
+    quantity,
+)
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.transformation.publications.lifecycle import purge_publications
@@ -122,7 +128,7 @@ def _publication_counts(ctx: PhaseContext) -> PhaseMetrics:
 
     Chaque décompte est long : sa ligne annonce le travail en cours, puis affiche son résultat.
     """
-    step(ctx.logger, "Recalcul des décomptes de publications")
+    open_section(ctx.logger, "Recalcul des décomptes de publications")
 
     with waiting(f"{BRANCH}par adresse", ctx.logger) as line:
         with ctx.open_tx() as conn:
@@ -325,7 +331,7 @@ _PUBLICATION_COUNTS = Task(
 )
 
 
-STEPS = (
+_CHILDREN = (
     _PURGE_PUBLICATIONS,
     _PUBLICATIONS_IN_PERIMETER,
     _STRUCTURES,
@@ -353,3 +359,12 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
         "publications_purged": by_task["purge_publications"].details["purged"],
     }
     return metrics
+
+
+PHASE = Phase(
+    "finalize",
+    "Données dérivées : périmètre des publications, purges, vues, compteurs",
+    _CHILDREN,
+    Block.DERIVED_DATA,
+    assemble=assemble,
+)

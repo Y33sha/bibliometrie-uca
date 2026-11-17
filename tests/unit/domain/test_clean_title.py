@@ -4,6 +4,9 @@ from domain.normalize import clean_title
 
 
 class TestCleanTitle:
+    def test_compose_les_diacritiques_combinants(self):
+        assert clean_title("Étude de l'érosion") == "Étude de l'érosion"
+
     def test_decodes_double_encoded_html_tags(self):
         """Cas réel d'OpenAlex et de scanR : `<i>…</i>` arrive doublement échappé."""
         result = clean_title("Detection of &amp;lt;i&amp;gt;Candida&amp;lt;/i&amp;gt; species")

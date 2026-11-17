@@ -1,12 +1,13 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount, tick } from 'svelte';
-	import { api, apiDetail } from '#lib/api/index.js';
-	import { issnLabel, serialRelationLabels } from '#lib/labels.js';
+	import { apiDetail, apiOnce } from '#lib/api/index.js';
+	import { issnLabel, serialRelationLabels, sectionLabels } from '#lib/labels.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import { activeTabId, type TabDef } from '#lib/tabs.js';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
@@ -15,7 +16,7 @@
 	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import SerialDrawer from '#lib/components/serials/SerialDrawer.svelte';
-	import { issnPortalUrl } from '#lib/utils.js';
+	import { formatDate, issnPortalUrl } from '#lib/utils.js';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import type { components } from '#lib/api/schema.js';
@@ -67,17 +68,12 @@
 
 	onMount(async () => {
 		const labelMap = (opts: EnumOption[]) => Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
-		const oaModelLabelsP = api<EnumOption[]>('/api/serials/oa-models').then((opts) => {
+		const oaModelLabelsP = apiOnce<EnumOption[]>('/api/serials/oa-models').then((opts) => {
 			oaModelLabels = labelMap(opts);
 		});
 		await Promise.all([loadSerial(), oaModelLabelsP]);
 		await tick();
 	});
-
-	function formatDate(iso: string | null): string {
-		if (!iso) return '';
-		return new Date(iso).toLocaleDateString('fr-FR');
-	}
 
 	/** Filtre de la liste des revues qui retient les revues d'une liste, ou d'un niveau de classement. */
 	function listQuery(list: { code: string; is_level: boolean }): string {
@@ -92,7 +88,7 @@
 	}
 </script>
 
-<EntityBreadcrumb section={{ label: 'Publications en série', path: 'journals' }} name={journal?.title} fallback="Publication en série" />
+<EntityBreadcrumb section={{ label: sectionLabels.journals, path: 'journals' }} name={journal?.title} fallback="Publication en série" />
 
 {#if error || !journal}
 	<EntityStatus {error} notFound="Publication en série introuvable" />
@@ -104,7 +100,7 @@
 			{#snippet identifierLinks()}
 				<span class="title-identifier-text">
 					{#each journal!.issn_details.filter((i) => i.status === 'active' || i.linking) as issn (issn.issn)}
-						<span><span class="identifier-label">{issnLabel(issn)}</span> <a href={issnPortalUrl(issn.issn)} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{issn.issn}</a></span>
+						<span><span class="identifier-label">{issnLabel(issn)}</span> <a href={issnPortalUrl(issn.issn)} target="_blank" rel="noopener" use:tooltip={'Portail ISSN (nouvel onglet)'}>{issn.issn}</a></span>
 					{/each}
 				</span>
 			{/snippet}
@@ -128,7 +124,7 @@
 						{#if relation.serial_id}
 							<a href={resolve(`journals/${relation.serial_id}`)}>{relation.title}</a>
 						{:else if relation.issn}
-							<a href={issnPortalUrl(relation.issn)} target="_blank" rel="noopener" title="Portail ISSN (nouvel onglet)">{relation.issn}</a>
+							<a href={issnPortalUrl(relation.issn)} target="_blank" rel="noopener" use:tooltip={'Portail ISSN (nouvel onglet)'}>{relation.issn}</a>
 						{/if}
 					</EntityMetaItem>
 				{/each}
@@ -138,7 +134,7 @@
 			<div class="entity-meta">
 				<EntityMetaItem label="Listes">
 					{#each journal.lists as list (list.code)}
-						<a class="list-link" href={resolve(`journals?${listQuery(list)}`)} title={listTitle(list)}>{list.label}</a>
+						<a class="list-link" href={resolve(`journals?${listQuery(list)}`)} use:tooltip={listTitle(list)}>{list.label}</a>
 					{/each}
 				</EntityMetaItem>
 			</div>

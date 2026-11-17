@@ -1,11 +1,13 @@
 <script lang="ts">
   // Volet d'édition d'une publication en série, réservé à la session admin : titre, type, modèle OA, caractère académique et fusion.
-  import { onMount, untrack } from "svelte";
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
+  import { onMount } from "svelte";
   import { resolve } from "$app/paths";
-  import { api, errorMessage, serials as serialsApi } from "#lib/api/index.js";
+  import { api, apiOnce, serials as serialsApi } from "#lib/api/index.js";
   import { autofocus } from "#lib/actions/focus.js";
   import { useDebouncedSearch } from "#lib/composables/useDebouncedSearch.svelte.js";
-  import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
+  import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
+  import { confirmDialog, toastError } from "#lib/dialogs.svelte.js";
   import { issnLabel } from "#lib/labels.js";
   import Drawer from "#lib/components/Drawer.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
@@ -31,7 +33,6 @@
     onchange: () => void;
   } = $props();
 
-  let serial = $state<SerialDetail | null>(null);
   let serialTypes: EnumOption[] = $state([]);
   let oaModels: EnumOption[] = $state([]);
 
@@ -50,27 +51,21 @@
     transform: (results) => results.filter((j) => j.id !== id),
   });
 
-  async function load() {
-    const current = id;
-    const detail = await api<SerialDetail>(`/api/serials/${current}`);
-    if (current === id) serial = detail;
-  }
-
   // Chaque publication en série ouverte repart de son état chargé, sans édition ni fusion en cours.
-  $effect(() => {
-    void id;
-    untrack(() => {
-      serial = null;
+  const entity = useDrawerEntity({
+    id: () => id,
+    fetch: (id) => api<SerialDetail>(`/api/serials/${id}`),
+    onreset() {
       editing = false;
       closeMerge();
-      void load();
-    });
+    },
   });
+  const serial = $derived(entity.data);
 
   onMount(async () => {
     [serialTypes, oaModels] = await Promise.all([
-      api<EnumOption[]>("/api/serials/types"),
-      api<EnumOption[]>("/api/serials/oa-models"),
+      apiOnce<EnumOption[]>("/api/serials/types"),
+      apiOnce<EnumOption[]>("/api/serials/oa-models"),
     ]);
   });
 
@@ -78,10 +73,10 @@
     try {
       await serialsApi.update(id, body);
     } catch (e) {
-      toast(errorMessage(e), "error");
+      toastError(e);
       return false;
     }
-    await load();
+    await entity.reload();
     onchange();
     return true;
   }
@@ -112,7 +107,7 @@
         }
       }
     } catch (e) {
-      toast("Erreur lors du calcul d'impact : " + errorMessage(e), "error");
+      toastError(e, "Calcul d'impact impossible");
       select.value = previous;
       return;
     }
@@ -137,7 +132,7 @@
     if (!(await confirmDialog({ message, danger: true }))) return;
     if (!(await mergeSerial(serial, source.id))) return;
     closeMerge();
-    await load();
+    await entity.reload();
     onchange();
   }
 
@@ -159,7 +154,7 @@
             <button type="button" class="btn btn-sm" onclick={() => (editing = false)}>Annuler</button>
           </form>
         {:else}
-          <a class="drawer-name-link" href={resolve(`journals/${serial.id}`)} target="_blank" rel="noopener" title="Voir la fiche publique">
+          <a class="drawer-name-link" href={resolve(`journals/${serial.id}`)} target="_blank" rel="noopener" use:tooltip={'Voir la fiche publique'}>
             {serial.title}
           </a>
           <div class="drawer-head-actions">
@@ -174,7 +169,7 @@
     <p class="muted">Chargement…</p>
   {:else}
     <div class="drawer-meta">
-      <span>{serial.publication_count.toLocaleString("fr-FR")} publications</span>
+      <span>{formatCount(serial.publication_count, "publication")}</span>
       {#if serial.is_in_doaj}<span class="tag tag-success badge-doaj">DOAJ</span>{/if}
     </div>
 
@@ -251,7 +246,7 @@
           {#snippet item(r)}
             {r.title}
             {#if r.publisher_name}<span class="muted"> — {r.publisher_name}</span>{/if}
-            <span class="muted"> ({r.publication_count} publications)</span>
+            <span class="muted"> ({formatCount(r.publication_count, "publication")})</span>
           {/snippet}
         </Picker>
       {:else}

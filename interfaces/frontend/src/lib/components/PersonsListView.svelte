@@ -15,8 +15,6 @@
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import PersonCurationDrawer from '#lib/components/persons/PersonCurationDrawer.svelte';
-	import { withBase } from '#lib/paths.js';
-	import { paramsToQuery } from '#lib/utils.js';
 
 	// Vue-liste des personnes réutilisable. Utilisée par :
 	// - `/persons` (annuaire autonome avec sync URL)
@@ -93,16 +91,10 @@
 		),
 	);
 
-	function exportCsvUrl(): string {
-		const params = list.filterParams();
-		params.set('sort', list.sort);
-		return withBase(`/api/persons/export.csv?${paramsToQuery(params)}`);
-	}
-
 	onMount(list.restore);
 </script>
 
-<ListToolbar bind:search={list.search} placeholder="Rechercher par nom" onsearch={list.onSearchInput} list={list.listing} one="personne" many="personnes" exportUrl={exportCsvUrl()} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher par nom" onsearch={list.onSearchInput} list={list.listing} one="personne" many="personnes" exportUrl={list.exportUrl('/api/persons/export.csv')} countBelow>
 	{#snippet leading()}
 		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
 	{/snippet}

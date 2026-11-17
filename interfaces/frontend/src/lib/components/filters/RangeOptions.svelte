@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
+	import { formatNumber } from '#lib/utils.js';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import { coreRange, rangeSelection, rangeSummary } from '#lib/filterRegistry.js';
 
@@ -93,7 +95,7 @@
 		</div>
 		<div class="histogram" aria-hidden="true">
 			{#each bars as bar, i (bar.key)}
-				<span class="bar-slot" title="{bar.label} :{bar.count.toLocaleString('fr-FR')}">
+				<span class="bar-slot" use:tooltip={`${bar.label} :${formatNumber(bar.count)}`}>
 					<span class="bar" class:in-range={i >= start && i < end} style:height="{bar.count ? Math.max(4, (bar.count / maxCount) * 100) : 0}%"></span>
 				</span>
 			{/each}

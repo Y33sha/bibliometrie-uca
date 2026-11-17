@@ -16,7 +16,7 @@ from domain.sources.registry import PROFILES, Source
 from pipeline.runtime.config import YearRange
 from pipeline.runtime.modes import MODES, ModePolicy
 
-# Fabrique de transaction gérée en context-manager : commit en sortie de bloc si succès, rollback sur exception. Une phase ouvre une transaction par sous-étape.
+# Fabrique de transaction gérée en context-manager : commit en sortie de bloc si succès, rollback sur exception. Une phase ouvre une transaction par tâche.
 OpenTransaction = Callable[[], AbstractContextManager[Connection]]
 
 # Contrôle des identifiants d'accès : motif d'absence des identifiants d'une source, ou `None` s'ils sont utilisables.

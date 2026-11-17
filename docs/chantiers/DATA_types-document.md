@@ -56,7 +56,7 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 - Un type `practice_thesis` distingue les thèses d'exercice des mémoires. Il est exclu des publications, comme `memoir`.
 - Un type `journal_issue` désigne le numéro de revue, dirigé ou non. Il est exclu des publications. Un article qui a le DOI de son numéro le perd.
 - `data_paper` rejoint la famille des données et logiciels.
-- Erratum et rétractation quittent les listes de documents. Ils sont rattachés à la publication concernée.
+- Errata et avis de rétractation sont exclus des publications (`OUT_OF_SCOPE_DOC_TYPES`). La publication concernée les relie par leur DOI.
 - Un type `conference_abstract` (« Résumé de conférence »), famille Conférences, désigne le résumé publié d'une communication. Sources : OpenAlex `conference-abstract`, WoS `Meeting Abstract`, recueil de résumés HAL, communication rattachée à une revue, revue au titre en « abstract(s) ».
 - À l'arbitrage, le résumé l'emporte sur la communication. Un poster déclaré par une source (HAL, DataCite, session d'affichage Crossref) l'emporte sur les deux.
 - Les rapports par unité de recherche excluent les résumés.
@@ -79,13 +79,18 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 
 Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur 427 et 12 rétractations sur 14 sans relation. `is_retracted` est vrai pour 14 publications, dont 7 avis de rétractation et 1 erratum : OpenAlex marque aussi les avis. 6 articles rétractés, dont 1 relié à son avis.
 
-- [ ] `update-to` (erratum ou avis) et `updated-by` (article) de Crossref gardés dans `source_extras`. Oneshot depuis le raw store pour le stock. Errata et avis Crossref sans relation : article en base pour 44 errata et 7 avis de rétractation, absent pour 16 errata et 4 avis, surtout antérieurs à 2017.
-- [ ] Phase `relations` : correction, rétractation et avis de préoccupation tirés de `update-to` et `updated-by`, vers un DOI absent de la base compris. Avis absents de la base, connus par `updated-by`, y compris d'après Retraction Watch : 10.1038/s41467-017-00508-5, 10.1016/j.biortech.2018.03.127, 10.1016/j.biortech.2018.11.031.
-- [ ] Errata WoS sans DOI : référence de l'article (« vol 21 283 2020 ») retirée du titre avant le rapprochement. 74 errata trouvent un seul article, 8 plusieurs, 32 aucun.
-- [ ] Avis de rétractation rapprochés par le titre. Cas : avis 210139 et article 15199, avis sans payload Crossref.
-- [ ] « Rétracté » fondé sur les relations et sur OpenAlex, faux pour les avis eux-mêmes. Rétractation sur place par Elsevier : titre « RETRACTED: », `update-to` vers le DOI de l'article lui-même (10.1016/j.indmarman.2022.05.009).
-- [ ] Erratum et rétractation hors des listes de documents, affichés sur la publication concernée.
-- [ ] Erratum et rétractation sans contributions : `author_grouping` les saute, donc ni alignement ni personne. Leurs contributions sources restent en base, comme pour `OUT_OF_SCOPE_DOC_TYPES`. Mesure préalable : publications typées erratum ou rétractation sans titre de correction.
+- [x] `update-to` (erratum ou avis) et `updated-by` (article) de Crossref gardés dans `source_extras`. Oneshot `write_crossref_updates` depuis le raw store pour le stock : 896 enregistrements sources, 451 sans payload au raw store. Errata et avis Crossref sans relation : article en base pour 44 errata et 7 avis de rétractation, absent pour 16 errata et 4 avis, surtout antérieurs à 2017. 7d90f4e20, 140fc212d
+- [x] Phase `relations` : correction, rétractation et avis de préoccupation tirés de `update-to` et `updated-by`, vers un DOI absent de la base compris. Avis absents de la base, connus par `updated-by`, y compris d'après Retraction Watch : 10.1038/s41467-017-00508-5, 10.1016/j.biortech.2018.03.127, 10.1016/j.biortech.2018.11.031. d434701c3
+- [x] Errata WoS : titre WoS sans la référence de l'article (« (vol 21, pg 283, 2020) ») comparé au titre des publications, année de l'article lue dans la référence. Base locale : 169 errata reliés, dont 37 sans relation auparavant. 28 errata sans relation corrigent un article absent de la base. 074342de7
+- [x] Avis de rétractation : toutes les publications de type `retraction` sont reliées par les mises à jour Crossref. Elsevier déclare ses avis de rétractation comme des errata : une correction dont l'avis est de type `retraction` devient une rétractation. Base locale : 12 corrections remplacées par 8 rétractations. 7c178e803
+- [x] « Rétracté » calculé par la phase `relations` : relation de rétractation, rétractation sur place déclarée à Crossref, retrait, OpenAlex. Un avis, repéré par ses relations, est exclu. Un retrait Elsevier (`withdrawal`) est déclaré par le doublon retiré, vers l'article déjà publié : il marque le doublon, sans relation. Base locale : 9 publications rétractées. 0a89ad728
+- [ ] Doublons retirés par l'éditeur (Elsevier `withdrawal`) supprimés : 258617, 15131.
+- [ ] DOI tronqué déclaré par Retraction Watch (`10.1016/j.crphar.2022`, avis 9317).
+- [x] Errata et avis typés par enregistrement source : mise à jour Crossref vers une autre œuvre, titres d'errata et d'avis, référence en fin de titre WoS. Un article rétracté sur place typé `retraction` (OpenAlex, 2236) redevient `article`. Mesure du 2026-11-16 : 151 errata et avis sur 346 avaient un enregistrement source d'un autre type ; 391 enregistrements sources retypés. e4f88f785
+- [x] `erratum` et `retraction` dans `OUT_OF_SCOPE_DOC_TYPES`. Oneshot `requeue_notice_publications` : 355 publications, 1 434 enregistrements sources à réconcilier. 6959cb793
+- [x] Tâche `notices` de la phase `relations` : la relation part de la publication concernée, vers le DOI de l'avis. Signaux : déclarations Crossref de la publication et de l'avis, référence en fin de titre WoS, titre « Erratum: ». Chaque tâche reconstruit sa partie de `publication_relations`, définie par des types de relation. 6959cb793
+- [x] « Rétracté » lu sur `has_retraction`, sans exclusion des avis. 6959cb793
+- [ ] Mesures après le run : publications d'errata et d'avis, relations de correction et de rétractation, publications rétractées.
 - [ ] Facette « Rétracté ». Mise en forme de la page d'un article rétracté.
 
 ### Phase 3 — Arbitrage

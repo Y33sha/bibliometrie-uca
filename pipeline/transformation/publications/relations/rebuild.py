@@ -1,10 +1,12 @@
-"""Phase `relations` : reconstruction complète de `publication_relations` à chaque run, en une transaction.
+"""Phase `relations`, tâche `rebuild` : reconstruction à chaque run des relations entre publications, hors relations avec un erratum ou un avis (tâche `notices`).
 
 La phase suit `publications` : les enregistrements sources sont rattachés à leur publication, et un DOI cible se résout en publication quand elle est en base. Les relations viennent de trois signaux :
 
 - **Signal #1, relations déclarées** par DataCite (`related_identifiers`) et Crossref (`relation`), traduites par `domain.publications.relations`. Une relation de même œuvre (`IsVersionOf`, `IsVariantFormOf`) entre deux œuvres distinctes selon `declares_same_work` reçoit son type d'après les types de document des deux publications. Exemple : un preprint arXiv et l'article publié.
 - **Signal #2, clés de confirmation partagées** (hal_id, PMID, NNT, DOI arXiv) par deux publications distinctes : leurs types de document donnent la relation (`infer_shared_key_relation`).
-- **Signal #3, titre** : un erratum rejoint l'article corrigé (titre de l'article à la suite de « Erratum: »), un preprint sa version publiée (même titre), à condition qu'un seul candidat ait ce titre.
+- **Signal #3, titre** : un preprint rejoint sa version publiée (même titre), à condition qu'un seul candidat ait ce titre.
+
+Chaque tâche reconstruit sa partie de `publication_relations`, définie par des types de relation (`rebuild_relations`).
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from domain.documents.doc_types import DocType
 from domain.documents.identifiers import ARXIV_DOI_PREFIX
 from domain.publications.relations import (
     DEPENDENT_DOC_TYPE_RELATIONS,
+    NOTICE_RELATION_TYPES,
     RELATION_PAIR_LABELS,
     RelationType,
     extract_crossref_relations,
@@ -44,7 +47,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 class DeclaredRelationSource(NamedTuple):
-    """Enregistrement source rattaché qui déclare des relations dans son `source_extras` (DataCite `related_identifiers` ou Crossref `relation`)."""
+    """Enregistrement source rattaché qui déclare des relations dans son `source_extras` (DataCite `related_identifiers`, Crossref `relation`)."""
 
     publication_id: int
     source: str
@@ -87,9 +90,10 @@ class SharedKeyPair(NamedTuple):
 
 
 class TitleMatch(NamedTuple):
-    """Publication reliée par titre à l'œuvre dont elle dépend (signal #3) : un erratum à l'article corrigé, un preprint à sa version publiée. Le parent est au corpus. La relation dirigée part de `child` vers `parent` (`is_correction_of`, `is_preprint_of`)."""
+    """Œuvre dépendante reliée par titre à la publication dont elle dépend : un preprint à sa version publiée, un erratum à l'article corrigé."""
 
     child_id: int
+    """Publication du preprint, enregistrement source de l'erratum."""
     parent_id: int
     parent_doi: str | None
 
@@ -105,7 +109,7 @@ class RelationsRebuild(NamedTuple):
     """Arêtes disparues : présentes avant la reconstruction et absentes après."""
 
 
-_TITLE_MATCH_YEAR_WINDOW = 2
+TITLE_MATCH_YEAR_WINDOW = 2
 """Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens : un erratum suit son article (parent dans `[année − N … année]`), une version publiée suit son preprint (parent dans `[année … année + N]`)."""
 
 _SINGLE_KEY_TYPES = tuple(
@@ -137,35 +141,17 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
 """)
 """Paires de publications distinctes partageant une clé de confirmation, héritée par la publication de ses enregistrements sources : tout `hal_id` actif, pour NNT et PMID l'identifiant actif de rôle le plus fort, puis de plus petite valeur, et tout DOI arXiv actif. Le DOI arXiv, DOI de dépôt, laisse séparées deux versions publiées d'un même preprint. `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples."""
 
-_ERRATUM_TITLE_MATCHES_SQL = text(f"""
-    WITH child AS (
-        SELECT id, title_normalized AS t, publication_year AS y
-        FROM publications
-        WHERE doc_type = '{DocType.ERRATUM.value}'
-          AND title_normalized IS NOT NULL AND publication_year IS NOT NULL
-    ),
-    candidate AS (
-        SELECT c.id AS child_id, p.id AS parent_id, p.doi AS parent_doi,
-               (p.doc_type::text NOT IN ('{DocType.PREPRINT.value}', '{DocType.DATASET.value}'))
-                   AS substantive
-        FROM child c
-        JOIN publications p
-          ON p.id <> c.id
-         AND p.doc_type <> '{DocType.ERRATUM.value}'
-         AND length(p.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
-         AND p.publication_year BETWEEN c.y - {_TITLE_MATCH_YEAR_WINDOW} AND c.y
-         AND right(c.t, length(p.title_normalized)) = p.title_normalized
-    ),
+UNIQUE_SUBSTANTIVE_CANDIDATE = """
     substantive_count AS (
-        SELECT child_id, count(*) FILTER (WHERE substantive) AS n
+        SELECT child_id, count(DISTINCT parent_id) FILTER (WHERE substantive) AS n
         FROM candidate GROUP BY child_id
     )
-    SELECT c.child_id, c.parent_id, c.parent_doi
+    SELECT DISTINCT c.child_id, c.parent_id, c.parent_doi
     FROM candidate c
     JOIN substantive_count s ON s.child_id = c.child_id
     WHERE s.n = 1 AND c.substantive
-""")
-"""Signal #3, erratum → article corrigé : titre de l'article suffixe du titre de l'erratum, article publié dans [année − 2 … année]. Garde d'ambiguïté : un seul candidat substantiel, sinon aucune relation."""
+"""
+"""Garde d'ambiguïté du rattachement par le titre, à la suite d'une CTE `candidate (child_id, parent_id, parent_doi, substantive)` : le candidat retenu est le seul candidat substantiel de l'enfant."""
 
 _PREPRINT_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
@@ -182,16 +168,9 @@ _PREPRINT_TITLE_MATCHES_SQL = text(f"""
           ON p.doc_type <> '{DocType.PREPRINT.value}'
          AND p.title_normalized = c.t
          AND length(p.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
-         AND p.publication_year BETWEEN c.y AND c.y + {_TITLE_MATCH_YEAR_WINDOW}
+         AND p.publication_year BETWEEN c.y AND c.y + {TITLE_MATCH_YEAR_WINDOW}
     ),
-    substantive_count AS (
-        SELECT child_id, count(*) FILTER (WHERE substantive) AS n
-        FROM candidate GROUP BY child_id
-    )
-    SELECT c.child_id, c.parent_id, c.parent_doi
-    FROM candidate c
-    JOIN substantive_count s ON s.child_id = c.child_id
-    WHERE s.n = 1 AND c.substantive
+    {UNIQUE_SUBSTANTIVE_CANDIDATE}
 """)
 """Preprint → version publiée : titre identique, parent publié dans [année … année + 2]. Garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre."""
 
@@ -249,15 +228,6 @@ def fetch_shared_key_pairs(conn: Connection) -> list[SharedKeyPair]:
     ]
 
 
-def fetch_erratum_title_matches(conn: Connection) -> list[TitleMatch]:
-    """Renvoie les erratums reliés par titre à l'œuvre corrigée (signal #3).
-
-    Les candidats d'un erratum sont les publications autres qu'erratum, à titre assez long, publiées dans `[année − 2 … année]`, à `title_normalized` suffixe de celui de l'erratum. La relation exige un seul candidat de ce titre, hors `preprint` et `dataset`, autres formes de la même œuvre.
-    """
-    rows = conn.execute(_ERRATUM_TITLE_MATCHES_SQL).all()
-    return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
-
-
 def fetch_preprint_title_matches(conn: Connection) -> list[TitleMatch]:
     """Renvoie les preprints reliés par titre à leur version publiée (signal #3).
 
@@ -271,29 +241,40 @@ _IDENTITY_COLUMNS = "from_publication_id, relation_type, target_publication_id, 
 """Colonnes de la contrainte d'unicité, qui identifient une arête. Le diff avant/après les compare."""
 
 
-def rebuild_relations(conn: Connection, edges: list[RelationEdge]) -> RelationsRebuild:
-    """Reconstruit `publication_relations` : purge la table, puis insère `edges`, chaque arête avec sa `source`. Résout les `target_doi` en `target_publication_id`, écarte les auto-relations, dédoublonne par `(from, type, target)`. L'ordre de `edges` fixe la priorité. Renvoie le bilan de la reconstruction."""
+def rebuild_relations(
+    conn: Connection, edges: list[RelationEdge], owned: frozenset[RelationType]
+) -> RelationsRebuild:
+    """Reconstruit la partie de `publication_relations` des types `owned` : purge ces relations, puis insère `edges`, chaque arête avec sa `source`. Résout les `target_doi` en `target_publication_id`, écarte les auto-relations, dédoublonne par `(from, type, target)`. L'ordre de `edges` fixe la priorité. Renvoie le bilan de la reconstruction.
+
+    Raises:
+        ValueError: une arête d'un type hors de `owned`.
+    """
+    if stray := sorted({e.relation_type for e in edges} - set(owned)):
+        raise ValueError(f"Arêtes de types hors de la reconstruction : {', '.join(stray)}")
+    owned_sql = f"relation_type::text IN {in_clause(sorted(owned))}"
     # La table temporaire, créée avant la purge, sert la comparaison puis est supprimée. Un échec annule sa création avec le reste de la transaction.
     conn.execute(
         text(
             f"CREATE TEMP TABLE relations_before AS "
-            f"SELECT {_IDENTITY_COLUMNS} FROM publication_relations"
+            f"SELECT {_IDENTITY_COLUMNS} FROM publication_relations WHERE {owned_sql}"
         )
     )
-    conn.execute(text("DELETE FROM publication_relations"))
+    conn.execute(text(f"DELETE FROM publication_relations WHERE {owned_sql}"))
     written = 0 if not edges else _insert_edges(conn, edges)
-    changes = RelationsRebuild(written, _count_added(conn), _count_removed(conn))
+    changes = RelationsRebuild(
+        written, _count_added(conn, owned_sql), _count_removed(conn, owned_sql)
+    )
     conn.execute(text("DROP TABLE relations_before"))
     return changes
 
 
-def _count_added(conn: Connection) -> list[tuple[str, int]]:
-    """Compte par type les arêtes présentes après la reconstruction et absentes avant."""
+def _count_added(conn: Connection, owned_sql: str) -> list[tuple[str, int]]:
+    """Compte par type les arêtes de la partie reconstruite présentes après la reconstruction et absentes avant."""
     rows = conn.execute(
         text(f"""
             SELECT relation_type::text AS rel_type, count(*) AS cnt
             FROM (
-                SELECT {_IDENTITY_COLUMNS} FROM publication_relations
+                SELECT {_IDENTITY_COLUMNS} FROM publication_relations WHERE {owned_sql}
                 EXCEPT
                 SELECT {_IDENTITY_COLUMNS} FROM relations_before
             ) added
@@ -304,15 +285,15 @@ def _count_added(conn: Connection) -> list[tuple[str, int]]:
     return [(r.rel_type, r.cnt) for r in rows]
 
 
-def _count_removed(conn: Connection) -> int:
-    """Compte les arêtes présentes avant la reconstruction et absentes après."""
+def _count_removed(conn: Connection, owned_sql: str) -> int:
+    """Compte les arêtes de la partie reconstruite présentes avant la reconstruction et absentes après."""
     return scalar_int(
         conn.execute(
             text(f"""
                 SELECT count(*) FROM (
                     SELECT {_IDENTITY_COLUMNS} FROM relations_before
                     EXCEPT
-                    SELECT {_IDENTITY_COLUMNS} FROM publication_relations
+                    SELECT {_IDENTITY_COLUMNS} FROM publication_relations WHERE {owned_sql}
                 ) removed
             """)
         )
@@ -355,22 +336,34 @@ def count_by_relation_type(conn: Connection) -> list[tuple[str, int]]:
     return [(r.rel_type, r.cnt) for r in rows]
 
 
+def _declared_relations(source_record: DeclaredRelationSource) -> list[tuple[RelationType, str]]:
+    """Renvoie les relations déclarées par un enregistrement source, hors relations avec un avis : `(type, DOI cible)`."""
+    if source_record.source == Source.DATACITE:
+        relations = extract_datacite_relations(source_record.source_extras)
+    elif source_record.source == Source.CROSSREF:
+        relations = extract_crossref_relations(source_record.source_extras)
+    else:
+        return []
+    return [(rel, doi) for rel, doi in relations if rel not in NOTICE_RELATION_TYPES]
+
+
+def _declared_targets(sources: list[DeclaredRelationSource]) -> list[str]:
+    """Renvoie les DOI cibles des relations déclarées, et les DOI déclarés comme autre forme de l'œuvre."""
+    return sorted(
+        {
+            *_distinct_work_targets(sources),
+            *(doi for source_record in sources for _, doi in _declared_relations(source_record)),
+        }
+    )
+
+
 def _build_declared_edges(sources: list[DeclaredRelationSource]) -> list[RelationEdge]:
-    edges: list[RelationEdge] = []
-    for source_record in sources:
-        if source_record.source == Source.DATACITE:
-            relations = extract_datacite_relations(source_record.source_extras)
-        elif source_record.source == Source.CROSSREF:
-            relations = extract_crossref_relations(source_record.source_extras)
-        else:
-            continue
-        edges.extend(
-            RelationEdge(
-                source_record.publication_id, rel_type.value, target_doi, source_record.source
-            )
-            for rel_type, target_doi in relations
-        )
-    return edges
+    """Construit les arêtes des relations déclarées, hors relations avec un avis."""
+    return [
+        RelationEdge(source_record.publication_id, rel_type.value, target_doi, source_record.source)
+        for source_record in sources
+        for rel_type, target_doi in _declared_relations(source_record)
+    ]
 
 
 def _distinct_work_targets(sources: list[DeclaredRelationSource]) -> list[str]:
@@ -497,19 +490,15 @@ def _build_title_match_edges(
     ]
 
 
+REBUILT_RELATION_TYPES = frozenset(RelationType) - NOTICE_RELATION_TYPES
+"""Types de relation écrits par la tâche `rebuild`."""
+
+
 def rebuild(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
-    """Reconstruit `publication_relations` depuis les trois signaux, et renvoie les compteurs de la phase (répartition par type de relation dans `details`)."""
+    """Reconstruit les relations de `REBUILT_RELATION_TYPES` depuis les trois signaux, et renvoie les compteurs de la tâche."""
     sources = fetch_declared_relation_sources(conn)
+    publications_by_doi = fetch_publications_by_doi(conn, _declared_targets(sources))
     declared_edges = _build_declared_edges(sources)
-    publications_by_doi = fetch_publications_by_doi(
-        conn,
-        sorted(
-            {
-                *_distinct_work_targets(sources),
-                *(edge.target_doi for edge in declared_edges if edge.target_doi),
-            }
-        ),
-    )
     declared_edges += _build_distinct_work_edges(sources, publications_by_doi)
 
     pairs = fetch_shared_key_pairs(conn)
@@ -517,21 +506,33 @@ def rebuild(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
         pairs, _declared_pairs(declared_edges, publications_by_doi)
     )
 
-    erratum_matches = fetch_erratum_title_matches(conn)
-    preprint_matches = fetch_preprint_title_matches(conn)
     title_edges = _build_title_match_edges(
-        erratum_matches, DEPENDENT_DOC_TYPE_RELATIONS["erratum"]
-    ) + _build_title_match_edges(preprint_matches, DEPENDENT_DOC_TYPE_RELATIONS["preprint"])
+        fetch_preprint_title_matches(conn), DEPENDENT_DOC_TYPE_RELATIONS[DocType.PREPRINT]
+    )
 
     # L'ordre déclarées → clés partagées → titre fixe la priorité de dédoublonnage (`ON CONFLICT`).
-    changes = rebuild_relations(conn, declared_edges + shared_edges + title_edges)
-    by_type = count_by_relation_type(conn)
-    _log_changes(changes, logger)
+    changes = rebuild_relations(
+        conn, declared_edges + shared_edges + title_edges, REBUILT_RELATION_TYPES
+    )
+    return relations_metrics(conn, changes, REBUILT_RELATION_TYPES, logger)
 
+
+def relations_metrics(
+    conn: Connection,
+    changes: RelationsRebuild,
+    owned: frozenset[RelationType],
+    logger: logging.Logger,
+) -> PhaseMetrics:
+    """Journalise les changements d'une reconstruction, et renvoie ses compteurs : relations ajoutées, répartition par type de la partie reconstruite dans `details`."""
+    _log_changes(changes, logger)
     metrics = PhaseMetrics()
     metrics.add(new=sum(count for _, count in changes.added_by_type))
     metrics.details["table"] = {
-        "rows": [{"key": relation_type, "count": count} for relation_type, count in by_type]
+        "rows": [
+            {"key": relation_type, "count": count}
+            for relation_type, count in count_by_relation_type(conn)
+            if relation_type in owned
+        ]
     }
     return metrics
 

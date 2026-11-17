@@ -264,6 +264,25 @@ def test_numero_qui_detient_le_doi_le_retire_a_l_article_hal():
     ]
 
 
+def test_l_article_au_doi_d_un_avis_le_perd():
+    """Cas réel : le dépôt HAL de l'article porte le DOI de l'addendum (10.1038/s41567-023-02095-3). Le titre de l'avis contient celui de l'article."""
+    group = [
+        DoiClusterMember(
+            1,
+            "erratum",
+            "addendum test of lepton universality in beauty quark decays",
+            owns_doi=True,
+        ),
+        DoiClusterMember(
+            2, "erratum", "addendum test of lepton universality in beauty quark decays"
+        ),
+        DoiClusterMember(3, "article", "test of lepton universality in beauty quark decays"),
+    ]
+    assert resolve_cluster_doi_corrections(group) == [
+        DoiClusterDecision(3, DoiClusterCase.AVIS_VS_ARTICLE)
+    ]
+
+
 def test_numero_hal_au_doi_d_un_article_ne_retire_rien():
     """Le dépôt HAL du numéro contient le DOI de l'introduction, détenu en propre par Crossref et OpenAlex."""
     group = [
@@ -612,3 +631,70 @@ def test_enregistrement_source_crossref_sans_auteur_aucune_decision():
         _source_record(2, "hal", "jean chateauvert et gilles delavaud", {"martin"}),
     ]
     assert resolve_cluster_doi_corrections(group) == []
+
+
+# DOI d'un avis porté par l'article
+
+_NOTICE_DOI = "10.1038/s41567-023-02095-3"
+_ARTICLE_DOI = "10.1038/s41567-021-01478-8"
+
+
+def _notice_group():
+    """Cas réel : le dépôt HAL de l'article porte le DOI de l'addendum, qui déclare corriger l'article."""
+    notice = _row(
+        1,
+        "erratum",
+        identifiers=(_doi(_NOTICE_DOI, role=SourceIdentifierRole.PRIMARY),),
+        title="addendum test of lepton universality",
+        shared_doi=_NOTICE_DOI,
+        source="crossref",
+    )
+    article = _row(
+        2,
+        "article",
+        _NOTICE_DOI,
+        title="test of lepton universality",
+        shared_doi=_NOTICE_DOI,
+        source="hal",
+    )
+    return notice, article
+
+
+def test_l_article_recoit_le_doi_de_l_oeuvre_corrigee():
+    notice, article = _notice_group()
+    (update,) = compute_updates([notice, article], {_NOTICE_DOI: _ARTICLE_DOI})
+    assert update.id == 2
+    assert set(update.identifiers) == {
+        _doi(_NOTICE_DOI, DoiClusterCase.AVIS_VS_ARTICLE.value),
+        SourceIdentifier(
+            SourceIdentifierType.DOI,
+            _ARTICLE_DOI,
+            SourceIdentifierRole.SECONDARY,
+            added_by=DoiClusterCase.AVIS_VS_ARTICLE.value,
+        ),
+    }
+
+
+def test_l_ajout_est_stable():
+    """Un second passage sur les identifiants écrits ne change rien."""
+    notice, article = _notice_group()
+    (update,) = compute_updates([notice, article], {_NOTICE_DOI: _ARTICLE_DOI})
+    written = article._replace(identifiers=update.identifiers)
+    assert compute_updates([notice, written], {_NOTICE_DOI: _ARTICLE_DOI}) == []
+
+
+def test_sans_oeuvre_declaree_le_doi_est_seulement_retire():
+    notice, article = _notice_group()
+    (update,) = compute_updates([notice, article])
+    assert update.identifiers == (_doi(_NOTICE_DOI, DoiClusterCase.AVIS_VS_ARTICLE.value),)
+
+
+def test_l_ajout_suit_la_regle():
+    """Hors du cas `AVIS_VS_ARTICLE`, l'article garde le DOI de l'avis, sans DOI ajouté."""
+    notice, article = _notice_group()
+    (update,) = compute_updates([notice, article], {_NOTICE_DOI: _ARTICLE_DOI})
+    written = article._replace(identifiers=update.identifiers)
+    (reverted,) = compute_updates(
+        [notice._replace(doc_type="article"), written], {_NOTICE_DOI: _ARTICLE_DOI}
+    )
+    assert reverted.identifiers == (_doi(_NOTICE_DOI),)

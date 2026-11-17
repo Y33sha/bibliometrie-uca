@@ -28,9 +28,9 @@ def test_un_lot_par_tranche_de_50_orcid(identifiants_rh, ecritures):
 
     moissonneur(OpenalexPersonHarvester, client).run(arguments_du_run())
 
+    # Les lots partent en parallèle : l'ordre des requêtes n'est pas garanti.
     filters = [c.args[0] for c in client.fetch_filtered_page.call_args_list]
-    assert len(filters) == 2
-    assert filters[0].count("|") == _LOT - 1
+    assert sorted(f.count("|") for f in filters) == [0, _LOT - 1]
     assert all(f.endswith("publication_year:2024-2025") for f in filters)
 
 

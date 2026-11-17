@@ -1,6 +1,6 @@
-"""Phases du pipeline, dans l'ordre d'exécution, avec leur libellé et leurs attributs.
+"""Phases du pipeline, dans l'ordre d'exécution. Le module de chaque phase la déclare (`PHASE`) : libellé, bloc, étapes et tâches, condition, précondition, métriques.
 
-Les enrichissements (`extra`) viennent en dernier. Chacun est indépendant des autres. `resolve_ra` et `fetch_missing`, placées avant eux, lisent les relations au run suivant.
+Chaque phase appartient à un bloc (`Block`). Les enrichissements viennent en dernier. Chacun est indépendant des autres. `fetch_missing` et `dois`, placées avant eux, lisent les relations au run suivant.
 """
 
 from dataclasses import replace
@@ -17,126 +17,34 @@ from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation import finalize
+from pipeline.transformation.dois import dois
 from pipeline.transformation.persons import persons
-from pipeline.transformation.publications import oa_status, publications, relations
+from pipeline.transformation.publications import publications
 from pipeline.transformation.publications.author_grouping import author_grouping
 from pipeline.transformation.publications.correction import metadata_correction
+from pipeline.transformation.publications.relations import relations
 from pipeline.transformation.publications.subjects import subjects
-from pipeline.transformation.publishing import publishing, resolve_ra
+from pipeline.transformation.publishing import publishing
 from pipeline.transformation.structures import affiliations
-from pipeline.transformation.structures.perimeter import (
-    check_extraction_perimeter,
-    refresh_perimeter_structures,
-)
+from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
 PHASES: tuple[Phase, ...] = (
-    Phase(
-        "harvest",
-        "Moissonnage par affiliation",
-        harvest.TASKS,
-        harvesting=True,
-        check=check_extraction_perimeter,
-        assemble=harvest.assemble,
-    ),
-    Phase(
-        "harvest_by_person",
-        "Moissonnage par personne",
-        harvest_by_person.TASKS,
-        harvesting=True,
-        when=lambda options: options.policy.harvest_by_person,
-    ),
-    Phase(
-        "fetch_missing",
-        "Recherche dans chaque source des documents trouvés dans les autres",
-        fetch_missing.STEPS,
-        harvesting=True,
-        assemble=fetch_missing.assemble,
-    ),
-    Phase(
-        "fetch_stale",
-        "Recherche des documents non revus par le moissonnage",
-        fetch_stale.TASKS,
-        harvesting=True,
-        when=lambda options: options.policy.fetch_stale,
-        assemble=fetch_stale.assemble,
-    ),
-    Phase(
-        "fetch_truncated",
-        "Re-téléchargement des documents OpenAlex tronqués à 100 auteurs",
-        fetch_truncated.TASKS,
-        harvesting=True,
-    ),
-    Phase(
-        "normalize",
-        "Normalisation des données brutes",
-        normalize.STEPS,
-        assemble=normalize.assemble,
-    ),
-    Phase(
-        "affiliations",
-        "Structures, pays et périmètre des contributions sources",
-        affiliations.STEPS,
-        check=check_extraction_perimeter,
-        assemble=affiliations.assemble,
-    ),
-    Phase(
-        "resolve_ra",
-        "Résolution des agences d'enregistrement des DOI",
-        resolve_ra.TASKS,
-    ),
-    Phase(
-        "publishing",
-        "Référentiels de l'édition",
-        publishing.STEPS,
-        assemble=publishing.assemble,
-    ),
-    Phase(
-        "metadata_correction",
-        "Correction des métadonnées de publication",
-        metadata_correction.TASKS,
-        assemble=metadata_correction.assemble,
-    ),
-    Phase(
-        "oa_status",
-        "URL de résolution et statut open access des DOI",
-        oa_status.TASKS,
-        assemble=oa_status.assemble,
-    ),
-    Phase(
-        "publications",
-        "Dédoublonnage des publications",
-        publications.TASKS,
-    ),
-    Phase(
-        "author_grouping",
-        "Alignement des auteurs des enregistrements sources d'une même publication",
-        author_grouping.TASKS,
-        assemble=author_grouping.assemble,
-    ),
-    Phase(
-        "persons",
-        "Résolution des personnes",
-        persons.TASKS,
-        assemble=persons.assemble,
-    ),
-    Phase(
-        "finalize",
-        "Finalisation : périmètre des publications, vues des structures, purges et compteurs",
-        finalize.STEPS,
-        assemble=finalize.assemble,
-    ),
-    Phase(
-        "relations",
-        "Relations entre publications apparentées",
-        relations.TASKS,
-        extra=True,
-    ),
-    Phase(
-        "subjects",
-        "Sujets des publications",
-        subjects.TASKS,
-        extra=True,
-    ),
+    harvest.PHASE,
+    harvest_by_person.PHASE,
+    fetch_missing.PHASE,
+    fetch_stale.PHASE,
+    fetch_truncated.PHASE,
+    normalize.PHASE,
+    affiliations.PHASE,
+    dois.PHASE,
+    publishing.PHASE,
+    metadata_correction.PHASE,
+    publications.PHASE,
+    author_grouping.PHASE,
+    persons.PHASE,
+    finalize.PHASE,
+    relations.PHASE,
+    subjects.PHASE,
 )
 
 
@@ -152,7 +60,7 @@ PERIMETER_STRUCTURES = Task(
     writes=("perimeter_structures",),
     run=_refresh_perimeter_structures,
 )
-"""Matérialisation des structures des périmètres, exécutée par l'orchestrateur avant toute phase."""
+"""Matérialisation des structures des périmètres, exécutée par l'orchestrateur en tête de la première phase du run qui lit ses écritures."""
 
 
 def _qualified(phase: str, task: Task) -> Task:

@@ -4,7 +4,7 @@ Les enregistrements sources du voisinage se répartissent en partitions : compos
 
 Un DOI appartient à une seule partition. Un DOI partagé par plusieurs partitions reste à celle qui l'a en rôle fort, et les enregistrements sources des autres le perdent. Un DOI fort dans aucune partition est retiré de toutes. Le voisinage se repartitionne ensuite sans ces DOI.
 
-Chaque partition aboutit sur une seule publication, son ancre : celle qui a déjà son DOI, sinon celle du plus petit enregistrement source rattaché. L'ancre garde son identifiant, et donc les corrections faites à la main. Une partition d'enregistrements sources orphelins, sans publication, en crée une si l'un d'eux peut la fonder ; sinon, elle reste orpheline. Un enregistrement source écarté (`is_matchable`) quitte sa publication.
+Chaque partition aboutit sur une seule publication, son ancre : celle qui a déjà son DOI, sinon celle du plus petit enregistrement source rattaché. L'ancre garde son identifiant, et donc les corrections faites à la main. Une partition d'enregistrements sources orphelins, sans publication, en crée une si l'un d'eux est dans le périmètre ; sinon, elle reste orpheline. Un enregistrement source écarté (`is_matchable`) ou d'un type de document exclu (`OUT_OF_SCOPE_DOC_TYPES`) n'entre dans aucune partition, et quitte sa publication.
 """
 
 from collections import Counter, defaultdict
@@ -74,9 +74,9 @@ class ReconcileMember:
     """L'enregistrement source entre dans la réconciliation (`is_matchable`)."""
 
     @property
-    def can_found_publication(self) -> bool:
-        """Vrai si l'enregistrement source est dans le périmètre, et d'un type de document retenu (`OUT_OF_SCOPE_DOC_TYPES`)."""
-        return self.in_perimeter and self.doc_type not in OUT_OF_SCOPE_DOC_TYPES
+    def admitted(self) -> bool:
+        """Vrai si l'enregistrement source entre dans les groupes : il entre dans la réconciliation (`is_matchable`), et son type de document est retenu (`OUT_OF_SCOPE_DOC_TYPES`). Un erratum qui partage une clé avec l'article corrigé reste ainsi hors de sa publication."""
+        return self.matchable and self.doc_type not in OUT_OF_SCOPE_DOC_TYPES
 
     @property
     def materializable(self) -> bool:
@@ -290,7 +290,7 @@ def _claim(
     """Renvoie la revendication d'ancre d'une partition d'ancre DOI `doi`, ou `None` si la partition reste orpheline.
 
     - Partition avec des enregistrements sources rattachés : la publication qui a son DOI (revendication forte), sinon celle du plus petit enregistrement source rattaché (faible).
-    - Partition d'orphelins : création, si un membre peut fonder une publication et un membre a un titre et une année.
+    - Partition d'orphelins : création, si un membre est dans le périmètre et un membre a un titre et une année.
 
     Une publication qui a déjà le DOI de la partition sans membre dans le voisinage (`existing_publication_by_doi`) reste l'ancre : une publication créée au même DOI heurterait la contrainte d'unicité.
     """
@@ -310,7 +310,7 @@ def _claim(
     if materialized:
         anchor_publication = min(materialized, key=lambda m: m.source_record_id).publication_id
         return _Claim(anchor_publication, False, source_record_ids, doi)
-    if any(m.materializable for m in part) and any(m.can_found_publication for m in part):
+    if any(m.materializable for m in part) and any(m.in_perimeter for m in part):
         return _Claim(None, False, source_record_ids, doi)
     return None
 
@@ -391,7 +391,7 @@ def plan_reconciliation(
         publication_sizes: nombre total d'enregistrements sources par publication ; une publication qui en garde hors du voisinage survit.
     """
     members = list(members)
-    admitted = [m for m in members if m.matchable]
+    admitted = [m for m in members if m.admitted]
     partitions, removed_dois = _unique_doi_partitions(admitted)
     claims = [
         claim
@@ -400,7 +400,7 @@ def plan_reconciliation(
     ]
     award = _award(claims, admitted)
     excluded = sorted(
-        m.source_record_id for m in members if not m.matchable and m.publication_id is not None
+        m.source_record_id for m in members if not m.admitted and m.publication_id is not None
     )
     return ReconcilePlan(
         groups=award.groups,

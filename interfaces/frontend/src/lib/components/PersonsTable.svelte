@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels } from '#lib/labels.js';
@@ -63,7 +64,7 @@
 	<thead>
 		<tr>
 			{#if onopen}<th class="panel-col"></th>{/if}
-			<th class="rh-col" title="Présente dans le SI RH">RH</th>
+			<th class="rh-col" use:tooltip={'Présente dans le SI RH'}>RH</th>
 			<th
 				class="sortable"
 				class:active={sortDirection(sort, 'name') !== null}
@@ -117,7 +118,7 @@
 								href={resolve(`structures/${lab.id}`)}
 								class="lab-link"
 								class:past-lab={!lab.current}
-								title={lab.current ? undefined : 'Dernier laboratoire'}>{lab.label}</a
+								use:tooltip={lab.current ? undefined : 'Dernier laboratoire'}>{lab.label}</a
 							>{/each}
 					</td>
 					{#each countColumns as col (col.sortKey)}

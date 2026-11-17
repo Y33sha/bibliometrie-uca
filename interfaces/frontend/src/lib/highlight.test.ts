@@ -9,6 +9,13 @@ describe('highlight', () => {
 		]);
 	});
 
+	it('repère le terme dans un texte à diacritiques combinants', () => {
+		expect(highlight('Méité, Méké', 'meite')).toEqual([
+			{ text: 'Méité', match: true },
+			{ text: ', Méké', match: false },
+		]);
+	});
+
 	it('repère chaque occurrence', () => {
 		expect(highlight('Micro et micro', 'MICRO').filter((s) => s.match).map((s) => s.text)).toEqual(['Micro', 'micro']);
 	});

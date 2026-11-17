@@ -1,7 +1,6 @@
-"""Branches `ror`, `hal_structure`, thèse et brevet de la vue `source_contribution_structures`."""
+"""Branches adresse, `ror`, `hal_structure`, thèse et brevet de la vue `source_contribution_structures`."""
 
 import json
-import logging
 
 from sqlalchemy import text
 
@@ -132,6 +131,28 @@ def test_ror_sans_adresse_seulement(sa_sync_conn):
     }
 
 
+def test_adresse_concatenee_ecartee(sa_sync_conn):
+    """Une adresse concaténée, même résolue vers une structure du périmètre, est sans indice ; une adresse non examinée reste un indice."""
+    univ, _ = _perimeter(sa_sync_conn)
+    record = insert_source_record(sa_sync_conn)
+    reached_by = {}
+    for position, flag in enumerate((True, False, None)):
+        address_id = insert_address(sa_sync_conn, f"Université {position}")
+        sa_sync_conn.execute(
+            text("UPDATE addresses SET is_concatenated = :f WHERE id = :id"),
+            {"f": flag, "id": address_id},
+        )
+        insert_address_structure(sa_sync_conn, address_id, structure_id=univ)
+        source_contribution = _source_contribution(sa_sync_conn, record, position)
+        insert_source_contribution_address(sa_sync_conn, source_contribution, address_id=address_id)
+        reached_by[flag] = source_contribution
+
+    assert _reached(sa_sync_conn) == {
+        (reached_by[False], univ, "address"),
+        (reached_by[None], univ, "address"),
+    }
+
+
 def test_ror_sans_adresse_ecarte_pour_une_contribution_source_a_adresse(sa_sync_conn):
     """Les structures d'une contribution source se déduisent de ses adresses, à défaut de ses ROR sans adresse."""
     _perimeter(sa_sync_conn)
@@ -188,7 +209,7 @@ def test_structures_d_une_these(sa_sync_conn):
         sa_sync_conn, record, source="theses", author_position=None, roles=["jury_member"]
     )
 
-    resolve_thesis_partners(sa_sync_conn, logging.getLogger("test"))
+    resolve_thesis_partners(sa_sync_conn)
 
     assert _reached(sa_sync_conn) == {
         (doctorant, univ, "thesis_institution"),

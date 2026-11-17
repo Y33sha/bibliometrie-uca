@@ -102,7 +102,6 @@ class AlignedSourceContribution:
     name: ContributorName
     identifiers: Mapping[str, str]
     """Identifiants non neutralisés."""
-    in_perimeter: bool
     roles: Sequence[str] = ()
     pinned_person_id: int | None = None
     """Personne sur laquelle l'administration a épinglé la contribution source."""
@@ -120,6 +119,15 @@ class AlignedSourceContribution:
             for id_type, value in self.identifiers.items()
             if trusted_identifier(id_type, self.source)
         }
+
+
+@dataclass(frozen=True)
+class AlignedContribution:
+    """Contribution à décider."""
+
+    members: Sequence[AlignedSourceContribution]
+    in_perimeter: bool
+    """Appartenance de la contribution au périmètre (`contributions.in_perimeter`)."""
 
 
 @dataclass(frozen=True)
@@ -169,15 +177,16 @@ def _single(candidates: set[int]) -> int | None:
 
 
 def decide_contribution(
-    members: Sequence[AlignedSourceContribution],
+    contribution: AlignedContribution,
     index: PersonIndex,
     rejected_person_ids: frozenset[int] = frozenset(),
 ) -> ContributionDecision:
-    """Rattache la contribution formée des contributions sources `members` à une personne, crée une personne, ou laisse la contribution sans personne.
+    """Rattache la contribution à une personne, crée une personne, ou laisse la contribution sans personne.
 
     Args:
         rejected_person_ids: personnes rejetées pour la publication de la contribution.
     """
+    members = contribution.members
     pinned = {m.pinned_person_id for m in members if m.pinned_person_id is not None}
     if pinned:
         if (person_id := _single(pinned)) is not None:
@@ -188,7 +197,7 @@ def decide_contribution(
             ContributionOutcome.SKIP, reason=ContributionSkipReason.PIN_CONFLICT
         )
 
-    in_perimeter = any(m.in_perimeter for m in members)
+    in_perimeter = contribution.in_perimeter
     refused: list[tuple[str, str]] = []
     identified = [
         candidates

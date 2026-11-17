@@ -1,5 +1,5 @@
 # STATUS: recurring (dev)
-"""Affiche l'arborescence du pipeline : phases, étapes et tâches, avec la phrase d'entrées → sorties de chaque étape.
+"""Affiche l'arborescence du pipeline : blocs, phases, étapes et tâches, avec la phrase d'entrées → sorties de chaque étape.
 
 Usage :
     uv run python -m interfaces.cli.dev.pipeline_tree [PHASE] [--interface]
@@ -42,11 +42,15 @@ def main() -> None:
     parser.add_argument("phase", nargs="?", choices=[phase.name for phase in PHASES])
     parser.add_argument("--interface", action="store_true", help="Tables lues et écrites par étape")
     args = parser.parse_args()
+    block = None
     for phase in PHASES:
         if args.phase in (None, phase.name):
-            print(f"{phase.name} : {phase.label}")
+            if phase.block is not block:
+                block = phase.block
+                print(f"■ {block}")
+            print(f"{_INDENT}{phase.name} : {phase.label}")
             for child in phase.children:
-                print("\n".join(_lines(child, 1, args.interface)))
+                print("\n".join(_lines(child, 2, args.interface)))
 
 
 if __name__ == "__main__":

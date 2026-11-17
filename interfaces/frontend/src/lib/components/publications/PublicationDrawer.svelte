@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import { resolve } from "$app/paths";
   import { api, ApiError } from "#lib/api/index.js";
   import type { components } from "#lib/api/schema.js";
   import Drawer from "#lib/components/Drawer.svelte";
+  import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
   import PublicationMergeSection from "#lib/components/publications/PublicationMergeSection.svelte";
   import SourceTag from "#lib/components/SourceTag.svelte";
@@ -27,34 +29,25 @@
     onchange: (keptId: number) => void;
   } = $props();
 
-  let data = $state<PublicationSources | null>(null);
-  let failure = $state<string | null>(null);
-  // Incrémenté après une fusion qui conserve cette publication, pour relire ses enregistrements sources.
-  let version = $state(0);
+  const sources = useDrawerEntity({
+    id: () => publicationId,
+    fetch: (id) => api<PublicationSources>(`/api/publications/${id}/sources`),
+  });
+  const data = $derived(sources.data);
+  const failure = $derived(
+    sources.failure === null
+      ? null
+      : sources.failure instanceof ApiError && sources.failure.status === 404
+        ? "Publication introuvable."
+        : "Chargement impossible.",
+  );
 
+  // Une fusion qui conserve cette publication change ses enregistrements sources.
   function merged(keptId: number) {
     onchange(keptId);
-    if (keptId === publicationId) version++;
+    if (keptId === publicationId) void sources.reload();
     else onopen(keptId);
   }
-
-  $effect(() => {
-    const id = publicationId;
-    void version;
-    data = null;
-    failure = null;
-    api<PublicationSources>(`/api/publications/${id}/sources`)
-      .then((d) => {
-        if (id === publicationId) data = d;
-      })
-      .catch((e) => {
-        if (id !== publicationId) return;
-        failure =
-          e instanceof ApiError && e.status === 404
-            ? "Publication introuvable."
-            : "Chargement impossible.";
-      });
-  });
 
   // Une colonne par enregistrement source ; une ligne par champ, puis une ligne par contribution d'un même auteur.
   const records = $derived(data ? orderRecords(data.source_records) : []);
@@ -70,7 +63,7 @@
         href={resolve(`publications/${publicationId}`)}
         target="_blank"
         rel="noopener"
-        title="Voir la fiche publique"
+        use:tooltip={'Voir la fiche publique'}
       >
         <PublicationTitle titre={data.title} />
       </a>
@@ -104,7 +97,7 @@
             <th
               class="field"
               scope="row"
-              title={row.divergent ? "Valeurs différentes selon les sources" : undefined}
+              use:tooltip={row.divergent ? "Valeurs différentes selon les sources" : undefined}
             >
               {row.label}
             </th>
@@ -120,12 +113,12 @@
                   <PublicationTitle titre={cell.text} />
                 {:else}
                   {#if cell.corrected}
-                    <del class="uncorrected" title={cell.corrected.rule ? `Corrigé par la règle ${cell.corrected.rule}` : "Corrigé"}>{cell.corrected.from}</del>
+                    <del class="uncorrected" use:tooltip={cell.corrected.rule ? `Corrigé par la règle ${cell.corrected.rule}` : "Corrigé"}>{cell.corrected.from}</del>
                   {/if}
                   {cell.text}
                 {/if}
                 {#if cell.note}
-                  <div class="note" title="Valeur donnée par la source">{cell.note}</div>
+                  <div class="note" use:tooltip={'Valeur donnée par la source'}>{cell.note}</div>
                 {/if}
               </td>
             {/each}
@@ -142,7 +135,7 @@
             <th
               class="field unlabeled"
               scope="row"
-              title={row.divergent ? "Contribution source absente d'un enregistrement source" : undefined}
+              use:tooltip={row.divergent ? "Contribution source absente d'un enregistrement source" : undefined}
             ></th>
             {#each row.cells as s}
               <td class="author-cell">

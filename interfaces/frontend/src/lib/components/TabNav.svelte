@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils.js';
 	import { page } from '$app/state';
 	import { setQueryParam } from '#lib/url.js';
 	import { horizontalOverflow } from '#lib/actions/horizontalOverflow.js';
@@ -30,7 +31,7 @@
 	{#each tabs as t (t.id)}
 		<button class="tab" class:active={activeTab === t.id} onclick={() => switchTab(t.id)}>
 			{t.label}
-			{#if t.count != null}<span class="tab-count">{t.count.toLocaleString('fr-FR')}</span>{/if}
+			{#if t.count != null}<span class="tab-count">{formatNumber(t.count)}</span>{/if}
 		</button>
 	{/each}
 </div>

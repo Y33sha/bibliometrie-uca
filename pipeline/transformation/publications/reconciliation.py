@@ -57,8 +57,8 @@ from pipeline.runtime.observability.log_format import (
     LAST_BRANCH,
     inflect,
     nothing_to_do,
+    open_section,
     quantity,
-    step,
 )
 from pipeline.runtime.observability.progress import track_progress, waiting
 from pipeline.transformation.publications import lifecycle
@@ -592,10 +592,10 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
     dirty_ids = snapshot_queued_source_records(conn)
     if not dirty_ids:
         delete_processed_marks(conn)
-        step(logger, "Aucun document nouveau ou mis à jour")
+        open_section(logger, "Aucun document nouveau ou mis à jour")
         nothing_to_do(logger)
         return ReconcileStats()
-    step(
+    open_section(
         logger,
         "%s %s (%s)",
         quantity(len(dirty_ids), "document"),
@@ -622,7 +622,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
 
     # Recalcul des métadonnées consolidées depuis les enregistrements sources.
     to_refresh = _publications_to_refresh(conn, plan, applied, before)
-    step(logger, "Recalcul des métadonnées consolidées")
+    open_section(logger, "Recalcul des métadonnées consolidées")
     with track_progress(len(to_refresh), LAST_BRANCH.rstrip(), logger) as progress:
         lifecycle.refresh(conn, to_refresh, on_batch=progress.advance)
 

@@ -72,6 +72,8 @@ class SourceIdentifier:
     role: SourceIdentifierRole
     removed_by: str | None = None
     """Règle de correction qui retire l'identifiant, `None` pour un identifiant actif."""
+    added_by: str | None = None
+    """Règle de correction qui ajoute l'identifiant, `None` pour un identifiant donné par la source."""
 
     @property
     def key(self) -> tuple[SourceIdentifierType, str]:

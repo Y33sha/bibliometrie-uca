@@ -1,6 +1,6 @@
 """Tests d'intégration pour `infrastructure.read_models.contributions.queries`.
 
-Une contribution orpheline est une contribution du périmètre, sous un rôle d'auteur, sans personne."""
+Une contribution orpheline est une contribution du périmètre, sous un rôle d'auteur, sans personne, et capable de fonder une personne."""
 
 from sqlalchemy import text
 
@@ -89,6 +89,26 @@ class TestOrphanContributionsCount:
         )
         _contribution(sa_sync_conn)
         assert ContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
+
+    def test_exclut_les_inventeurs_seuls(self, sa_sync_conn):
+        """Un inventeur seul ne fonde pas de personne. Un inventeur aussi auteur reste dans la file."""
+        publication = insert_publication(sa_sync_conn)
+        source_record = insert_source_record(
+            sa_sync_conn, publication, source="ops", source_id="EP1"
+        )
+        insert_source_contribution(
+            sa_sync_conn, source_record, source="ops", roles=["inventor"], in_perimeter=True
+        )
+        insert_source_contribution(
+            sa_sync_conn,
+            source_record,
+            source="ops",
+            author_position=1,
+            roles=["author", "inventor"],
+            in_perimeter=True,
+        )
+        _contribution(sa_sync_conn)
+        assert ContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 1
 
 
 def _list(conn, **filters):

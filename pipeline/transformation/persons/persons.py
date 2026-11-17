@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from pipeline.graph import Task
+from pipeline.graph import Block, Phase, Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -17,9 +17,19 @@ from pipeline.transformation.persons.purge import purge
 
 
 def _arbitrate_identifiers(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        counts = arbitrate_identifier_conflicts(conn, ctx.logger)
-    return PhaseMetrics(extras=counts)
+    with (
+        ctx.open_tx() as conn,
+        waiting(f"{BRANCH}en cours", ctx.logger) as line,
+    ):
+        counts = arbitrate_identifier_conflicts(conn)
+        line.erase()
+    neutralized = counts["neutralized"]
+    report = (
+        f"{quantity(neutralized, 'identifiant')} {inflect(neutralized, 'neutralisé')}"
+        if neutralized
+        else "rien à faire"
+    )
+    return PhaseMetrics(extras=counts, report=report)
 
 
 def _resolve_contributions(ctx: PhaseContext) -> PhaseMetrics:
@@ -31,14 +41,15 @@ def _resolve_contributions(ctx: PhaseContext) -> PhaseMetrics:
 def _populate(ctx: PhaseContext) -> PhaseMetrics:
     with (
         ctx.open_tx() as conn,
-        waiting(f"{LAST_BRANCH}rafraîchissement en cours", ctx.logger) as line,
+        waiting(f"{BRANCH}rafraîchissement en cours", ctx.logger) as line,
     ):
         counts = populate(conn)
-        line.conclude(
-            f"{LAST_BRANCH}{quantity(counts.inserted, 'forme ajoutée', 'formes ajoutées')},"
-            f" {quantity(counts.updated, 'modifiée')}, {quantity(counts.deleted, 'supprimée')}"
-        )
-    return PhaseMetrics(extras=counts._asdict())
+        line.erase()
+    report = (
+        f"{quantity(counts.inserted, 'forme ajoutée', 'formes ajoutées')},"
+        f" {quantity(counts.updated, 'modifiée')}, {quantity(counts.deleted, 'supprimée')}"
+    )
+    return PhaseMetrics(extras=counts._asdict(), report=report)
 
 
 def _purge(ctx: PhaseContext) -> PhaseMetrics:
@@ -67,7 +78,7 @@ def _purge(ctx: PhaseContext) -> PhaseMetrics:
     return PhaseMetrics(extras=dict(counts))
 
 
-TASKS = (
+_CHILDREN = (
     Task(
         "arbitrate_identifiers",
         reads=(
@@ -101,6 +112,7 @@ TASKS = (
         ),
         run=_arbitrate_identifiers,
         section="Conflits d'identifiants",
+        label="Identifiants portés sous le nom d'une autre personne",
     ),
     Task(
         "resolve_contributions",
@@ -176,6 +188,8 @@ TASKS = (
             "contributions.person_id",
             "contributions.resolution_mode",
             "contributions.perimeter_evidence",
+            # Une contribution des seuls rôles sans création de personne laisse supprimer sa personne.
+            "contributions.roles",
             "aligned_source_contributions",
             "source_contributions.contributor_information_id",
             "source_contributions.neutralized_identifiers",
@@ -220,3 +234,12 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
         name_forms=by_task["populate_person_name_forms"].extras,
         purge=by_task["purge"].extras,
     )
+
+
+PHASE = Phase(
+    "persons",
+    "Rattachement des contributions aux personnes",
+    _CHILDREN,
+    Block.ENTITIES,
+    assemble=assemble,
+)

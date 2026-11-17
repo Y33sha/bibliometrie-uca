@@ -149,11 +149,11 @@ async def fetch_by_source_id(
 
 
 async def fetch_missing_ops_by_number(
-    conn: Connection, log: logging.Logger, *, retry_after_days: int
+    conn: Connection, log: logging.Logger, *, retry_after_days: int, scope: str | None = None
 ) -> PhaseMetrics:
     """Cherche dans OPS les familles des numéros des publications du périmètre sans famille, et les écrit dans `staging`.
 
-    Un numéro introuvable est inscrit dans `failed_lookups`, sous chacun de ses types cherchés.
+    Un numéro introuvable est inscrit dans `failed_lookups`, sous chacun de ses types cherchés. `scope` nomme l'identifiant au journal (`LookupChannel.scope`).
     """
     numbers = get_missing_numbers(conn, retry_after_days=retry_after_days)
 
@@ -177,5 +177,6 @@ async def fetch_missing_ops_by_number(
         stage=lambda staging, family: staging.stage(
             SOURCE, family, entry_mode=StagingEntryMode.FETCH_MISSING_PATENT_NUMBER
         ),
+        scope=scope,
     )
     return await look_up(conn, log, channel, list(numbers))

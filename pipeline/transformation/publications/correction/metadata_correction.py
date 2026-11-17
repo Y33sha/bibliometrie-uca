@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from pipeline.graph import Task, in_transaction
+from pipeline.graph import Block, Phase, Task, in_transaction
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.correction import (
     correct_unary,
@@ -25,7 +25,7 @@ from pipeline.transformation.publications.correction import (
     serial_by_doi,
 )
 
-TASKS = (
+_CHILDREN = (
     Task(
         "serial_by_doi",
         reads=(
@@ -118,7 +118,7 @@ TASKS = (
             # DOI présents en base.
             "source_record_identifiers",
             # DOI inconnus de doi.org.
-            "failed_lookups",
+            "dois.registered",
         ),
         writes=("doi_targets", "source_record_keys_queue"),
         previous_run=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
@@ -142,7 +142,7 @@ TASKS = (
             "source_record_identifiers",
             "doi_targets",
             # DOI inconnus de doi.org.
-            "failed_lookups",
+            "dois.registered",
             # Noms des auteurs d'un dépôt HAL et de l'enregistrement source Crossref de son DOI.
             "source_contributions.source_record_id",
             "source_contributions.contributor_information_id",
@@ -204,3 +204,12 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     counts.sort(key=lambda kc: kc[1], reverse=True)
     metrics.details["table"] = {"rows": [{"key": key, "count": count} for key, count in counts]}
     return metrics
+
+
+PHASE = Phase(
+    "metadata_correction",
+    "Correction des enregistrements sources",
+    _CHILDREN,
+    Block.SOURCE_RECORDS,
+    assemble=assemble,
+)

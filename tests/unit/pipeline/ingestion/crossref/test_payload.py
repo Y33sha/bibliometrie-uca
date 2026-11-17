@@ -184,6 +184,37 @@ class TestExtractCrossrefMeta:
         meta = extract_crossref_source_extras({"event": {"name": "EUROCALL 2022"}})
         assert meta == {"conference": {"name": "EUROCALL 2022"}}
 
+    def test_keeps_updates(self):
+        """Cas réel : avis de rétractation déclaré par l'éditeur et par Retraction Watch (10.1016/j.biortech.2024.131679)."""
+        msg = {
+            "update-to": [
+                {
+                    "DOI": "10.1016/J.BIORTECH.2018.03.127",
+                    "label": "Retraction",
+                    "record-id": "54848",
+                    "source": "retraction-watch",
+                    "type": "retraction",
+                    "updated": {"date-parts": [[2024, 7, 13]]},
+                },
+                {"label": "Retraction", "source": "publisher", "type": "retraction"},
+            ],
+            "updated-by": [
+                {"DOI": "10.1016/j.biortech.2024.999999", "source": "publisher", "type": "erratum"}
+            ],
+        }
+        assert extract_crossref_source_extras(msg) == {
+            "update_to": [
+                {
+                    "doi": "10.1016/j.biortech.2018.03.127",
+                    "type": "retraction",
+                    "source": "retraction-watch",
+                }
+            ],
+            "updated_by": [
+                {"doi": "10.1016/j.biortech.2024.999999", "type": "erratum", "source": "publisher"}
+            ],
+        }
+
 
 def _conference_assertion(name: str, value: str) -> dict:
     return {"group": {"name": "ConferenceInfo"}, "name": name, "value": value}

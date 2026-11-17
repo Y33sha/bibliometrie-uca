@@ -48,7 +48,7 @@ def _contributions(conn, count, person, mode, **kwargs):
 
 
 def _arbitrate(conn):
-    return arbitrate_identifier_conflicts(conn, _LOG)
+    return arbitrate_identifier_conflicts(conn)
 
 
 def _person_of(conn, contribution):

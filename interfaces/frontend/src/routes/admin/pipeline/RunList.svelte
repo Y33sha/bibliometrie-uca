@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import type { components } from "#lib/api/schema.js";
   import PhaseRibbon from "./PhaseRibbon.svelte";
   import { CELL_COLOR, fmtDate, fmtDuration, STATUS_LABEL, type Status } from "./helpers";
@@ -45,7 +46,7 @@
           <span
             class="dot"
             style="background:{CELL_COLOR[run.status as Status]}"
-            title={STATUS_LABEL[run.status as Status]}
+            use:tooltip={STATUS_LABEL[run.status as Status]}
           ></span>
           <span class="run-id">#{run.run_id}</span>
           <span class="run-date">{fmtDate(run.started_at)}</span>

@@ -34,7 +34,6 @@ class Publication:
     container_title: str | None = None
     language: str | None = None
     abstract: str | None = None
-    is_retracted: bool = False
     countries: tuple[str, ...] = field(default=())
     keywords: tuple[str, ...] = field(default=())
     biblio: dict[str, JsonValue] | None = None

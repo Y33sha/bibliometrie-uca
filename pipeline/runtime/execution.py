@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING
 
@@ -16,8 +17,13 @@ from pipeline.runtime.context import CredentialsMissing, PhaseContext, RequestBu
 if TYPE_CHECKING:
     from sqlalchemy import Connection
 
-# `setup_logger` attache un FileHandler sur `logs/pipeline.log` quand `LOG_TO_FILE=true`.
-log = setup_logger("pipeline", str(PROJECT_ROOT / "logs"))
+log = logging.getLogger("pipeline")
+"""Journal du pipeline, sans sortie tant que `configure_pipeline_log` ne l'a pas configuré."""
+
+
+def configure_pipeline_log() -> None:
+    """Attache au journal du pipeline la sortie console et, avec `LOG_TO_FILE=true`, le fichier `logs/pipeline.log` (`setup_logger`)."""
+    setup_logger(log.name, str(PROJECT_ROOT / "logs"))
 
 
 def open_tx() -> AbstractContextManager[Connection]:

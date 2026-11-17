@@ -1,6 +1,6 @@
 """Référentiel des structures HAL (`hal_structures`, `hal_structure_relations`, `hal_structure_aliases`) : chargement en tête de la phase `affiliations`.
 
-La tâche charge les structures citées par les contributions sources (`source_contribution_hal_structures`) ou comme parent (`hal_structures.parent_ids`), et absentes du référentiel. Un identifiant absent de `ref/structure` se cherche parmi les alias. Chaque lot lu est enregistré aussitôt : un run interrompu reprend au lot suivant. Les relations parent/enfant se reconstruisent ensuite depuis `parent_ids`. Quand une structure change de pays, les contributions sources citant la structure sont marquées pour l'étape des pays. En mode `full`, la tâche cherche aussi de nouveau les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
+La tâche charge les structures citées par les contributions sources (`source_contribution_hal_structures`) ou comme parent (`hal_structures.parent_ids`), et absentes du référentiel. Un identifiant absent de `ref/structure` se cherche parmi les alias. Une structure du référentiel retrouvée comme alias a été fusionnée dans HAL : sa ligne est remplacée par l'alias.Chaque lot lu est enregistré aussitôt : un run interrompu reprend au lot suivant. Les relations parent/enfant se reconstruisent ensuite depuis `parent_ids`. Quand une structure change de pays, les contributions sources citant la structure sont marquées pour l'étape des pays. En mode `full`, la tâche cherche aussi de nouveau les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
 """
 
 import logging
@@ -16,7 +16,7 @@ from infrastructure.db.queues import Queue, enqueue
 from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
 from pipeline.ingestion.hal.api import HAL_STRUCTURES_BATCH
 from pipeline.ingestion.hal.structures import HalStructure, parse_hal_structure
-from pipeline.runtime.observability.log_format import LAST_BRANCH, step
+from pipeline.runtime.observability.log_format import BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
 
@@ -75,8 +75,18 @@ class HalStructureStore:
             ).scalars()
         )
 
-    def save(self, structures: Collection[HalStructure], aliases: Mapping[int, int]) -> None:
-        """Écrit les structures et les alias. Un alias présent comme structure du référentiel est écarté. Les contributions sources citant une structure au pays changé, ou un alias changé de structure, sont marquées pour le recalcul des pays."""
+    def save(
+        self,
+        structures: Collection[HalStructure],
+        aliases: Mapping[int, int],
+        merged: Collection[int] = (),
+    ) -> None:
+        """Écrit les structures et les alias. Les contributions sources citant une structure au pays changé, ou un alias changé de structure, sont marquées pour le recalcul des pays.
+
+        Args:
+            aliases: `{alias: structure conservée}`. Un alias présent comme structure du référentiel est écarté, sauf s'il figure dans `merged`.
+            merged: alias absents de `ref/structure`, donc fusionnés dans leur structure conservée. Leur ligne du référentiel est remplacée par l'alias (`_replace_merged`).
+        """
         previous_countries: dict[int, str | None] = dict(
             self._conn.execute(
                 text(
@@ -126,6 +136,7 @@ class HalStructureStore:
                     for s in structures
                 ],
             )
+        repointed = self._replace_merged({a: aliases[a] for a in merged})
         if aliases:
             self._conn.execute(
                 text("""
@@ -142,8 +153,39 @@ class HalStructureStore:
                 for s in structures
                 if previous_countries.get(s.hal_structure_id) != s.country_code
             ],
-            [a for a, s in aliases.items() if previous_aliases.get(a) != s],
+            [a for a, s in aliases.items() if previous_aliases.get(a) != s] + repointed,
         )
+
+    def _replace_merged(self, merged: Mapping[int, int]) -> list[int]:
+        """Supprime les lignes du référentiel des structures fusionnées `{fusionnée: conservée}`, après report de leur structure interne et de leurs alias sur la structure conservée. Renvoie les alias reportés."""
+        if not merged:
+            return []
+        binds = {"merged": list(merged), "kept": list(merged.values())}
+        self._conn.execute(
+            text("""
+                UPDATE hal_structures k SET structure_id = m.structure_id
+                FROM unnest(CAST(:merged AS int[]), CAST(:kept AS int[])) pair(merged_id, kept_id)
+                JOIN hal_structures m ON m.hal_structure_id = pair.merged_id
+                WHERE k.hal_structure_id = pair.kept_id
+                  AND k.structure_id IS NULL AND m.structure_id IS NOT NULL
+            """),
+            binds,
+        )
+        repointed = list(
+            self._conn.execute(
+                text("""
+                    UPDATE hal_structure_aliases a SET hal_structure_id = pair.kept_id
+                    FROM unnest(CAST(:merged AS int[]), CAST(:kept AS int[])) pair(merged_id, kept_id)
+                    WHERE a.hal_structure_id = pair.merged_id
+                    RETURNING a.alias_id
+                """),
+                binds,
+            ).scalars()
+        )
+        self._conn.execute(
+            text("DELETE FROM hal_structures WHERE hal_structure_id = ANY(:merged)"), binds
+        )
+        return repointed
 
     def _mark_source_contributions(self, structure_ids: list[int], alias_ids: list[int]) -> None:
         """Marque pour le recalcul des pays les contributions sources citant une structure de `structure_ids`, directement ou par un alias, ou citant un alias de `alias_ids`."""
@@ -192,8 +234,8 @@ class HalStructuresLoad:
     """Identifiants introuvables."""
 
 
-SaveBatch = Callable[[list[HalStructure], dict[int, int]], None]
-"""Enregistre les structures et les alias `{alias: structure conservée}` d'un lot."""
+SaveBatch = Callable[[list[HalStructure], dict[int, int], set[int]], None]
+"""Enregistre les structures, les alias `{alias: structure conservée}` et les alias absents de `ref/structure` d'un lot (`HalStructureStore.save`)."""
 
 
 def _parsed(docs: Iterable[Mapping[str, JsonValue]]) -> list[HalStructure]:
@@ -225,17 +267,19 @@ def fetch_hal_structures(
             structures = {s.hal_structure_id: s for s in _parsed(source.by_ids(chunk))}
             missing = set(chunk) - structures.keys()
             aliases: dict[int, int] = {}
+            merged: set[int] = set()
             if missing:
                 for kept in _parsed(source.by_aliases(missing)):
                     structures[kept.hal_structure_id] = kept
                     for alias in missing & set(kept.alias_ids):
                         aliases[alias] = kept.hal_structure_id
-                load.not_found |= missing - aliases.keys()
+                merged = missing & aliases.keys()
+                load.not_found |= missing - merged
             for s in structures.values():
                 for alias in s.alias_ids:
                     aliases.setdefault(alias, s.hal_structure_id)
                 parents |= set(s.parent_ids)
-            save_batch(list(structures.values()), aliases)
+            save_batch(list(structures.values()), aliases, merged)
             load.structures += len(structures)
             if progress is not None:
                 progress.advance(len(chunk))
@@ -255,18 +299,19 @@ def run_refresh_hal_structures(
 ) -> PhaseMetrics:
     """Charge les structures à lire, puis reconstruit les relations, y compris quand HAL devient inaccessible."""
     metrics = PhaseMetrics()
-    step(logger, "Référentiel des structures HAL")
     ids = store.ids_to_fetch(refresh_stale=refresh_stale)
     if not ids:
-        logger.info("%sAucune structure à charger", LAST_BRANCH)
+        metrics.report = "Aucune structure à charger"
         return metrics
 
-    def save_batch(structures: list[HalStructure], aliases: dict[int, int]) -> None:
-        store.save(structures, aliases)
+    def save_batch(
+        structures: list[HalStructure], aliases: dict[int, int], merged: set[int]
+    ) -> None:
+        store.save(structures, aliases, merged)
         conn.commit()
 
     try:
-        with track_progress(len(ids), f"{LAST_BRANCH}HAL", logger) as progress:
+        with track_progress(len(ids), f"{BRANCH}HAL", logger) as progress:
             load = fetch_hal_structures(
                 ids, source=source, store=store, save_batch=save_batch, progress=progress
             )
@@ -285,11 +330,8 @@ def run_refresh_hal_structures(
         "loaded": load.structures,
         "not_found": len(load.not_found),
     }
-    logger.info(
-        "%s%d structures cherchées : %d trouvées, %d introuvables",
-        LAST_BRANCH,
-        load.requested,
-        load.requested - len(load.not_found),
-        len(load.not_found),
+    metrics.report = (
+        f"{load.requested} structures cherchées : {load.requested - len(load.not_found)} trouvées,"
+        f" {len(load.not_found)} introuvables"
     )
     return metrics

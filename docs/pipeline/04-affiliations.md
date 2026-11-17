@@ -1,8 +1,8 @@
 # Résolution des affiliations
 
-*À jour le 2026-11-02.*
+*À jour le 2026-11-16.*
 
-La phase `affiliations` rattache les contributions sources aux structures du périmètre, et marque leur entrée dans le périmètre.
+La phase `affiliations` rattache les contributions sources aux structures du périmètre, leur associe des pays, et marque leur entrée dans le périmètre.
 
 - **`refresh_ror`** — importe la dernière version du dump ROR, publié sur Zenodo, si elle n'est pas déjà importée.
 
@@ -26,5 +26,12 @@ La phase `affiliations` rattache les contributions sources aux structures du pé
    - une forme « excluante » empêche la reconnaissance de sa structure dans l'adresse qui la contient.
 
 - **`resolve_thesis_partners`** — rattache le PPN IdRef de chaque laboratoire partenaire de thèse à une structure, par les formes de noms (`idref_structures`).
+
+- **Pays** — associe des pays aux adresses et aux contributions sources, pour l'analyse des collaborations internationales.
+   - **Pays trouvés** (`detect_by_country_name`, `detect_by_place_name`). Chaque moyen de détection propose des pays pour une adresse (`address_country_candidates`) : pays donnés par OpenAlex et ScanR, nom de pays en fin d'adresse, noms d'institutions et de villes (`place_name_forms`), saisie manuelle.
+   - **Pays retenus** (`resolve_countries`). Une fonction de préséance du domaine (`domain/addresses/country_detection.py`) compose `addresses.countries` à partir des pays trouvés.
+   - **Report** (`refresh_source_record_countries`). Le pays d'une contribution source réunit les pays retenus de ses adresses et ceux de ses structures HAL. Quand ses adresses ne donnent aucun pays, il prend ceux de ses organisations ROR sans adresse. `source_records.countries` réunit les pays de ses contributions sources. La publication d'un enregistrement source aux pays modifiés entre dans la file de consolidation, qui recalcule `publications.countries`.
+
+   Seules les adresses et les contributions sources marquées sont retraitées.
 
 - **`populate`** — rafraîchit la vue matérialisée `source_contribution_structures`, qui rattache chaque contribution source aux structures du périmètre atteintes, avec l'indice : adresse, ROR, structure HAL, établissement de soutenance ou laboratoire partenaire d'une thèse, déposant d'un brevet. Les adresses de la contribution source font autorité. Un ROR est un indice seulement pour une contribution source sans adresse. Une contribution source entre aussi dans le périmètre quand elle contient un identifiant fort (ORCID, IdRef, `hal_person_id`) d'une personne avec une fiche RH. Le document paraît alors pendant une présence continue de la personne dans l'établissement, de l'année qui suit son début à l'année de sa fin. Ces indices sont écrits dans `source_contributions.perimeter_evidence` ; `in_perimeter` est vrai pour au moins un indice. Un enregistrement source sans publication, avec une contribution source dans le périmètre, est signalé à la phase [`publications`](07-publications.md), qui crée sa publication.

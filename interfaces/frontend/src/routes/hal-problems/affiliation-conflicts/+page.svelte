@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
@@ -78,7 +79,7 @@
 							{#each pub.authors as author, i (i)}
 								<div class="conflict-author">
 									{#if author.person_id}<a href={resolve(`persons/${author.person_id}`)}>{author.name}</a>{:else}{author.name}{/if}
-									{#each author.structures as structure (structure.name)}<span class="author-structure" title={structure.name}>{structureLabel(structure)}</span>{/each}
+									{#each author.structures as structure (structure.name)}<span class="author-structure" use:tooltip={structure.name}>{structureLabel(structure)}</span>{/each}
 								</div>
 							{/each}
 						</td>

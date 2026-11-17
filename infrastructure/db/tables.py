@@ -779,6 +779,15 @@ addresses = Table(
             " la pose sur les adresses sans origine."
         ),
     ),
+    Column(
+        "is_concatenated",
+        Boolean,
+        comment=(
+            "Vrai si le texte réunit plusieurs affiliations, chacune suivie des initiales de ses"
+            " auteurs. Une adresse concaténée est sans indice de périmètre. La phase affiliations"
+            " la pose sur les adresses non examinées."
+        ),
+    ),
     schema="structures",
 )
 
@@ -1505,6 +1514,11 @@ source_record_identifiers = Table(
         Text,
         comment="Règle de correction qui retire l'identifiant. NULL : identifiant actif.",
     ),
+    Column(
+        "added_by",
+        Text,
+        comment="Règle de correction qui ajoute l'identifiant. NULL : identifiant donné par la source.",
+    ),
     PrimaryKeyConstraint(
         "source_record_id", "id_type", "id_value", name="source_record_identifiers_pkey"
     ),
@@ -1785,22 +1799,29 @@ dois = Table(
         "registered_url",
         Text,
         comment=(
-            "URL de résolution du DOI, lue dans l'API des handles de doi.org. NULL avec une "
-            "date : DOI inconnu de doi.org."
+            "URL de résolution du DOI, lue dans l'API des handles de doi.org. NULL pour un DOI "
+            "inconnu, ou connu sans URL."
         ),
     ),
-    Column("resolved_at", DateTime(timezone=True), comment="Date de la lecture chez doi.org."),
+    Column("resolved_at", DateTime(timezone=True), comment="Date de la réponse de doi.org."),
+    Column(
+        "registered",
+        Boolean,
+        comment=(
+            "Réponse de doi.org : TRUE pour un DOI connu, FALSE pour un DOI inconnu. "
+            "NULL sans réponse."
+        ),
+    ),
     CheckConstraint(
         "unpaywall_oa_status IS NULL OR unpaywall_checked_at IS NOT NULL",
         name="dois_unpaywall_dated",
     ),
-    CheckConstraint(
-        "registered_url IS NULL OR resolved_at IS NOT NULL", name="dois_registered_url_dated"
-    ),
+    CheckConstraint("(registered IS NULL) = (resolved_at IS NULL)", name="dois_registered_dated"),
+    CheckConstraint("registered_url IS NULL OR registered", name="dois_registered_url_registered"),
     _lowercase_doi("dois"),
     comment=(
-        "Réponses des services externes sur chaque DOI de publication : verdict d'Unpaywall, "
-        "URL de résolution chez doi.org."
+        "Réponses des services externes sur chaque DOI connu : existence et URL de résolution "
+        "chez doi.org, verdict d'Unpaywall."
     ),
     schema="sources",
 )

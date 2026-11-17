@@ -1,6 +1,6 @@
 // Sources bibliographiques : libellés et ordre d'affichage servis par l'API, logos locaux.
 import { asset } from '$app/paths';
-import { api } from '#lib/api/index.js';
+import { apiOnce } from '#lib/api/index.js';
 import type { components } from '#lib/api/schema.js';
 
 type EnumOption = components['schemas']['EnumOption'];
@@ -20,19 +20,15 @@ const ICONS: Record<string, string> = {
 
 const sources = $state({ order: [] as string[], labels: {} as Record<string, string> });
 
-let loading: Promise<void> | null = null;
-
-/** Charge les sources une seule fois. Un échec laisse les clés brutes à l'affichage, et l'appel suivant réessaie. */
+/** Charge les sources. Un échec laisse les clés brutes à l'affichage, et l'appel suivant réessaie. */
 export function loadSources(): Promise<void> {
-	loading ??= api<EnumOption[]>('/api/sources')
-		.then((options) => {
+	return apiOnce<EnumOption[]>('/api/sources').then(
+		(options) => {
 			sources.order = options.map((o) => o.value);
 			sources.labels = Object.fromEntries(options.map((o) => [o.value, o.label_fr]));
-		})
-		.catch(() => {
-			loading = null;
-		});
-	return loading;
+		},
+		() => {},
+	);
 }
 
 /** Libellé d'une source (avec repli sur la clé brute tant que les sources ne sont pas chargées, ou pour une source inconnue). */
@@ -47,18 +43,14 @@ export function sourceOrder(): string[] {
 
 const structureIdSources = $state({ options: [] as EnumOption[] });
 
-let structureIdsLoading: Promise<void> | null = null;
-
-/** Charge une seule fois les sources des identifiants de structure (`structures.api_ids`) et le libellé de ces identifiants. Un échec laisse la liste vide, et l'appel suivant réessaie. */
+/** Charge les sources des identifiants de structure (`structures.api_ids`) et le libellé de ces identifiants. Un échec laisse la liste vide, et l'appel suivant réessaie. */
 export function loadStructureIdSources(): Promise<void> {
-	structureIdsLoading ??= api<EnumOption[]>('/api/sources/structure-ids')
-		.then((options) => {
+	return apiOnce<EnumOption[]>('/api/sources/structure-ids').then(
+		(options) => {
 			structureIdSources.options = options;
-		})
-		.catch(() => {
-			structureIdsLoading = null;
-		});
-	return structureIdsLoading;
+		},
+		() => {},
+	);
 }
 
 /** Sources des identifiants de structure, dans l'ordre d'affichage. */

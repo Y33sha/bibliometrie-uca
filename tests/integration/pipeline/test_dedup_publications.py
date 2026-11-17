@@ -302,15 +302,3 @@ class TestRefreshFromSources:
         assert "python" in lower_kw
         assert "data" in lower_kw
         assert "machine learning" in lower_kw
-
-    def test_is_retracted_or(self, sa_sync_conn):
-        """La publication est rétractée dès qu'une source la déclare rétractée."""
-        id1 = _insert_publication(sa_sync_conn, publication_year=2024, doc_type="article")
-        _source_record(sa_sync_conn, id1, source_id="hal-ret1", is_retracted=False)
-        _source_record(sa_sync_conn, id1, source="openalex", source_id="oa-ret1", is_retracted=True)
-        refresh(sa_sync_conn, [id1])
-
-        is_ret = _scalar(
-            sa_sync_conn, "SELECT is_retracted FROM publications WHERE id = :id", id=id1
-        )
-        assert is_ret is True

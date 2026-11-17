@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
+	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels } from '#lib/labels.js';
@@ -23,8 +25,6 @@
 	import IdentifierLink from '#lib/components/IdentifierLink.svelte';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
-	import { withBase } from '#lib/paths.js';
-	import { paramsToQuery } from '#lib/utils.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Publisher = components['schemas']['PublisherListItem'];
@@ -68,12 +68,6 @@
 		list.setSort(nextSort(list.sort, column, column === 'name' ? 'asc' : 'desc'));
 	}
 
-	function exportCsvUrl(): string {
-		const params = list.filterParams();
-		params.set('sort', list.sort);
-		return withBase(`/api/publishers/export.csv?${paramsToQuery(params)}`);
-	}
-
 	// Un type inconnu est une valeur absente : la cellule reste vide.
 	function publisherTypeLabel(value: string | null): string {
 		if (!value || value === 'unknown') return '';
@@ -84,7 +78,7 @@
 	onMount(list.restore);
 </script>
 
-<ListToolbar bind:search={list.search} placeholder="Rechercher dans les noms" onsearch={list.onSearchInput} list={list.listing} one="éditeur" many="éditeurs" exportUrl={exportCsvUrl()} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher dans les noms" onsearch={list.onSearchInput} list={list.listing} one="éditeur" many="éditeurs" exportUrl={list.exportUrl('/api/publishers/export.csv')} countBelow>
 	{#snippet leading()}
 		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
 	{/snippet}
@@ -140,13 +134,13 @@
 				<td>
 					<div class="tag-list">
 						{#each p.doi_prefixes as dp (dp.prefix)}
-							<span class="tag id-badge" title="RA : {dp.ra}{dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}">{dp.prefix}</span>
+							<span class="tag id-badge" use:tooltip={`RA : ${dp.ra}${dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}`}>{dp.prefix}</span>
 						{/each}
 					</div>
 				</td>
 				<!-- Un décompte non nul mène à l'onglet correspondant de la fiche. -->
-				<td class="num">{#if p.serial_count}<a href={resolve(`publishers/${p.id}?tab=serials`)}>{p.serial_count.toLocaleString('fr-FR')}</a>{:else}0{/if}</td>
-				<td class="num">{#if p.publication_count}<a href={resolve(`publishers/${p.id}?tab=publications`)}>{p.publication_count.toLocaleString('fr-FR')}</a>{:else}0{/if}</td>
+				<td class="num">{#if p.serial_count}<a href={resolve(`publishers/${p.id}?tab=serials`)}>{formatNumber(p.serial_count)}</a>{:else}0{/if}</td>
+				<td class="num">{#if p.publication_count}<a href={resolve(`publishers/${p.id}?tab=publications`)}>{formatNumber(p.publication_count)}</a>{:else}0{/if}</td>
 			</tr>
 		{/each}
 		{#if list.listing.items.length === 0}
@@ -163,10 +157,7 @@
 	<PublisherDrawer
 		id={drawer.id}
 		onclose={() => drawer.open(null)}
-		onchange={() => {
-			list.listing.load();
-			list.facets.load();
-		}}
+		onchange={list.reload}
 	/>
 {/if}
 

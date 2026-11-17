@@ -1,4 +1,4 @@
-"""Sous-étape `serial_by_doi` de la phase `metadata_correction` : rattachement de la revue manquante par l'espace de noms des DOI (`attach_serial_by_doi`), d'après la table `serial_doi_namespaces`."""
+"""Tâche `serial_by_doi` de la phase `metadata_correction` : rattachement de la revue manquante par l'espace de noms des DOI (`attach_serial_by_doi`), d'après la table `serial_doi_namespaces`."""
 
 import logging
 from collections.abc import Mapping, Sequence
@@ -7,7 +7,7 @@ from sqlalchemy import Connection
 
 from domain.serials.doi_namespaces import DoiNamespace
 from domain.source_records.metadata_correction.serial_by_doi import attach_serial_by_doi
-from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity
+from pipeline.runtime.observability.log_format import inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.correction.correction_batches import persist_in_batches
 from pipeline.transformation.publications.correction.correction_store import (
@@ -48,12 +48,13 @@ def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
     detached = len(updates) - len(serials)
 
     written = persist_in_batches(conn, updates, store.persist_serial_corrections)
-    logger.info(
-        "%s%s %s à %s%s",
-        LAST_BRANCH,
-        quantity(len(serials), "enregistrement source", "enregistrements sources"),
-        inflect(len(serials), "rattaché"),
-        quantity(len(set(serials)), "revue"),
-        f", {quantity(detached, 'rattachement')} {inflect(detached, 'retiré')}" if detached else "",
+    report = (
+        f"{quantity(len(serials), 'enregistrement source', 'enregistrements sources')}"
+        f" {inflect(len(serials), 'rattaché')} à {quantity(len(set(serials)), 'revue')}"
+        + (
+            f", {quantity(detached, 'rattachement')} {inflect(detached, 'retiré')}"
+            if detached
+            else ""
+        )
     )
-    return PhaseMetrics(seen=len(rows), updated=written)
+    return PhaseMetrics(seen=len(rows), updated=written, report=report)

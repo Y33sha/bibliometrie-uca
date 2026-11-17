@@ -1,4 +1,7 @@
 <script lang="ts">
+	import Check from '@lucide/svelte/icons/check';
+	import X from '@lucide/svelte/icons/x';
+	import { formatNumber } from '#lib/utils.js';
 	import { institution, loadInstitution } from '#lib/institution.svelte.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
@@ -7,16 +10,16 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
-	import { addresses as addressesApi, api, errorMessage, structures as structuresApi } from '#lib/api/index.js';
+	import { addresses as addressesApi, api, structures as structuresApi } from '#lib/api/index.js';
 	import AddressPublications from '#lib/components/AddressPublications.svelte';
 	import PublicationCountButton from '#lib/components/PublicationCountButton.svelte';
-	import { toast } from '#lib/dialogs.svelte.js';
+	import { toastError } from '#lib/dialogs.svelte.js';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import { groupStructuresByType, structureGroupLabel } from '#lib/structureTypes.js';
-	import { structDetectionClasses } from '#lib/labels.js';
+	import { structDetectionClasses, sectionLabels } from '#lib/labels.js';
 
 	// ---- Type definitions ----
 
@@ -236,7 +239,7 @@
 			if (!keep) list.total--;
 			loadStats();
 		} catch (e) {
-			toast(`Erreur : ${errorMessage(e)}`, 'error');
+			toastError(e);
 		}
 	}
 
@@ -402,7 +405,7 @@
 	});
 </script>
 
-<PageHeader title="Affiliations" hidden />
+<PageHeader title={sectionLabels['admin/addresses']} hidden />
 
 <div class="page-addresses">
 	<!-- Structure selection + feedback button -->
@@ -423,11 +426,11 @@
 			{/each}
 		</select>
 		<div class="stats-bar">
-			<span class="tag tag-pill">{stats.total.toLocaleString('fr-FR')} adresses</span>
-			<span class="tag tag-pill tag-accent">Détectées&nbsp;: {stats.detected.toLocaleString('fr-FR')}</span>
-			<span class="tag tag-pill tag-warning">Non validées&nbsp;: {stats.pending.toLocaleString('fr-FR')}</span>
-			<span class="tag tag-pill tag-success">Reliées&nbsp;: {stats.confirmed.toLocaleString('fr-FR')}</span>
-			<span class="tag tag-pill tag-danger">Rejetées&nbsp;: {stats.rejected.toLocaleString('fr-FR')}</span>
+			<span class="tag tag-pill">{formatCount(stats.total, 'adresse')}</span>
+			<span class="tag tag-pill tag-accent">Détectées&nbsp;: {formatNumber(stats.detected)}</span>
+			<span class="tag tag-pill tag-warning">Non validées&nbsp;: {formatNumber(stats.pending)}</span>
+			<span class="tag tag-pill tag-success">Reliées&nbsp;: {formatNumber(stats.confirmed)}</span>
+			<span class="tag tag-pill tag-danger">Rejetées&nbsp;: {formatNumber(stats.rejected)}</span>
 		</div>
 		{#if currentStructureId}
 			<a href={resolve(`admin/feedback?structure_id=${currentStructureId}`)} class="btn btn-sm feedback-btn">Qualité de la détection</a>
@@ -541,8 +544,8 @@
 		<div class="batch-bar batch-bar-addresses">
 			<span>{formatCount(selectedCount, 'sélectionnée')}</span>
 			<div class="batch-actions">
-				<button class="btn btn-sm" onclick={() => batchReview(false)}>Rejeter <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button>
-				<button class="btn btn-sm" onclick={() => batchReview(true)}>Relier <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg></button>
+				<button class="btn btn-sm" onclick={() => batchReview(false)}>Rejeter <X /></button>
+				<button class="btn btn-sm" onclick={() => batchReview(true)}>Relier <Check /></button>
 				<button class="btn btn-sm" onclick={() => batchReview(null)}>Réinitialiser</button>
 				<button class="btn btn-sm" onclick={clearSelection}>Annuler</button>
 			</div>

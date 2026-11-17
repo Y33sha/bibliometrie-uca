@@ -1,12 +1,13 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
   import Breadcrumb from '#lib/components/Breadcrumb.svelte';
   import ResultCount from '#lib/components/ResultCount.svelte';
   import PageHeader from '#lib/components/PageHeader.svelte';
   import KeyFigures from '#lib/components/KeyFigures.svelte';
   import { onMount } from "svelte";
   import { useUrlFilters } from "#lib/composables/useUrlFilters.svelte.js";
-  import { api, nameForms, structures as structuresApi, errorMessage } from "#lib/api/index.js";
-  import { deriveStructDetectionStatus } from "#lib/utils.js";
+  import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
+  import { deriveStructDetectionStatus, formatNumber, formatPercent } from "#lib/utils.js";
   import { structureLabel } from "#lib/structureLabels.js";
   import { groupStructuresByType, structureGroupLabel } from "#lib/structureTypes.js";
   import { columnLabels, structDetectionClasses, structDetectionLabels } from "#lib/labels.js";
@@ -14,7 +15,7 @@
   import Pagination from "#lib/components/Pagination.svelte";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import { autofocus } from "#lib/actions/focus.js";
-  import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
+  import { confirmDialog, toastError } from '#lib/dialogs.svelte.js';
   import IconButton from "#lib/components/IconButton.svelte";
   import StructureDrawer from "#lib/components/structures/StructureDrawer.svelte";
   import { useDrawerParam } from "#lib/composables/useDrawerParam.svelte.js";
@@ -151,7 +152,7 @@
       await nameForms.remove(formId);
       loadTable();
     } catch (e) {
-      toast("Erreur : " + errorMessage(e), 'error');
+      toastError(e);
     }
   }
 
@@ -184,7 +185,7 @@
       await nameForms.update(formId, { requires_context_of: ctx });
       loadTable();
     } catch (e) {
-      toast("Erreur : " + errorMessage(e), 'error');
+      toastError(e);
     }
   }
 
@@ -257,14 +258,14 @@
     <KeyFigures
       items={[
         {
-          value: stats.detection_rate !== null ? `${stats.detection_rate.toLocaleString("fr-FR")}\u00a0%` : "\u2014",
+          value: stats.detection_rate !== null ? formatPercent(stats.detection_rate / 100, 1) : "\u2014",
           label: "taux de concordance",
         },
-        { value: stats.total_reviewed.toLocaleString("fr-FR"), label: "adresses examinées" },
-        { value: stats.false_negatives.toLocaleString("fr-FR"), label: "faux négatifs" },
-        { value: stats.false_positives.toLocaleString("fr-FR"), label: "faux positifs" },
-        { value: stats.concordant_valid.toLocaleString("fr-FR"), label: "vrais positifs" },
-        { value: stats.pending.toLocaleString("fr-FR"), label: "en attente" },
+        { value: formatNumber(stats.total_reviewed), label: "adresses examinées" },
+        { value: formatNumber(stats.false_negatives), label: "faux négatifs" },
+        { value: formatNumber(stats.false_positives), label: "faux positifs" },
+        { value: formatNumber(stats.concordant_valid), label: "vrais positifs" },
+        { value: formatNumber(stats.pending), label: "en attente" },
       ]}
     />
   {/if}
@@ -318,7 +319,7 @@
             <td>
               {#if a.structures && a.structures.length > 0}
                 {#each a.structures as l}
-                  <span class={structDetectionClasses[structDetectionStatus(l)]} title={structTagTitle(l)}>
+                  <span class={structDetectionClasses[structDetectionStatus(l)]} use:tooltip={structTagTitle(l)}>
                     {structureLabel(l)}
                   </span>
                 {/each}
@@ -340,8 +341,8 @@
                           (ctx: {formatCtx(f.requires_context_of)})
                         </span>
                       {/if}
-                      <button class="btn btn-sm" data-ctx-trigger title="Ajouter un contexte contraignant" onclick={(e) => openCtxPicker(f.form_id, e)}> + ctx </button>
-                      <button class="btn btn-sm btn-danger" title="Supprimer cette forme" onclick={() => deleteForm(f.form_id)}> suppr. </button>
+                      <button class="btn btn-sm" data-ctx-trigger use:tooltip={'Ajouter un contexte contraignant'} onclick={(e) => openCtxPicker(f.form_id, e)}> + ctx </button>
+                      <button class="btn btn-sm btn-danger" use:tooltip={'Supprimer cette forme'} onclick={() => deleteForm(f.form_id)}> suppr. </button>
                     </div>
                   {/each}
                 {:else}

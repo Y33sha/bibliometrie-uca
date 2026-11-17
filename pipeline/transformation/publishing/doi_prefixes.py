@@ -1,6 +1,6 @@
 """Store de la table `doi_prefixes` : agence d'enregistrement (Registration Agency) et éditeur de chaque préfixe DOI.
 
-La phase `resolve_ra` insère chaque préfixe avec son agence. La phase `publishing` interroge ensuite l'API `/prefixes` de Crossref, puis celle de DataCite, et attache l'éditeur. Pour un préfixe DataCite, l'éditeur est le provider DataCite ; le client DataCite (repository) a ses propres colonnes.
+La tâche `dois.resolve_prefixes` insère chaque préfixe avec son agence. La phase `publishing` interroge ensuite l'API `/prefixes` de Crossref, puis celle de DataCite, et attache l'éditeur. Pour un préfixe DataCite, l'éditeur est le provider DataCite ; le client DataCite (repository) a ses propres colonnes.
 """
 
 from typing import Literal, NamedTuple
@@ -33,7 +33,7 @@ class PendingPublisherPrefix(NamedTuple):
     prefix: str
     ra: str
     publisher_name_raw: str | None
-    """En général vide : `resolve_ra` crée la ligne avec l'agence seule. Un nom présent dispense de la requête à l'agence."""
+    """En général vide : `dois.resolve_prefixes` crée la ligne avec l'agence seule. Un nom présent dispense de la requête à l'agence."""
     publisher_name_normalized: str | None
     sample_doi: str | None = None
     """DOI d'un enregistrement source de ce préfixe, lu juste avant d'interroger Crossref."""
@@ -72,7 +72,7 @@ class DoiPrefixStore:
         return result.rowcount > 0
 
     def breakdown_by_registration_agency(self) -> list[tuple[str, int, int]]:
-        """Renvoie le nombre de DOI et de préfixes de chaque agence parmi les DOI connus, par nombre de DOI décroissant. Un préfixe absent de la table compte comme `unknown`. Sert au journal de la phase `resolve_ra`."""
+        """Renvoie le nombre de DOI et de préfixes de chaque agence parmi les DOI connus, par nombre de DOI décroissant. Un préfixe absent de la table compte comme `unknown`. Sert au journal de la tâche `dois.resolve_prefixes`."""
         result = self._conn.execute(
             text(
                 """

@@ -1,7 +1,7 @@
 """Tests de l'assemblage des arêtes des signaux #2 (clés de confirmation partagées) et #3 (titre), et du compte des relations ajoutées par lien."""
 
 from domain.publications.relations import RelationType
-from pipeline.transformation.publications.relations import (
+from pipeline.transformation.publications.relations.rebuild import (
     DeclaredRelationSource,
     DoiPublication,
     RelationEdge,

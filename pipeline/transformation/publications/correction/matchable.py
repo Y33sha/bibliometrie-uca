@@ -1,4 +1,4 @@
-"""Sous-étape `matchable` de la phase `metadata_correction` : calcul de `source_records.is_matchable` (`is_matchable`), après les sous-étapes de correction du DOI, des identifiants et des liens. Un changement de valeur marque l'enregistrement source pour la réconciliation."""
+"""Tâche `matchable` de la phase `metadata_correction` : calcul de `source_records.is_matchable` (`is_matchable`), après les tâches de correction du DOI, des identifiants et des liens. Un changement de valeur marque l'enregistrement source pour la réconciliation."""
 
 import logging
 import time

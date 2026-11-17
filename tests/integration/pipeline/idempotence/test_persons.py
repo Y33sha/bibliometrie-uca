@@ -52,7 +52,7 @@ def _setup(conn) -> dict[str, int]:
 
 
 def _run(conn) -> None:
-    arbitrate_identifier_conflicts(conn, logging.getLogger("test"))
+    arbitrate_identifier_conflicts(conn)
     resolve_contributions(conn, logging.getLogger("test"))
     populate(conn)
     purge(conn)

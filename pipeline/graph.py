@@ -1,16 +1,17 @@
 """Tâches, étapes et phases du pipeline, et graphe de dépendances des tâches d'après leurs lectures et leurs écritures.
 
-Le module de chaque phase déclare ses étapes et ses tâches. `pipeline.phases` liste les phases dans l'ordre d'exécution. L'ordre des tâches est celui d'un parcours en profondeur des phases et de leurs étapes.
+Le module de chaque phase déclare la phase (`PHASE`), avec ses étapes et ses tâches. `pipeline.phases` liste les phases dans l'ordre d'exécution. L'ordre des tâches est celui d'un parcours en profondeur des phases et de leurs étapes.
 
 Une donnée se désigne par sa table (`"serials"`) ou par une colonne (`"serials.serial_type"`). `"serials.id"` désigne l'existence des lignes, créées et supprimées par les écrivains. Une table et l'une de ses colonnes se recouvrent.
 
 Une tâche dépend des tâches placées avant elle et écrivant une donnée lue par elle. Une lecture déclarée `previous_run` lit aussi les écritures du run précédent, faites par une tâche placée après elle ou par elle-même. Les tests vérifient que l'ordre d'exécution ne fait lire à aucune tâche une donnée écrite après elle, sauf lecture du run précédent déclarée.
 
-La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucune ne dépend d'une autre tâche du groupe.
+La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle, une file par source (`network`) : les tâches d'une même source s'enchaînent dans l'ordre, les sources s'exécutent en même temps. Une tâche peut dépendre d'une tâche de sa source placée avant elle, jamais d'une tâche d'une autre source du groupe.
 """
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import KW_ONLY, dataclass
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from pipeline.http.circuit_breaker import DEFAULT_THRESHOLD
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Connection
 
-    from pipeline.runtime.context import PhaseContext, RunOptions
+    from pipeline.runtime.context import PhaseContext
     from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
@@ -41,19 +42,17 @@ class Task:
     maintenance: tuple[str, ...] = ()
     """Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE source_contributions`."""
     parallel_group: str | None = None
-    """Groupe de tâches consécutives exécutées en parallèle, nommé dans sa phase."""
+    """Groupe de tâches consécutives exécutées en parallèle, une file par source, nommé dans sa phase."""
     section: str | None = None
-    """Titre de la sous-étape ouverte par une tâche placée hors d'une étape. `None` : la tâche écrit sous le titre courant."""
+    """Section de la tâche au journal, hors d'une étape de premier niveau qui en a une. `None` : la tâche écrit sous la section courante."""
     label: str | None = None
-    """Libellé de la ligne de bilan. `None` : la tâche écrit elle-même ses lignes."""
-    progress_bar: bool = False
-    """La tâche affiche une barre d'avancement en terminal, donc sa ligne de bilan va seulement au journal."""
+    """Libellé de la ligne de bilan, suivi du bilan de la tâche. `None` : la ligne de bilan est `PhaseMetrics.report`, ou, à défaut, la tâche écrit elle-même ses lignes."""
     threshold: int = DEFAULT_THRESHOLD
     """Échecs consécutifs avant la coupure du circuit-breaker de la source."""
     when: Callable[[PhaseContext], bool] | None = None
     """Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée n'écrit rien."""
     silent_when_empty: bool = False
-    """La tâche n'écrit rien sans élément traité : `total` nul, sans signal."""
+    """La tâche n'écrit rien sans élément traité : `total` nul, sans erreur ni signal."""
 
 
 type TaskRun = Callable[[PhaseContext], PhaseMetrics]
@@ -92,14 +91,27 @@ def _writes_read(reader: Task, writer: Task) -> list[str]:
     return [r for r in reader.reads if any(_affected_by(r, w) for w in writer.writes)]
 
 
+def reads_from(children: Iterable[Step | Task], writer: Task) -> bool:
+    """Indique si une tâche de `children` lit une donnée écrite par `writer`."""
+    return any(_writes_read(task, writer) for task in leaves(children))
+
+
+def concurrent(a: Task, b: Task) -> bool:
+    """Indique si deux tâches s'exécutent en même temps : même groupe parallèle, sources différentes."""
+    return (
+        a.parallel_group is not None
+        and a.parallel_group == b.parallel_group
+        and a.network != b.network
+    )
+
+
 def dependencies(tasks: Sequence[Task]) -> dict[str, set[str]]:
-    """Renvoie, pour chaque tâche, les tâches placées avant elle, hors de son groupe parallèle, et écrivant une donnée lue par elle."""
+    """Renvoie, pour chaque tâche, les tâches placées avant elle, exécutées avant elle (`concurrent`), et écrivant une donnée lue par elle."""
     return {
         reader.name: {
             writer.name
             for writer in tasks[:i]
-            if (reader.parallel_group is None or writer.parallel_group != reader.parallel_group)
-            and _writes_read(reader, writer)
+            if not concurrent(reader, writer) and _writes_read(reader, writer)
         }
         for i, reader in enumerate(tasks)
     }
@@ -124,8 +136,8 @@ class Step:
     summary: str
     """Entrées → sorties de l'étape."""
     children: tuple[Step | Task, ...]
-    label: str | None = None
-    """Titre de section au journal des tâches d'une étape de premier niveau. `None` : chaque tâche écrit sous sa `section` ou sous son propre titre."""
+    section: str | None = None
+    """Section des tâches d'une étape de premier niveau, au journal. `None` : chaque tâche écrit sous sa propre `section`."""
 
     @property
     def tasks(self) -> tuple[Task, ...]:
@@ -151,6 +163,17 @@ def interface(children: Iterable[Step | Task]) -> tuple[frozenset[str], frozense
     return frozenset(reads), frozenset(writes)
 
 
+class Block(StrEnum):
+    """Bloc du premier niveau de l'arborescence du pipeline. Il regroupe les phases à l'affichage, sans effet sur l'exécution."""
+
+    HARVESTING = "Moissonnage"
+    SOURCE_RECORDS = "Enregistrements sources"
+    ENTITIES = "Entités"
+    DERIVED_DATA = "Données dérivées"
+    ENRICHMENTS = "Enrichissements"
+    """Phases hors résolution d'entités : `--no-extras` les omet."""
+
+
 @dataclass(frozen=True)
 class Phase:
     """Phase du pipeline : étapes et tâches consécutives, avec leur libellé et leurs attributs."""
@@ -159,12 +182,9 @@ class Phase:
     label: str
     """Libellé lisible sans connaître le schéma."""
     children: tuple[Step | Task, ...]
-    extra: bool = False
-    """Enrichissement, hors résolution d'entités : `--no-extras` l'omet."""
-    harvesting: bool = False
-    """Moissonnage : le journal de la phase se termine par le total de ses sources."""
-    when: Callable[[RunOptions], bool] | None = None
-    """Condition d'exécution, d'après les options du run. Une phase écartée le signale au journal et renvoie des métriques vides."""
+    block: Block
+    when: Callable[[PhaseContext], bool] | None = None
+    """Condition d'exécution, évaluée avant la précondition. Une phase écartée le signale au journal et renvoie des métriques vides."""
     check: Callable[[PhaseContext], None] | None = None
     """Précondition, vérifiée avant les tâches : lève une exception si elle n'est pas remplie."""
     assemble: Callable[[Mapping[str, PhaseMetrics]], PhaseMetrics] | None = None
@@ -173,3 +193,8 @@ class Phase:
     @property
     def tasks(self) -> tuple[Task, ...]:
         return leaves(self.children)
+
+    @property
+    def extra(self) -> bool:
+        """Enrichissement : `--no-extras` omet la phase."""
+        return self.block is Block.ENRICHMENTS

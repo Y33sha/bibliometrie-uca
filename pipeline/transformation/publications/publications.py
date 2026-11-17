@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from sqlalchemy import Connection, text
 
-from pipeline.graph import Task
+from pipeline.graph import Block, Phase, Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -72,6 +72,8 @@ _CONSOLIDATION_WRITES = (
     "contributions.id",
     "aligned_source_contributions",
     "contribution_resolution_queue",
+    # Contributions d'une publication dont le DOI change : l'enregistrement OpenAlex éditeur peut changer.
+    "contribution_attributes_queue",
     "publication_relations",
     "publication_subjects",
     "publications_detail",
@@ -88,7 +90,7 @@ _CONSOLIDATION_PREVIOUS_RUN = (
 )
 """Lectures du run précédent de la consolidation : publications supprimées, enregistrements sources et paiements APC détachés par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize`."""
 
-TASKS = (
+_CHILDREN = (
     Task(
         "reconcile",
         reads=(
@@ -118,4 +120,12 @@ TASKS = (
         label="Publications en file",
         silent_when_empty=True,
     ),
+)
+
+
+PHASE = Phase(
+    "publications",
+    "Rattachement des enregistrements sources aux publications",
+    _CHILDREN,
+    Block.ENTITIES,
 )

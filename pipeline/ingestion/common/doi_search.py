@@ -8,22 +8,18 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-import httpx2
 from sqlalchemy import Connection, ScalarResult, text
 
 from domain.documents.identifiers import DOI
 from domain.source_records.identifiers import SourceIdentifierType
-from domain.sources.registry import DOI_ORG, PROFILES, Source
+from domain.sources.registry import PROFILES, Source
 from domain.sources.staging import StagingEntryMode
 from infrastructure.db.doi_targets import unversioned_doi_sql
-from pipeline.http.lookup import UNAVAILABLE, Unavailable
-from pipeline.http.polite_pool import polite_user_agent
 from pipeline.ingestion.common.failed_lookups import (
     pending_failed_lookup_sql,
     record_failed_lookup,
 )
-from pipeline.ingestion.common.lookup import Fetch, LookupBatch, LookupChannel, look_up
-from pipeline.ingestion.complements.doi_org import doi_existence
+from pipeline.ingestion.common.lookup import Fetch, LookupChannel, look_up
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -42,13 +38,13 @@ def get_missing_dois(
 ) -> list[str]:
     """Renvoie les DOI à chercher dans la cible : DOI des publications du périmètre absents de la cible, nettoyés et sans doublon.
 
-    Les candidats viennent de la vue `candidate_dois` : DOI des enregistrements sources, cibles des relations entre publications, DOI DataCite déduits des identifiants arXiv. La forme sans version de chaque DOI à suffixe de version s'ajoute aux candidats. Quand elle existe, elle devient la cible des versions (sous-étape `doi_targets`). Le périmètre est celui du run précédent ; les DOI des enregistrements sources créés pendant le run attendent le run suivant.
+    Les candidats viennent de la vue `candidate_dois` : DOI des enregistrements sources, cibles des relations entre publications, DOI DataCite déduits des identifiants arXiv. La forme sans version de chaque DOI à suffixe de version s'ajoute aux candidats. Quand elle existe, elle devient la cible des versions (tâche `doi_targets`). Le périmètre est celui du run précédent ; les DOI des enregistrements sources créés pendant le run attendent le run suivant.
 
-    Un DOI est absent de la cible s'il manque à son `staging` et à tous les DOI de ses enregistrements sources : une source renvoie un même document pour chacun de ses DOI.
+    Un DOI est absent de la cible s'il manque à son `staging` et à tous les DOI de ses enregistrements sources, DOI retirés par la correction compris : une source renvoie un même document pour chacun de ses DOI.
 
-    Un DOI sort de la sélection pendant `retry_after_days` jours après une recherche vaine dans la cible, et définitivement s'il est inconnu de doi.org (`failed_lookups`).
+    Un DOI sort de la sélection pendant `retry_after_days` jours après une recherche vaine dans la cible (`failed_lookups`), et définitivement s'il est inconnu de doi.org (`dois.registered`).
 
-    Pour une cible agence d'enregistrement, seuls comptent les DOI à préfixe résolu vers cette agence. Un préfixe encore sans agence attend la phase `resolve_ra`, plus loin dans le run : son DOI est cherché au run suivant, auprès d'une seule des deux agences.
+    Pour une cible agence d'enregistrement, seuls comptent les DOI à préfixe résolu vers cette agence. Un préfixe encore sans agence attend la phase `dois`, plus loin dans le run : son DOI est cherché au run suivant, auprès d'une seule des deux agences.
 
     `years` borne les candidats à la fenêtre d'années du run : un DOI est retenu quand l'un des enregistrements sources de sa publication a son année dans la fenêtre. Les sources d'une même publication diffèrent souvent d'un an.
     """
@@ -61,9 +57,7 @@ def get_missing_dois(
     )
     prefix_filter = " AND dp.ra = :target_ra" if target_ra else ""
     pending = pending_failed_lookup_sql(source_sql=":target", id_type="doi", value_sql="c.doi")
-    unknown_to_doi_org = pending_failed_lookup_sql(
-        source_sql=f"'{DOI_ORG}'", id_type="doi", value_sql="c.doi"
-    )
+    unknown_to_doi_org = "EXISTS (SELECT 1 FROM dois x WHERE x.doi = c.doi AND NOT x.registered)"
     year_filter = (
         """
           AND EXISTS (
@@ -82,7 +76,7 @@ def get_missing_dois(
             FROM source_records sr
             JOIN source_record_identifiers d ON d.source_record_id = sr.id
             WHERE sr.source = CAST(:target AS source_type)
-              AND d.id_type = '{SourceIdentifierType.DOI.value}' AND d.removed_by IS NULL
+              AND d.id_type = '{SourceIdentifierType.DOI.value}'
         )
         SELECT DISTINCT c.doi
         FROM (
@@ -120,58 +114,31 @@ async def fetch_missing_doi(
     retry_after_days: int,
     limit: int | None = None,
     years: list[int] | None = None,
+    scope: str | None = None,
 ) -> PhaseMetrics:
     """Cherche dans la source les DOI absents de son `staging`, et écrit dans `staging` les documents trouvés.
 
-    Un DOI absent de la source est inscrit dans `failed_lookups`. Quand la source est une agence d'enregistrement, ses DOI absents passent ensuite à doi.org : un DOI inconnu de doi.org est inscrit sous `DOI_ORG`. `limit` plafonne le nombre de DOI d'une exécution.
-
-    Renvoie les compteurs de `look_up`, avec le nombre de DOI inconnus de doi.org (`unknown_to_doi_org`).
+    Un DOI absent de la source est inscrit dans `failed_lookups`. `limit` plafonne le nombre de DOI d'une exécution. `scope` nomme l'identifiant au journal (`LookupChannel.scope`). Renvoie les compteurs de `look_up`.
     """
     dois = get_missing_dois(conn, source, retry_after_days=retry_after_days, years=years)
     if limit and len(dois) > limit:
-        scoped_logger(log, source).info(
+        scoped_logger(log, source, scope).info(
             "plafond de %d DOI par exécution, %d reportés aux suivantes", limit, len(dois) - limit
         )
         dois = dois[:limit]
 
-    absent: list[str] = []
-
-    def _absent(conn: Connection, doi: str) -> None:
-        record_failed_lookup(conn, source, "doi", doi)
-        absent.append(doi)
-
-    metrics = await look_up(
+    return await look_up(
         conn,
         log,
         LookupChannel(
             source=source,
             fetch=search.fetch,
-            on_absent=_absent,
+            on_absent=lambda conn, doi: record_failed_lookup(conn, source, "doi", doi),
             stage=lambda staging, record: staging.stage(
                 source, record, entry_mode=StagingEntryMode.FETCH_MISSING_DOI
             ),
             batch_size=search.batch_size,
+            scope=scope,
         ),
         dois,
-    )
-    if absent and PROFILES[Source(source)].registration_agency is not None:
-        checked = await look_up(conn, log, _doi_org_channel(), absent)
-        metrics.add(unknown_to_doi_org=checked.extras.get("unknown_to_doi_org", 0))
-    return metrics
-
-
-def _doi_org_channel() -> LookupChannel:
-    """Renvoie le canal de vérification auprès de doi.org des DOI absents d'une agence d'enregistrement."""
-    user_agent = polite_user_agent()
-
-    async def _fetch(client: httpx2.AsyncClient, dois: list[str]) -> LookupBatch | Unavailable:
-        known, unknown = await doi_existence(client, dois, user_agent=user_agent)
-        return LookupBatch(absent=unknown) if known or unknown else UNAVAILABLE
-
-    return LookupChannel(
-        source=DOI_ORG,
-        fetch=_fetch,
-        on_absent=lambda conn, doi: record_failed_lookup(conn, DOI_ORG, "doi", doi),
-        absent_metric="unknown_to_doi_org",
-        shown=False,
     )

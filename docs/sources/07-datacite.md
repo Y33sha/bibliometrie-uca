@@ -26,7 +26,7 @@ Les DOI d'un entrepôt sans affiliation renseignée (NAKALA, notamment) entrent 
 - Adresse électronique de contact dans le `User-Agent` (`POLITE_POOL_EMAIL`)
 - Pas de quota contractuel. Débit et requêtes simultanées du pipeline : `pipeline/ingestion/api_params.py`
 
-**Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identifie l'organisation déposante (*provider*) et l'entrepôt (*client*) d'un préfixe DOI, pour la phase [`publishing`](../pipeline/05-publishing.md) (`resolve_datacite_publishers`), une fois connue l'agence d'enregistrement du préfixe ([`resolve_ra`](../pipeline/05-publishing.md#agences-denregistrement-doi-resolve_ra)).
+**Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identifie l'organisation déposante (*provider*) et l'entrepôt (*client*) d'un préfixe DOI, pour la phase [`publishing`](../pipeline/05-publishing.md) (`resolve_datacite_publishers`), une fois connue l'agence d'enregistrement du préfixe (phase [`dois`](../pipeline/05-publishing.md#référentiel-des-doi-dois)).
 
 ## Données récupérées
 

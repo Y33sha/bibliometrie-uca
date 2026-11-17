@@ -48,6 +48,5 @@ Les contributions sources sont reliées à leurs adresses par `source_contributi
 
 - Le pipeline recalcule `perimeter_structures` avant sa première phase.
 - La phase [`normalize`](../pipeline/03-normalize.md) crée les adresses et les pays qu'en donnent les sources.
-- La phase [`affiliations`](../pipeline/04-affiliations.md) écrit l'origine des adresses sans origine, les rattachements détectés et `idref_structures`. Elle conserve les rattachements confirmés ou saisis à la main.
+- La phase [`affiliations`](../pipeline/04-affiliations.md) écrit l'origine des adresses sans origine, les rattachements détectés et `idref_structures`. Elle conserve les rattachements confirmés ou saisis à la main. Elle détecte et retient les pays des adresses.
 - La phase `publications` compte les publications des adresses.
-- La phase [`countries`](../pipeline/11-enrichissements.md#pays-des-adresses-countries) détecte et retient les pays des adresses.

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8euHfavb3NbrPRg7hYamzHe0GUD9pT64nz1DupcUcNm4ghp8TnN3tde8uDrRvmS
+\restrict MeadtDJugwpZPrpG4FYqaVStQtX8FE8JzrVlrhYiXoiod9UrmSyq0b1LvFz1Sk7
 
--- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
--- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped from database version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1470,6 +1470,37 @@ CREATE TABLE structures.address_structures (
 
 
 --
+-- Name: addresses; Type: TABLE; Schema: structures; Owner: -
+--
+
+CREATE TABLE structures.addresses (
+    id integer NOT NULL,
+    raw_text text NOT NULL,
+    normalized_text text NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    publication_count integer DEFAULT 0,
+    countries character(2)[],
+    origin public.address_origin,
+    is_concatenated boolean,
+    CONSTRAINT ck_addresses_normalized_text_not_empty CHECK ((normalized_text <> ''::text))
+);
+
+
+--
+-- Name: COLUMN addresses.origin; Type: COMMENT; Schema: structures; Owner: -
+--
+
+COMMENT ON COLUMN structures.addresses.origin IS 'Origine du texte : adresse brute, libellé HAL ou nom seul. La phase affiliations la pose sur les adresses sans origine.';
+
+
+--
+-- Name: COLUMN addresses.is_concatenated; Type: COMMENT; Schema: structures; Owner: -
+--
+
+COMMENT ON COLUMN structures.addresses.is_concatenated IS 'Vrai si le texte réunit plusieurs affiliations, chacune suivie des initiales de ses auteurs. Une adresse concaténée est sans indice de périmètre. La phase affiliations la pose sur les adresses non examinées.';
+
+
+--
 -- Name: idref_structures; Type: TABLE; Schema: structures; Owner: -
 --
 
@@ -1603,9 +1634,10 @@ CREATE MATERIALIZED VIEW sources.source_contribution_structures AS
  SELECT saa.source_contribution_id,
     ast.structure_id,
     'address'::public.perimeter_evidence AS evidence
-   FROM (sources.source_contribution_addresses saa
+   FROM ((sources.source_contribution_addresses saa
+     JOIN structures.addresses a ON ((a.id = saa.address_id)))
      JOIN structures.address_structures ast ON ((ast.address_id = saa.address_id)))
-  WHERE ((ast.is_confirmed IS DISTINCT FROM false) AND (ast.structure_id IN ( SELECT perimeter.structure_id
+  WHERE ((ast.is_confirmed IS DISTINCT FROM false) AND (a.is_concatenated IS NOT TRUE) AND (ast.structure_id IN ( SELECT perimeter.structure_id
            FROM perimeter)))
 UNION
  SELECT sar.source_contribution_id,
@@ -3018,6 +3050,7 @@ CREATE TABLE sources.source_record_identifiers (
     id_value text NOT NULL,
     role public.source_identifier_role NOT NULL,
     removed_by text,
+    added_by text,
     CONSTRAINT source_record_identifiers_id_value_case CHECK ((id_value =
 CASE
     WHEN ((id_type)::text = ANY (ARRAY['nnt'::text, 'patent_publication_number'::text, 'patent_application_number'::text])) THEN upper(id_value)
@@ -3052,6 +3085,13 @@ COMMENT ON COLUMN sources.source_record_identifiers.role IS 'primary : identifia
 --
 
 COMMENT ON COLUMN sources.source_record_identifiers.removed_by IS 'Règle de correction qui retire l''identifiant. NULL : identifiant actif.';
+
+
+--
+-- Name: COLUMN source_record_identifiers.added_by; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_record_identifiers.added_by IS 'Règle de correction qui ajoute l''identifiant. NULL : identifiant donné par la source.';
 
 
 --
@@ -3184,8 +3224,10 @@ CREATE TABLE sources.dois (
     unpaywall_checked_at timestamp with time zone,
     registered_url text,
     resolved_at timestamp with time zone,
+    registered boolean,
     CONSTRAINT dois_doi_lowercase CHECK ((doi = lower(doi))),
-    CONSTRAINT dois_registered_url_dated CHECK (((registered_url IS NULL) OR (resolved_at IS NOT NULL))),
+    CONSTRAINT dois_registered_dated CHECK (((registered IS NULL) = (resolved_at IS NULL))),
+    CONSTRAINT dois_registered_url_registered CHECK (((registered_url IS NULL) OR registered)),
     CONSTRAINT dois_unpaywall_dated CHECK (((unpaywall_oa_status IS NULL) OR (unpaywall_checked_at IS NOT NULL)))
 );
 
@@ -3194,7 +3236,7 @@ CREATE TABLE sources.dois (
 -- Name: TABLE dois; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON TABLE sources.dois IS 'Réponses des services externes sur chaque DOI de publication : verdict d''Unpaywall, URL de résolution chez doi.org.';
+COMMENT ON TABLE sources.dois IS 'Réponses des services externes sur chaque DOI connu : existence et URL de résolution chez doi.org, verdict d''Unpaywall.';
 
 
 --
@@ -3215,14 +3257,21 @@ COMMENT ON COLUMN sources.dois.unpaywall_checked_at IS 'Date du verdict d''Unpay
 -- Name: COLUMN dois.registered_url; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON COLUMN sources.dois.registered_url IS 'URL de résolution du DOI, lue dans l''API des handles de doi.org. NULL avec une date : DOI inconnu de doi.org.';
+COMMENT ON COLUMN sources.dois.registered_url IS 'URL de résolution du DOI, lue dans l''API des handles de doi.org. NULL pour un DOI inconnu, ou connu sans URL.';
 
 
 --
 -- Name: COLUMN dois.resolved_at; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON COLUMN sources.dois.resolved_at IS 'Date de la lecture chez doi.org.';
+COMMENT ON COLUMN sources.dois.resolved_at IS 'Date de la réponse de doi.org.';
+
+
+--
+-- Name: COLUMN dois.registered; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.dois.registered IS 'Réponse de doi.org : TRUE pour un DOI connu, FALSE pour un DOI inconnu. NULL sans réponse.';
 
 
 --
@@ -3488,29 +3537,6 @@ CREATE SEQUENCE structures.address_structures_id_seq
 --
 
 ALTER SEQUENCE structures.address_structures_id_seq OWNED BY structures.address_structures.id;
-
-
---
--- Name: addresses; Type: TABLE; Schema: structures; Owner: -
---
-
-CREATE TABLE structures.addresses (
-    id integer NOT NULL,
-    raw_text text NOT NULL,
-    normalized_text text NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    publication_count integer DEFAULT 0,
-    countries character(2)[],
-    origin public.address_origin,
-    CONSTRAINT ck_addresses_normalized_text_not_empty CHECK ((normalized_text <> ''::text))
-);
-
-
---
--- Name: COLUMN addresses.origin; Type: COMMENT; Schema: structures; Owner: -
---
-
-COMMENT ON COLUMN structures.addresses.origin IS 'Origine du texte : adresse brute, libellé HAL ou nom seul. La phase affiliations la pose sur les adresses sans origine.';
 
 
 --
@@ -6298,5 +6324,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8euHfavb3NbrPRg7hYamzHe0GUD9pT64nz1DupcUcNm4ghp8TnN3tde8uDrRvmS
+\unrestrict MeadtDJugwpZPrpG4FYqaVStQtX8FE8JzrVlrhYiXoiod9UrmSyq0b1LvFz1Sk7
 

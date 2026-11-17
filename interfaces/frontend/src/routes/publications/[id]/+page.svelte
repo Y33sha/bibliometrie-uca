@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { sectionLabels } from "#lib/labels.js";
   import EntityBreadcrumb from "#lib/components/EntityBreadcrumb.svelte";
   import EntityStatus from "#lib/components/EntityStatus.svelte";
   import { goto } from "$app/navigation";
@@ -80,7 +81,7 @@
 </script>
 
 <EntityBreadcrumb
-  section={{ label: "Publications", path: "publications" }}
+  section={{ label: sectionLabels.publications, path: "publications" }}
   name={titleText(pub?.title)}
   title={titleText(pub?.title).slice(0, 80)}
   fallback="Publication"

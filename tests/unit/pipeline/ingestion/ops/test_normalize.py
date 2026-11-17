@@ -119,3 +119,20 @@ def test_graphie_nom_virgule_prenom_preferee():
         Party("DENONFOUX JEREMIE [FR]", False),
     ]
     assert display_names(parties) == ["DENONFOUX, Jérémie"]
+
+
+def test_graphies_non_latines_ecartees():
+    """Les membres chinois, japonais et coréens d'une famille donnent au format original une graphie de plus par inventeur."""
+    parties = [
+        Party("BRUHAT, Alain", True),
+        Party("A·布鲁哈特", True),
+        Party("ブリュア，アラン", True),
+        Party("브루하 알랭", True),
+        Party("BRUHARTE ANDR ¨", False),
+        Party("BRUHAT ALAIN [FR]", False),
+    ]
+    assert display_names(parties) == ["BRUHAT, Alain"]
+
+
+def test_famille_sans_graphie_latine():
+    assert display_names([Party("ブリュア，アラン", True)]) == ["ブリュア，アラン"]

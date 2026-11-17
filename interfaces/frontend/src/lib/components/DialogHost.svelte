@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import Modal from '#lib/components/Modal.svelte';
 	import { dialogs, resolveConfirm, dismissToast } from '#lib/dialogs.svelte.js';
 </script>
@@ -27,7 +28,7 @@
 {#if dialogs.toasts.length}
 	<div class="toast-stack" role="status">
 		{#each dialogs.toasts as t (t.id)}
-			<button type="button" class="toast toast-{t.type}" title="Fermer" onclick={() => dismissToast(t.id)}>
+			<button type="button" class="toast toast-{t.type}" use:tooltip={'Fermer'} onclick={() => dismissToast(t.id)}>
 				{t.message}
 			</button>
 		{/each}

@@ -16,13 +16,14 @@ from datetime import date, timedelta
 from domain.dates import date_to_french, today
 from domain.sources.registry import HARVESTED_SOURCES, Source, source_label
 from infrastructure.observability.phase_executions import get_last_daily_harvest_date
-from pipeline.graph import Task, TaskRun
+from pipeline.graph import Block, Phase, Task, TaskRun
 from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.harvester import HarvestWindow, run_harvest
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import assemble_by_source
+from pipeline.transformation.structures.perimeter import check_extraction_perimeter
 
 
 def _source_summary(metrics: PhaseMetrics) -> dict[str, float | None]:
@@ -77,7 +78,7 @@ def _harvest(source: str) -> TaskRun:
     return run
 
 
-TASKS = tuple(
+_CHILDREN = tuple(
     Task(
         str(source),
         reads=(
@@ -94,7 +95,6 @@ TASKS = tuple(
         parallel_group="sources",
         run=_harvest(source),
         label=source_label(source),
-        progress_bar=True,
         threshold=5,
         when=lambda ctx, source=source: source in _effective_sources(ctx),
     )
@@ -106,3 +106,13 @@ TASKS = tuple(
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie la somme des métriques des sources, avec la table des sources moissonnées."""
     return assemble_by_source(by_task, _source_summary)
+
+
+PHASE = Phase(
+    "harvest",
+    "Moissonnage par affiliation",
+    _CHILDREN,
+    Block.HARVESTING,
+    check=check_extraction_perimeter,
+    assemble=assemble,
+)

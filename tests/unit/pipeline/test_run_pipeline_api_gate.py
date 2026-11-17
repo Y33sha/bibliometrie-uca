@@ -3,6 +3,7 @@
 Sans identifiants, l'étape est sautée avec un signal `source_unconfigured`, avant toute requête. Une source indisponible ou un circuit coupé donnent un signal `source_unavailable`.
 """
 
+import dataclasses
 import logging
 from unittest.mock import patch
 
@@ -13,7 +14,7 @@ from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
-from pipeline.transformation.publications import oa_status
+from pipeline.transformation.dois import lookups
 
 _LOG = logging.getLogger("test")
 
@@ -93,17 +94,18 @@ def test_circuit_coupe_signale():
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
 
 
-def _run_oa_status(credentials_missing) -> tuple[PhaseMetrics, list[oa_status.DoiService]]:
-    """Exécute la phase `oa_status` sans réseau ni base, et renvoie ses métriques et les services interrogés."""
+def _run_lookups(credentials_missing) -> tuple[PhaseMetrics, list[lookups.DoiService]]:
+    """Exécute les interrogations de doi.org et d'Unpaywall de la phase `dois`, sans réseau ni base, et renvoie leurs métriques et les services interrogés."""
     services = []
 
     def run(task, _ctx):
         services.append(task.service)
         return PhaseMetrics(new=4)
 
-    with patch.object(oa_status.DoiLookupTask, "run", autospec=True, side_effect=run):
+    phase = next(p for p in PHASES if p.name == "dois")
+    with patch.object(lookups.DoiLookupTask, "run", autospec=True, side_effect=run):
         metrics = run_phase(
-            next(p for p in PHASES if p.name == "oa_status"),
+            dataclasses.replace(phase, children=lookups.TASKS),
             phase_context(
                 RunOptions(),
                 credentials_missing=credentials_missing,
@@ -113,18 +115,18 @@ def _run_oa_status(credentials_missing) -> tuple[PhaseMetrics, list[oa_status.Do
     return metrics, services
 
 
-def test_phase_oa_status_skips_unpaywall_without_email():
-    metrics, services = _run_oa_status(
+def test_unpaywall_sautee_sans_adresse():
+    metrics, services = _run_lookups(
         lambda source: "adresse absente" if source == "unpaywall" else None
     )
 
-    assert services == [oa_status.DOI_ORG]
+    assert services == [lookups.DOI_ORG]
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]
 
 
-def test_phase_oa_status_runs_with_email():
-    metrics, services = _run_oa_status(lambda _source: None)
+def test_unpaywall_interrogee_avec_adresse():
+    metrics, services = _run_lookups(lambda _source: None)
 
-    assert services == [oa_status.DOI_ORG, oa_status.UNPAYWALL]
+    assert services == [lookups.DOI_ORG, lookups.UNPAYWALL]
     assert metrics.new == 8  # somme des deux services
     assert metrics.signals == []

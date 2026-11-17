@@ -28,7 +28,6 @@ def _source_record(**overrides) -> SourceRecord:
         "monograph_id": None,
         "container_title": None,
         "language": None,
-        "is_retracted": None,
         "abstract": None,
         "countries": (),
         "keywords": (),
@@ -205,7 +204,6 @@ class TestChampsAgreges:
             countries=("FR",),
             biblio={"volume": "3"},
             source_extras={"source_title": "Actes du colloque"},
-            is_retracted=True,
         )
 
         publication = _publication()
@@ -221,7 +219,6 @@ class TestChampsAgreges:
         assert publication.countries == ("FR",)
         assert publication.biblio == {"volume": "3"}
         assert publication.source_extras == {"source_title": "Actes du colloque"}
-        assert publication.is_retracted is True
 
     def test_les_mots_cles_sont_dedoublonnes_sans_egard_a_la_casse(self):
         premiere = _source_record(id=1, source="openalex", keywords=("Blé",))

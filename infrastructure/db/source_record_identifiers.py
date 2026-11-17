@@ -88,7 +88,7 @@ def serial_doi_sql(identifier: str, source_record: str) -> str:
 
 
 def identifiers_json_sql(source_record: str) -> str:
-    """Renvoie l'expression SQL des identifiants de l'enregistrement source, avec leur rôle et leur statut, en tableau JSON trié par type puis par valeur.
+    """Renvoie l'expression SQL des identifiants de l'enregistrement source, avec leur rôle, leur statut et la règle qui les ajoute, en tableau JSON trié par type puis par valeur.
 
     Args:
         source_record: expression SQL de l'identifiant de l'enregistrement source.
@@ -97,7 +97,7 @@ def identifiers_json_sql(source_record: str) -> str:
         COALESCE((
             SELECT jsonb_agg(jsonb_build_object(
                 'id_type', i.id_type, 'value', i.id_value, 'role', i.role,
-                'removed_by', i.removed_by
+                'removed_by', i.removed_by, 'added_by', i.added_by
             ) ORDER BY i.id_type, i.id_value)
             FROM source_record_identifiers i WHERE i.source_record_id = {source_record}
         ), '[]'::jsonb)
@@ -115,7 +115,7 @@ def fetch_identifiers(
     rows = conn.execute(
         text(f"""
             SELECT i.source_record_id, i.id_type::text AS id_type, i.id_value,
-                   i.role::text AS role, i.removed_by
+                   i.role::text AS role, i.removed_by, i.added_by
             FROM source_record_identifiers i
             {where}
             ORDER BY i.source_record_id, i.id_type, i.id_value
@@ -129,6 +129,7 @@ def fetch_identifiers(
                 r.id_value,
                 SourceIdentifierRole(r.role),
                 r.removed_by,
+                r.added_by,
             )
             for r in group
         )
@@ -144,6 +145,7 @@ def parse_identifiers(raw: list[dict[str, str | None]]) -> tuple[SourceIdentifie
             str(i["value"]),
             SourceIdentifierRole(str(i["role"])),
             i["removed_by"],
+            i.get("added_by"),
         )
         for i in raw
     )

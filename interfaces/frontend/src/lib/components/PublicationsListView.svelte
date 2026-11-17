@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
+	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SourceLinks from '#lib/components/SourceLinks.svelte';
 	import AccessButton from '#lib/components/AccessButton.svelte';
@@ -10,7 +12,6 @@
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { withBase } from '#lib/paths.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import FilterPanel from '#lib/components/filters/FilterPanel.svelte';
 	import FilterLayout from '#lib/components/filters/FilterLayout.svelte';
@@ -32,7 +33,6 @@
 	import { PUBLICATION_FILTER_GROUPS, publicationFilters } from '#lib/publicationFilters.js';
 	import { useColumnVisibility } from '#lib/composables/useColumnVisibility.svelte.js';
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
-	import { paramsToQuery } from '#lib/utils.js';
 	import { nextSort, sortDirection, type SortDirection } from '#lib/sort.js';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import ListStatus from '#lib/components/ListStatus.svelte';
@@ -227,20 +227,11 @@
 		list.setSort(nextSort(currentSort, column, column === 'year' || column === 'apc' ? 'desc' : 'asc'));
 	}
 
-	function exportCsvUrl(): string {
-		const params = list.filterParams();
-		params.set('sort', currentSort);
-		// Colonnes visibles → le CSV reflète le tableau affiché.
-		params.set('columns', cv.visibleColumns.join(','));
-		return withBase(`/api/publications/export.csv?${paramsToQuery(params)}`);
-	}
-
 	async function onExcludeClick(p: Publication) {
 		if (!onExcludeContribution || p.contribution_id == null) return;
 		const result = await onExcludeContribution(p.contribution_id, p.id);
-		// `false` = annulé par le parent (ex. l'utilisatrice a cliqué Annuler) ; `true` ou `undefined` = succès → on retire la ligne du tableau.
-		if (result === false) return;
-		listing.items = listing.items.filter((item) => item.id !== p.id);
+		// `false` : exclusion annulée par le parent. `true` ou `undefined` : exclusion faite.
+		if (result !== false) list.reload();
 	}
 
 	onMount(async () => {
@@ -253,7 +244,7 @@
 </script>
 
 
-<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou sujet" onsearch={list.onSearchInput} list={listing} one="publication" many="publications" exportUrl={view === 'stats' ? undefined : exportCsvUrl()} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher par titre ou sujet" onsearch={list.onSearchInput} list={listing} one="publication" many="publications" exportUrl={view === 'stats' ? undefined : list.exportUrl('/api/publications/export.csv', cv.visibleColumns)} countBelow>
 	{#snippet leading()}
 		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
 	{/snippet}
@@ -268,7 +259,7 @@
 						{#each noticeSorts as s (s.field)}<option value={s.field}>{s.label}</option>{/each}
 					</select>
 				</label>
-				<button type="button" class="facet-btn sort-dir" title={sortDirTitle} aria-label="Sens du tri : {sortDirTitle}" onclick={toggleSortDir}>
+				<button type="button" class="facet-btn sort-dir" use:tooltip={sortDirTitle} aria-label="Sens du tri : {sortDirTitle}" onclick={toggleSortDir}>
 					{#if sortDirLabel}{sortDirLabel}{:else}
 						<svg class="sort-dir-icon" class:up={sortDir === 'asc'} width="10" height="18" viewBox="0 0 10 18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 1.5v15M1.5 13l3.5 3.5L8.5 13" /></svg>
 					{/if}
@@ -353,7 +344,7 @@
 			{#if !isLab && col('labs')}<th style="width:80px" class="sortable" class:active={labsSort !== null} onclick={() => toggleSort('labs')}>
 				{columnLabels.labs} <SortChevron direction={labsSort} />
 			</th>{/if}
-			{#if isPerson && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
+			{#if isPerson && col('corr')}<th style="width:30px" use:tooltip={'Auteur correspondant'}>&#9993;</th>{/if}
 			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSort !== null} onclick={() => toggleSort('apc')}>
 				{columnLabels.apc} <SortChevron direction={apcSort} />
 			</th>{/if}
@@ -420,12 +411,12 @@
 							{@const isPersonNonCorr = isPerson && !isCorresponding(p)}
 							{#if ucaApc.length > 0}
 								<span class="tag" class:tag-success={!isPersonNonCorr}
-									title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || institution.name})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
-									{Math.round(ucaApc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+									use:tooltip={ucaApc.map(a => `${a.amount == null ? '?' : formatNumber(a.amount)} € (${a.lab_acronym || institution.name})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
+									{formatNumber(Math.round(ucaApc.reduce((s, a) => s + (a.amount || 0), 0)))} €
 								</span>
 							{:else}
-								<span class="tag" title={p.apc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.institution || '?'})`).join('\n')}>
-									{Math.round(p.apc.reduce((s, a) => s + (a.amount || 0), 0)).toLocaleString('fr-FR')} €
+								<span class="tag" use:tooltip={p.apc.map(a => `${a.amount == null ? '?' : formatNumber(a.amount)} € (${a.institution || '?'})`).join('\n')}>
+									{formatNumber(Math.round(p.apc.reduce((s, a) => s + (a.amount || 0), 0)))} €
 								</span>
 							{/if}
 						{/if}
@@ -465,8 +456,7 @@
 		onclose={() => drawer.open(null)}
 		onopen={drawer.open}
 		onchange={() => {
-			listing.load();
-			facets.load();
+			list.reload();
 			onchange?.();
 		}}
 	/>

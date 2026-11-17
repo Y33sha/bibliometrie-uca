@@ -51,8 +51,8 @@ def _orcid_projete(conn):
     [member] = [
         m
         for by_contribution in load_candidate_contributions(conn, prepare_candidates(conn)).values()
-        for members in by_contribution.values()
-        for m in members
+        for contribution in by_contribution.values()
+        for m in contribution.members
         if m.name.display() == "Jean Neutralisation"
     ]
     return member.identifiers.get("orcid")

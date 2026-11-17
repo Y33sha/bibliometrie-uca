@@ -48,11 +48,11 @@ def get_missing_nnts(conn: Connection, *, retry_after_days: int) -> list[str]:
 
 
 async def fetch_missing_theses_by_nnt(
-    conn: Connection, log: logging.Logger, *, retry_after_days: int
+    conn: Connection, log: logging.Logger, *, retry_after_days: int, scope: str | None = None
 ) -> PhaseMetrics:
     """Cherche dans theses.fr les thèses repérées par NNT dans d'autres sources et les écrit dans `staging`.
 
-    Un NNT introuvable est inscrit dans `failed_lookups`. Quand theses.fr est indisponible, le NNT reste dans la sélection du run suivant.
+    Un NNT introuvable est inscrit dans `failed_lookups`. Quand theses.fr est indisponible, le NNT reste dans la sélection du run suivant. `scope` nomme l'identifiant au journal (`LookupChannel.scope`).
 
     Renvoie les compteurs de `look_up`, avec le nombre de NNT introuvables (`not_found`).
     """
@@ -67,6 +67,7 @@ async def fetch_missing_theses_by_nnt(
             stage=lambda staging, thesis: staging.stage(
                 "theses", thesis, entry_mode=StagingEntryMode.FETCH_MISSING_NNT
             ),
+            scope=scope,
         ),
         nnts,
     )

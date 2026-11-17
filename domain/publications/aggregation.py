@@ -31,7 +31,6 @@ def refresh_from_sources(
     - Type de document : `_arbitrate_doc_type_with_article_subtype`, puis `arbitrate_conference`.
     - Date de publication : `arbitrate_publication_date` ; l'année en dérive.
     - Licence : celle de la version éditeur (`publisher_license_sources`). Licence de dépôt : celle du fichier déposé dans HAL.
-    - Rétractation : déclarée par une source au moins.
     - Indicateurs de citation : ceux du premier enregistrement source OpenAlex dans l'ordre d'arbitrage. Le nombre de citations et le FWCI décrivent ainsi la même œuvre, comptée dans la même base.
     - Mots-clés et pays : union sans doublon.
     - `biblio` et `source_extras` : fusion par clé, la source prioritaire l'emporte.
@@ -76,7 +75,6 @@ def refresh_from_sources(
     publication.countries = _union_ci(s.countries for s in sorted_sources)
     publication.biblio = _merge_by_key(s.biblio for s in sorted_sources)
     publication.source_extras = _merge_by_key(s.source_extras for s in sorted_sources)
-    publication.is_retracted = any(s.is_retracted for s in sorted_sources)
     publication.impact = next(
         (s.impact for s in sorted_sources if s.source == Source.OPENALEX), None
     )

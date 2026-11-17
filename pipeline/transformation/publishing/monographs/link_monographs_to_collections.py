@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishing` : rattachement de chaque monographie à sa collection.
+"""Tâche de la phase `publishing` : rattachement de chaque monographie à sa collection.
 
 Les monographies sans collection à ISSN se regroupent en séries (`group_series`, `domain/serials/series.py`) : même clé de série, même éditeur, au moins deux volumes. Chaque série a son entrée dans `serials` : l'entrée sans ISSN de même titre déjà rattachée à ses volumes, à défaut la revue sans ISSN de son titre et de son éditeur (`serial_for_title_and_publisher`). L'entrée est typée série d'actes ou collection de livres selon ses volumes. `choose_monograph_serial` (`domain/monographs/collection.py`) choisit ensuite l'entrée de chaque monographie : sa collection à ISSN, à défaut sa série sans ISSN, à défaut le volume lui-même, à défaut aucune. Une monographie en conflit reste en l'état, signalée. Le calcul se refait à chaque run, d'après les enregistrements sources.
 """
@@ -20,7 +20,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.serials.store import SerialStore
 
 LABEL = "Rattachement aux collections"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 
 class MonographSerialCandidates(NamedTuple):

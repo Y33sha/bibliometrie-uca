@@ -1,6 +1,6 @@
 """Client doi.org : agence d'enregistrement des préfixes DOI, et existence d'un DOI.
 
-`doi.org/ra/<p1>,<p2>,…` renvoie l'agence d'enregistrement de chaque préfixe (`Crossref`, `DataCite`, `mEDRA`…), ou le statut `DOI does not exist` pour un préfixe inconnu. Une agence vaut pour tous les DOI d'un préfixe. Interrogé par la phase `resolve_ra`.
+`doi.org/ra/<p1>,<p2>,…` renvoie l'agence d'enregistrement de chaque préfixe (`Crossref`, `DataCite`, `mEDRA`…), ou le statut `DOI does not exist` pour un préfixe inconnu. Une agence vaut pour tous les DOI d'un préfixe. Interrogé par la tâche `dois.resolve_prefixes`.
 
 `doi.org/api/handles/<doi>` répond 404 pour un DOI inconnu du registre. Interrogé par la phase `fetch_missing` pour un DOI absent de son agence d'enregistrement. Sa valeur de type `URL` est l'URL de résolution du DOI, lue par la phase `oa_status`. Les requêtes s'identifient par l'adresse polite pool, dans le `User-Agent`.
 """
@@ -15,7 +15,7 @@ import httpx2
 
 from domain.types import as_mapping, as_sequence, as_str
 from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
-from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
+from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.api_params import API_BASE_URLS, DOI_ORG_RA_BATCH
 
 logger = logging.getLogger(__name__)
@@ -53,8 +53,8 @@ def _handle_url(doi: str) -> str:
 
 async def fetch_registered_url(
     client: httpx2.AsyncClient, doi: str, *, user_agent: str
-) -> LookupOutcome[str]:
-    """Renvoie l'URL de résolution d'un DOI. `NOT_FOUND` couvre un DOI inconnu de doi.org et un handle sans URL."""
+) -> LookupOutcome[str | None]:
+    """Renvoie l'URL de résolution d'un DOI, `None` pour un DOI connu sans URL, `NOT_FOUND` pour un DOI inconnu de doi.org."""
     outcome = await lookup_json_async(
         client,
         "GET",
@@ -72,22 +72,4 @@ async def fetch_registered_url(
             url := as_str(as_mapping(value.get("data")).get("value"))
         ):
             return url
-    return NOT_FOUND
-
-
-async def doi_existence(
-    client: httpx2.AsyncClient, dois: Sequence[str], *, user_agent: str
-) -> tuple[list[str], list[str]]:
-    """Répartit des DOI entre DOI connus et inconnus de doi.org. Un DOI sans réponse concluante reste hors des deux listes."""
-    headers = {"User-Agent": user_agent, "Accept": "application/json"}
-    known: list[str] = []
-    unknown: list[str] = []
-    for doi in dois:
-        outcome = await lookup_json_async(
-            client, "GET", _handle_url(doi), headers=headers, timeout=15, label=f"DOI {doi}"
-        )
-        if isinstance(outcome, NotFound):
-            unknown.append(doi)
-        elif not isinstance(outcome, Unavailable):
-            known.append(doi)
-    return known, unknown
+    return None

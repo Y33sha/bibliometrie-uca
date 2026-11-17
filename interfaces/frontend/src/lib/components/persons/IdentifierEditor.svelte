@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
+  import ShieldCheck from "@lucide/svelte/icons/shield-check";
   import IdentifierLink from "#lib/components/IdentifierLink.svelte";
   import StatusToggles from "#lib/components/StatusToggles.svelte";
   import RejectedFold from "./RejectedFold.svelte";
@@ -44,30 +46,10 @@
       <span class="chip-controls">
         <span
           class="authenticated-badge"
-          title="Authentifié par le chercheur — statut protégé, non modifiable"
+          use:tooltip={'Authentifié par le chercheur — statut protégé, non modifiable'}
           aria-label="Authentifié par le chercheur"
         >
-          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-            <path
-              d="M12 2 4 5v6c0 4.5 3.1 7.9 8 9 4.9-1.1 8-4.5 8-9V5l-8-3Z"
-              fill="currentColor"
-              opacity="0.15"
-            />
-            <path
-              d="M12 2 4 5v6c0 4.5 3.1 7.9 8 9 4.9-1.1 8-4.5 8-9V5l-8-3Z"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.6"
-            />
-            <path
-              d="m8.5 11.8 2.4 2.4 4.6-4.9"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <ShieldCheck size={15} />
         </span>
       </span>
     {:else}
@@ -79,7 +61,7 @@
       class="tag status-chip identifier-chip"
       class:confirmed={ident.status === "confirmed" || ident.status === "authenticated"}
       class:rejected={ident.status === "rejected"}
-      title={identifierTitle(ident)}
+      use:tooltip={identifierTitle(ident)}
     >
       {ident.id_value}
     </span>
@@ -135,7 +117,7 @@
 {:else}
   <button
     class="btn-add btn-add-id"
-    title="Ajouter un identifiant"
+    use:tooltip={'Ajouter un identifiant'}
     onclick={() => ontoggleForm(person.id)}>+ Identifiant</button
   >
 {/if}

@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `finalize` : suppression des monographies vides.
+"""Tâche de la phase `finalize` : suppression des monographies vides.
 
 Une monographie vide est sans enregistrement source et sans publication. Elle se vide quand ses enregistrements sources rejoignent une autre monographie, par exemple quand l'ISBN arrive sur une monographie créée par son titre. Une monographie encore rattachée à une publication attend le recalcul de celle-ci par la phase `publications`. Le journal garde le titre de chaque monographie supprimée.
 """
@@ -11,7 +11,7 @@ from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 LABEL = "Monographies vides"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 _DELETE_EMPTY = text("""
     DELETE FROM monographs m

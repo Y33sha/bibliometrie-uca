@@ -58,7 +58,7 @@ def _apply(conn) -> int:
 
 
 def _apply_serial_by_doi(conn) -> int:
-    """Joue la sous-étape `serial_by_doi` sans valider la transaction."""
+    """Joue la tâche `serial_by_doi` sans valider la transaction."""
     namespaces = SourceRecordCorrectionStore(conn).fetch_serial_doi_namespaces()
     rows = SourceRecordCorrectionStore(conn).fetch_serial_by_doi_candidates()
     return SourceRecordCorrectionStore(conn).persist_serial_corrections(
@@ -342,11 +342,11 @@ def test_thesis_with_serial_corrected_and_deconflated(sa_sync_conn):
     ]
 
 
-# ── Sous-étape cluster : ouvrage/chapitre au même DOI ──
+# ── Tâches `doi_targets` et `remove_identifiers` : ouvrage/chapitre au même DOI ──
 
 
 def _apply_cluster(conn) -> int:
-    """Joue les sous-étapes `doi_targets` puis `remove_identifiers`. Renvoie le nombre d'enregistrements sources corrigés."""
+    """Joue les tâches `doi_targets` puis `remove_identifiers`. Renvoie le nombre d'enregistrements sources corrigés."""
     run_doi_targets(conn, logging.getLogger("test"))
     store = SourceRecordCorrectionStore(conn)
     return store.persist_doi_corrections(compute_updates(fetch_candidates(store)))
@@ -484,7 +484,7 @@ def test_chapters_number_prefix_same_chapter_untouched(sa_sync_conn):
     assert _apply_cluster(conn) == 0
 
 
-# ── Sous-étape cluster : enregistrement source au DOI d'une autre œuvre ──
+# ── Tâches `doi_targets` et `remove_identifiers` : enregistrement source au DOI d'une autre œuvre ──
 
 
 def _authored_source_record(conn, *, source, title_normalized, authors):
@@ -549,7 +549,7 @@ def test_un_work_au_titre_proche_garde_le_doi(sa_sync_conn):
     assert _doi_statuses(conn, work) == {"10.1/o": None}
 
 
-# ── Sous-étape cluster : DOI inconnu de doi.org ──
+# ── Tâches `doi_targets` et `remove_identifiers` : DOI inconnu de doi.org ──
 
 
 def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
@@ -563,8 +563,8 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
     )
     conn.execute(
         text(
-            "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at)"
-            " VALUES ('doi_org', 'doi', '10.1364/ao.xx.xxxxxx', now())"
+            "INSERT INTO dois (doi, registered, resolved_at)"
+            " VALUES ('10.1364/ao.xx.xxxxxx', FALSE, now())"
         )
     )
 
@@ -572,13 +572,13 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
     assert _doi_statuses(conn, first) == {"10.1364/ao.xx.xxxxxx": "UNRESOLVED_DOI_TO_NULL"}
 
     # doi.org connaît le DOI au run suivant : les enregistrements sources le retrouvent.
-    conn.execute(text("DELETE FROM failed_lookups"))
+    conn.execute(text("UPDATE dois SET registered = TRUE"))
     assert _apply_cluster(conn) == 2
     for source_record in (first, second):
         assert _doi_statuses(conn, source_record) == {"10.1364/ao.xx.xxxxxx": None}
 
 
-# ── Sous-étape cluster : copies de repository et versions (IsVariantFormOf, IsVersionOf) ──
+# ── Tâches `doi_targets` et `remove_identifiers` : copies de repository et versions (IsVariantFormOf, IsVersionOf) ──
 
 
 def _seed_datacite(conn, *, source_id, doi, doc_type, relations, corrections=None):
@@ -666,8 +666,8 @@ def test_une_cible_inconnue_de_doi_org_n_est_pas_une_cible(sa_sync_conn):
     )
     conn.execute(
         text(
-            "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at)"
-            " VALUES ('doi_org', 'doi', '10.1103/inconnu', now())"
+            "INSERT INTO dois (doi, registered, resolved_at)"
+            " VALUES ('10.1103/inconnu', FALSE, now())"
         )
     )
     _apply_cluster(conn)
@@ -686,8 +686,8 @@ def test_un_doi_inconnu_de_doi_org_n_a_pas_de_cible(sa_sync_conn):
     )
     conn.execute(
         text(
-            "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at)"
-            " VALUES ('doi_org', 'doi', '10.5281/zenodo.20', now())"
+            "INSERT INTO dois (doi, registered, resolved_at)"
+            " VALUES ('10.5281/zenodo.20', FALSE, now())"
         )
     )
     _apply_cluster(conn)
@@ -819,7 +819,7 @@ def test_le_concept_present_comme_doi_lie_ne_compte_pas(sa_sync_conn):
     assert _targets(conn) == {}
 
 
-# ── Sous-étape cluster : pièce d'un dataset → dataset parent (IsPartOf) ──
+# ── Tâches `doi_targets` et `remove_identifiers` : pièce d'un dataset → dataset parent (IsPartOf) ──
 
 
 def _seed_datacite_piece(conn, *, source_id, doi, parent_doi, doc_type="dataset", title="Piece"):
@@ -869,7 +869,7 @@ def test_dataset_piece_without_target_when_parent_absent(sa_sync_conn):
     assert _targets(conn) == {}
 
 
-# ── Sous-étape cluster : fichier complémentaire figshare → collection de l'article ──
+# ── Tâches `doi_targets` et `remove_identifiers` : fichier complémentaire figshare → collection de l'article ──
 
 
 def _seed_figshare(

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import type { ChartMode, PivotChart } from '#lib/composables/usePivotChart.svelte.js';
 
 	// Réglages du graphique des statistiques, en une phrase : « Afficher <indicateur> <comparaison> en <valeur absolue | pourcentage>, classés par <tri> ». Chaque mot réglable est une liste déroulante.
@@ -50,7 +51,7 @@
 				{/each}
 			</select>
 			{#if s.chartSort}
-				<button type="button" class="sort-dir" title={s.chartSortDir === 'desc' ? 'Ordre décroissant' : 'Ordre croissant'} aria-label="Sens du tri" onclick={() => chart.set('chartSortDir', s.chartSortDir === 'desc' ? 'asc' : 'desc')}>
+				<button type="button" class="sort-dir" use:tooltip={s.chartSortDir === 'desc' ? 'Ordre décroissant' : 'Ordre croissant'} aria-label="Sens du tri" onclick={() => chart.set('chartSortDir', s.chartSortDir === 'desc' ? 'asc' : 'desc')}>
 					{s.chartSortDir === 'desc' ? '↓' : '↑'}
 				</button>
 			{/if}

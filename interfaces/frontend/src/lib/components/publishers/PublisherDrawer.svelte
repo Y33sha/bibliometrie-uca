@@ -1,11 +1,15 @@
 <script lang="ts">
   // Volet d'édition d'un éditeur, réservé à la session admin : nom, type, pays, formes de nom et fusion.
-  import { onMount, untrack } from "svelte";
+  import { tooltip } from "#lib/actions/tooltip.svelte.js";
+  import { formatNumber } from "#lib/utils.js";
+  import { formatCount } from "#lib/plural.js";
+  import { onMount } from "svelte";
   import { resolve } from "$app/paths";
-  import { api, ApiError, errorMessage, publishers as publishersApi } from "#lib/api/index.js";
+  import { api, apiOnce, ApiError, publishers as publishersApi } from "#lib/api/index.js";
   import { autofocus } from "#lib/actions/focus.js";
   import { useDebouncedSearch } from "#lib/composables/useDebouncedSearch.svelte.js";
-  import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
+  import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
+  import { confirmDialog, toastError } from "#lib/dialogs.svelte.js";
   import Drawer from "#lib/components/Drawer.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
   import Picker from "#lib/components/Picker.svelte";
@@ -30,8 +34,6 @@
     onchange: () => void;
   } = $props();
 
-  let publisher = $state<Publisher | null>(null);
-  let nameForms = $state<PublisherNameForm[] | null>(null);
   let publisherTypes: EnumOption[] = $state([]);
   let countries: Country[] = $state([]);
 
@@ -52,34 +54,29 @@
     transform: (results) => results.filter((p) => p.id !== id),
   });
 
-  async function load() {
-    const current = id;
-    const [p, forms] = await Promise.all([
-      api<Publisher>(`/api/publishers/${current}`),
-      api<PublisherNameForm[]>(`/api/publishers/${current}/name-forms`),
-    ]);
-    if (current !== id) return;
-    publisher = p;
-    nameForms = forms;
-  }
-
   // Chaque éditeur ouvert repart de son état chargé, sans édition ni fusion en cours.
-  $effect(() => {
-    void id;
-    untrack(() => {
-      publisher = null;
-      nameForms = null;
+  const entity = useDrawerEntity({
+    id: () => id,
+    fetch: async (id) => {
+      const [publisher, nameForms] = await Promise.all([
+        api<Publisher>(`/api/publishers/${id}`),
+        api<PublisherNameForm[]>(`/api/publishers/${id}/name-forms`),
+      ]);
+      return { publisher, nameForms };
+    },
+    onreset() {
       editing = false;
       blocking = null;
       closeMerge();
-      void load();
-    });
+    },
   });
+  const publisher = $derived(entity.data?.publisher ?? null);
+  const nameForms = $derived(entity.data?.nameForms ?? null);
 
   onMount(async () => {
     [publisherTypes, countries] = await Promise.all([
-      api<EnumOption[]>("/api/publishers/types"),
-      api<Country[]>("/api/countries"),
+      apiOnce<EnumOption[]>("/api/publishers/types"),
+      apiOnce<Country[]>("/api/countries"),
     ]);
   });
 
@@ -87,10 +84,10 @@
     try {
       await publishersApi.update(id, body);
     } catch (e) {
-      toast(errorMessage(e), "error");
+      toastError(e);
       return false;
     }
-    await load();
+    await entity.reload();
     onchange();
     return true;
   }
@@ -131,12 +128,12 @@
         closeMerge();
         blocking = { detail: body.detail ?? "", serials: body.blocking_serials };
       } else {
-        toast(errorMessage(e), "error");
+        toastError(e);
       }
       return;
     }
     closeMerge();
-    await load();
+    await entity.reload();
     onchange();
   }
 
@@ -158,7 +155,7 @@
             <button type="button" class="btn btn-sm" onclick={() => (editing = false)}>Annuler</button>
           </form>
         {:else}
-          <a class="drawer-name-link" href={resolve(`publishers/${publisher.id}`)} target="_blank" rel="noopener" title="Voir la fiche publique">
+          <a class="drawer-name-link" href={resolve(`publishers/${publisher.id}`)} target="_blank" rel="noopener" use:tooltip={'Voir la fiche publique'}>
             {publisher.name}
           </a>
           <div class="drawer-head-actions">
@@ -173,8 +170,8 @@
     <p class="muted">Chargement…</p>
   {:else}
     <div class="drawer-meta">
-      <span>{publisher.serial_count.toLocaleString("fr-FR")} publications en série</span>
-      <span>{publisher.publication_count.toLocaleString("fr-FR")} publications</span>
+      <span>{formatCount(publisher.serial_count, "publication en série", "publications en série")}</span>
+      <span>{formatCount(publisher.publication_count, "publication")}</span>
     </div>
 
     <dl class="drawer-section drawer-fields">
@@ -212,7 +209,7 @@
         <h3>Préfixes DOI</h3>
         <div class="tag-list">
           {#each publisher.doi_prefixes as p (p.prefix)}
-            <span class="tag id-badge" title="RA : {p.ra}{p.crossref_member_id ? ` / membre Crossref ${p.crossref_member_id}` : ''}">{p.prefix}</span>
+            <span class="tag id-badge" use:tooltip={`RA : ${p.ra}${p.crossref_member_id ? ` / membre Crossref ${p.crossref_member_id}` : ''}`}>{p.prefix}</span>
           {/each}
         </div>
       </section>
@@ -250,7 +247,7 @@
         >
           {#snippet item(r)}
             {r.name}
-            <span class="muted">({r.serial_count} publications en série, {r.publication_count} publications)</span>
+            <span class="muted">({formatCount(r.serial_count, "publication en série", "publications en série")}, {formatCount(r.publication_count, "publication")})</span>
           {/snippet}
         </Picker>
       {:else}
@@ -273,7 +270,7 @@
             {#each nameForms as nf (nf.form)}
               <tr>
                 <td>{nf.form}</td>
-                <td class="num" class:zero={nf.source_record_count === 0}>{nf.source_record_count.toLocaleString("fr-FR")}</td>
+                <td class="num" class:zero={nf.source_record_count === 0}>{formatNumber(nf.source_record_count)}</td>
               </tr>
             {/each}
           </tbody>

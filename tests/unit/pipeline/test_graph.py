@@ -25,13 +25,13 @@ def test_noms_uniques():
     assert len(names) == len(set(names))
 
 
-def test_une_tache_placee_dans_une_etape_titree_ecrit_sous_le_titre_de_l_etape():
-    """La `section` d'une tâche placée dans une étape titrée serait ignorée par l'exécuteur."""
+def test_une_tache_placee_dans_une_etape_a_section_ecrit_sous_la_section_de_l_etape():
+    """La `section` d'une tâche placée dans une étape à section serait ignorée par l'exécuteur."""
     in_steps = [
         task.name
         for phase in PHASES
         for child in phase.children
-        if isinstance(child, Step) and child.label is not None
+        if isinstance(child, Step) and child.section is not None
         for task in child.tasks
         if task.section is not None
     ]
@@ -70,8 +70,14 @@ def test_une_tache_de_relecture_par_source():
 
 def test_une_tache_de_recherche_par_doi_par_source_interrogeable():
     """HAL aussi : `fetch_missing` l'interroge par DOI, en plus des canaux hal-id et NNT."""
-    doi_tasks = [name for name in _names("fetch_missing") if name.startswith("doi.")]
-    assert doi_tasks == [f"doi.{s}" for s in DOI_SEARCHABLE_SOURCES]
+    doi_tasks = {name for name in _names("fetch_missing") if name.startswith("doi.")}
+    assert doi_tasks == {f"doi.{s}" for s in DOI_SEARCHABLE_SOURCES}
+
+
+def test_fetch_missing_enchaine_les_recherches_de_hal():
+    """La recherche par DOI dans HAL suit les recherches par hal-id et par NNT : elle écarte les documents déjà écrits dans `staging`."""
+    names = _names("fetch_missing")
+    assert names.index("hal_by_id") < names.index("hal_by_nnt") < names.index("doi.hal")
 
 
 def test_normalisation_dans_l_ordre_de_priorite_des_sources():
@@ -210,7 +216,9 @@ def test_chaque_canal_de_fetch_missing_declare_ses_propres_lectures():
     assert lisent_l_agence == {"doi.crossref", "doi.datacite"}
 
 
-def test_un_lot_est_d_un_seul_tenant_et_sans_dependance_interne():
+def test_un_lot_est_d_un_seul_tenant_et_ses_dependances_internes_restent_dans_une_source():
+    """Les tâches d'un lot s'exécutent en parallèle, une file par source : une tâche dépend au plus des tâches de sa source."""
+    by_name = {task.name: task for task in ALL_TASKS}
     deps = dependencies(ALL_TASKS)
     lots: dict[str, list[int]] = {}
     for index, task in enumerate(ALL_TASKS):
@@ -220,4 +228,6 @@ def test_un_lot_est_d_un_seul_tenant_et_sans_dependance_interne():
     for indices in lots.values():
         assert indices == list(range(indices[0], indices[-1] + 1))
         noms = {ALL_TASKS[i].name for i in indices}
-        assert all(not (deps[ALL_TASKS[i].name] & noms) for i in indices)
+        for i in indices:
+            task = ALL_TASKS[i]
+            assert all(by_name[d].network == task.network for d in deps[task.name] & noms)

@@ -23,7 +23,6 @@ class SourceRecord:
     monograph_id: int | None
     container_title: str | None
     language: str | None
-    is_retracted: bool | None
     abstract: str | None
     countries: tuple[str, ...]
     keywords: tuple[str, ...]

@@ -44,6 +44,35 @@ export type PhaseView = {
   tables?: TableView[];
 };
 
+// Agences des préfixes DOI et interrogations de doi.org et d'Unpaywall : vues de la phase `dois`, et des phases `resolve_ra` et `oa_status` des runs antérieurs.
+const DOI_PREFIX_SUMMARY: SummaryItem[] = [
+  { key: "new_prefixes", label: "Nouveaux préfixes" },
+  { key: "resolved", label: "Résolus" },
+];
+const DOI_PREFIX_TABLE: TableView = {
+  source: "table",
+  firstColumnLabel: "Registration Agency",
+  columns: [
+    { key: "dois", label: "DOI", pct: true },
+    { key: "prefixes", label: "Préfixes DOI", pct: true },
+    { key: "new", label: "Run", sign: true },
+  ],
+  total: true,
+};
+const DOI_SERVICES_TABLE: TableView = {
+  source: "services",
+  firstColumnLabel: "Service",
+  rowLabels: { resolve_dois: "doi.org", verify_unpaywall: "Unpaywall" },
+  columns: [
+    { key: "stale", label: "DOI à vérifier" },
+    { key: "checked", label: "Vérifiés" },
+    { key: "new", label: "Nouveaux" },
+    { key: "updated", label: "Modifiés" },
+    { key: "unchanged", label: "Inchangés" },
+    { key: "not_found", label: "Non trouvés" },
+  ],
+};
+
 export const PHASE_VIEWS: Record<string, PhaseView> = {
   harvest: {
     tables: [
@@ -163,22 +192,12 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     ],
   },
   resolve_ra: {
-    summary: [
-      { key: "new_prefixes", label: "Nouveaux préfixes" },
-      { key: "resolved", label: "Résolus" },
-    ],
-    tables: [
-      {
-        source: "table",
-        firstColumnLabel: "Registration Agency",
-        columns: [
-          { key: "dois", label: "DOI", pct: true },
-          { key: "prefixes", label: "Préfixes DOI", pct: true },
-          { key: "new", label: "Run", sign: true },
-        ],
-        total: true,
-      },
-    ],
+    summary: DOI_PREFIX_SUMMARY,
+    tables: [DOI_PREFIX_TABLE],
+  },
+  dois: {
+    summary: DOI_PREFIX_SUMMARY,
+    tables: [DOI_PREFIX_TABLE, DOI_SERVICES_TABLE],
   },
   metadata_correction: {
     matrix: {
@@ -287,19 +306,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
   },
   oa_status: {
     tables: [
-      {
-        source: "services",
-        firstColumnLabel: "Service",
-        rowLabels: { resolve_dois: "doi.org", verify_unpaywall: "Unpaywall" },
-        columns: [
-          { key: "stale", label: "DOI à vérifier" },
-          { key: "checked", label: "Vérifiés" },
-          { key: "new", label: "Nouveaux" },
-          { key: "updated", label: "Modifiés" },
-          { key: "unchanged", label: "Inchangés" },
-          { key: "not_found", label: "Non trouvés" },
-        ],
-      },
+      DOI_SERVICES_TABLE,
       {
         source: "table",
         firstColumnLabel: "Statut OA",

@@ -9,7 +9,7 @@ from collections.abc import Mapping
 
 from domain.normalize import normalize_text
 from domain.types import JsonValue
-from pipeline.ingestion.common.harvester import HarvestWindow, SourceHarvester, stage_document
+from pipeline.ingestion.common.harvester import HarvestWindow, SourceHarvester, stage_records
 from pipeline.ingestion.ops.api import (
     SEARCH_MAX,
     SEARCH_PAGE,
@@ -21,6 +21,7 @@ from pipeline.ingestion.ops.api import (
     search_params,
 )
 from pipeline.ingestion.ops.family import family_key, family_members, first_priority
+from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
 
@@ -62,17 +63,20 @@ class OpsHarvester(SourceHarvester[None]):
         years = frozenset(self._years(window))
         publications: dict[str, str] = {}
         searched = search_forms(forms)
-        with track_progress(len(searched), self._label("recherche"), self.logger) as progress:
+        with track_progress(len(searched), self._label("déposants"), self.logger) as progress:
             for form in searched:
                 for hit in self._search(form):
                     if kept_hit(hit, forms, years):
                         publications.setdefault(hit.family_id, hit.publication)
                 progress.advance()
         return self._harvest_at_once(
-            len(publications), lambda progress: self._stage_families(publications, years, progress)
+            len(publications),
+            lambda progress: self._stage_families(publications, years, progress),
+            scope="familles",
         )
 
     def _search(self, form: str) -> list[SearchHit]:
+        """Renvoie les `SEARCH_MAX` premiers résultats de la recherche de `form`, toutes dates confondues. OPS refuse les rangs suivants, donc leurs résultats sont absents du moissonnage. Un dépassement est journalisé."""
         hits: list[SearchHit] = []
         start = 1
         while start <= SEARCH_MAX:
@@ -82,6 +86,10 @@ class OpsHarvester(SourceHarvester[None]):
             if body is None:
                 break
             total, page = search_page(body)
+            if start == 1 and total > SEARCH_MAX:
+                scoped_logger(self.logger, self.SOURCE, form).warning(
+                    "%d résultats, seuls les %d premiers sont accessibles", total, SEARCH_MAX
+                )
             hits.extend(page)
             start += SEARCH_PAGE
             if start > total or not page:
@@ -108,8 +116,5 @@ class OpsHarvester(SourceHarvester[None]):
             ):
                 continue
             staged.add(key)
-            stage_document(
-                self.conn, metrics, source=self.SOURCE, record=family_document(body, key)
-            )
-            self.conn.commit()
+            stage_records(self.conn, metrics, self.SOURCE, [family_document(body, key)])
         return metrics

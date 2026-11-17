@@ -102,7 +102,7 @@ def test_first_import_downloads():
 
 
 def test_dump_without_recognized_serial_is_signaled():
-    """Aucune revue reconnue : rien n'est écrit, la sous-étape le signale."""
+    """Aucune revue reconnue : rien n'est écrit, la tâche le signale."""
 
     @contextmanager
     def download_dump():

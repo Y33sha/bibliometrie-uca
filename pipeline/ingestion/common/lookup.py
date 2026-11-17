@@ -107,6 +107,8 @@ class LookupChannel:
     absent_metric: str = "not_found"
     """Compteur des identifiants absents."""
     batch_size: int = 1
+    scope: str | None = None
+    """Type d'identifiant cherché, au journal : colonne de la barre à côté de la source, préfixe des lignes."""
     shown: bool = True
     """Vrai si la recherche a sa barre de progression. `False` : vérification prolongeant une autre recherche, sous la barre de celle-ci."""
 
@@ -116,12 +118,15 @@ async def look_up(
 ) -> PhaseMetrics:
     """Cherche les identifiants dans la source du canal, écrit les documents trouvés et range les absents.
 
-    Renvoie les compteurs : identifiants cherchés (`total`), documents écrits (`new`, `updated`, `unchanged`), identifiants des lots non servis par la source (`errors`), identifiants absents (compteur du canal). La barre compte les documents trouvés.
+    Renvoie les compteurs : identifiants cherchés (`total`), documents écrits (`new`, `updated`, `unchanged`), identifiants des lots non servis par la source (`errors`), identifiants absents (compteur du canal). La barre compte les documents trouvés. Sans identifiant à chercher, le journal reçoit le libellé de la barre suivi de « rien à faire ».
     """
     metrics = PhaseMetrics(seen=len(keys))
+    label = source_branch(channel.source, channel.scope)
     if not keys:
+        if channel.shown:
+            log.info("%s rien à faire", label)
         return metrics
-    slog = scoped_logger(log, channel.source)
+    slog = scoped_logger(log, channel.source, channel.scope)
     size = channel.batch_size
     batches = [list(keys[i : i + size]) for i in range(0, len(keys), size)]
 
@@ -136,7 +141,7 @@ async def look_up(
         return result
 
     progress = (
-        track_progress(len(keys), source_branch(channel.source), slog, count_kept=True)
+        track_progress(len(keys), label, slog, count_kept=True)
         if channel.shown
         else nullcontext(_Unshown())
     )

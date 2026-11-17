@@ -86,15 +86,12 @@
 		activeId?: number | null;
 	} = $props();
 
-	const MONTHS = [
-		'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
-		'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.',
-	];
-
-	function formatDate(iso: string | null): { month: string; year: string } | null {
+	/** Mois abrégé et année d'une date `AAAA-MM-JJ`. */
+	function monthYear(iso: string | null): { month: string; year: string } | null {
 		if (!iso) return null;
-		const [y, m] = iso.split('-');
-		return { month: MONTHS[parseInt(m, 10) - 1] || '', year: y };
+		const [year, month] = iso.split('-');
+		// `AAAA-MM-JJ` se lit à minuit UTC : formatée dans un autre fuseau, la date passerait parfois au mois précédent.
+		return { month: month ? new Date(iso).toLocaleDateString('fr-FR', { month: 'short', timeZone: 'UTC' }) : '', year };
 	}
 
 	const col = (key: string) => cv.col(key);
@@ -153,8 +150,8 @@
 			<TableStatusRow {loading} {error} colspan={cv.visibleColumns.length + (onopen ? 1 : 0)} emptyText="Aucune thèse" />
 		{/if}
 		{#each items as t (t.id)}
-			{@const insc = formatDate(t.date_inscription)}
-			{@const sout = formatDate(t.date_soutenance)}
+			{@const insc = monthYear(t.date_inscription)}
+			{@const sout = monthYear(t.date_soutenance)}
 			<tr class:active-row={t.id === activeId}>
 				{#if onopen}
 					<td class="panel-col row-actions">

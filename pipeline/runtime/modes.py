@@ -1,8 +1,4 @@
-"""Modes d'exécution du pipeline : sources moissonnées, années, et opérations coûteuses.
-
-- `daily` : les sources incrémentales (HAL), dépôts modifiés depuis le dernier moissonnage quotidien réussi, sans `fetch_stale` ni `harvest_by_person`, ni recherche dans HAL des thèses par NNT.
-- `full` : toutes les sources moissonnées, sur la plage d'années du run.
-"""
+"""Modes d'exécution du pipeline (`MODES`) : chacun fixe les sources moissonnées, la fenêtre du moissonnage et les opérations coûteuses du run."""
 
 from dataclasses import dataclass
 
@@ -18,6 +14,7 @@ class ModePolicy:
     incremental: bool
     """Le moissonnage retient les documents modifiés depuis le dernier moissonnage quotidien réussi."""
     vacuum_full: bool
+    """Les `VACUUM` de la maintenance des tables deviennent des `VACUUM FULL` : la table est réécrite, et l'espace libéré revient au système."""
     fetch_stale: bool
     """La phase `fetch_stale` réinterroge un à un les enregistrements sources non revus par le moissonnage."""
     harvest_by_person: bool

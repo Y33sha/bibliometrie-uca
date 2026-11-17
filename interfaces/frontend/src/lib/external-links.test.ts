@@ -43,14 +43,14 @@ const HOTES_AFFICHABLES = new Set([
 /* Expressions admises dans un attribut `href`. Les fonctions de composition écrivent l'hôte ;
  * les valeurs internes désignent une route de l'application. */
 const COMPOSITION =
-	/^(halPersonUrl|halCollectionUrl|halUrl|rorFullUrl|crossrefMemberUrl|issnPortalUrl|exportCsvUrl|relHref)\(/;
+	/^(halPersonUrl|halCollectionUrl|halUrl|rorFullUrl|crossrefMemberUrl|issnPortalUrl|relHref)\(/;
 const INTERNE = /^(pubsUrl|statsUrl)$/;
 /* Liens de la page d'accueil vers une vue des publications, et résultats de la recherche
  * transverse : routes de l'application, composées par `resolve`. */
 const ROUTE_COMPOSEE = /^(questionUrl\(|r\.href$)/;
 /* `resolve` compose un chemin de l'application sous le préfixe de déploiement, `withBase` un
- * chemin de l'API ; `loginUrl` y ajoute la page de retour après connexion. */
-const ROUTE = /^(resolve|withBase|loginUrl)\(/;
+ * chemin de l'API ; `loginUrl` y ajoute la page de retour après connexion, `list.exportUrl` les filtres d'une vue de liste. */
+const ROUTE = /^(resolve|withBase|loginUrl|list\.exportUrl)\(/;
 const TABLE_IDENTIFIANTS = /^(EXT_META\[|meta\.url\()/;
 /* Fiche DOAJ servie par l'API, dont l'hôte est vérifié côté serveur. Liens vers le portail d'une
  * source ou d'une plateforme, composés par l'API : l'hôte y est écrit dans le code et
@@ -168,7 +168,7 @@ describe('hôtes des liens affichés', () => {
 			if (fichier.endsWith('.test.ts')) continue;
 			for (const ligne of readFileSync(fichier, 'utf8').split('\n')) {
 				// Un espace de noms XML et un lien de commentaire ne deviennent pas une adresse affichée.
-				if (ligne.includes('xmlns') || /^\s*(\*|\/\/)/.test(ligne)) continue;
+				if (ligne.includes('xmlns') || /^\s*(\/?\*|\/\/)/.test(ligne)) continue;
 				for (const [, hote] of ligne.matchAll(URL_LITTERALE)) {
 					if (!HOTES_AFFICHABLES.has(hote)) inconnus.set(hote, fichier);
 				}

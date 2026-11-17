@@ -248,11 +248,24 @@ export function titleCase(s: string | null | undefined): string {
 		.join('');
 }
 
+/** Nombre à la française : « 1 234 », « 3,5 ». */
+export function formatNumber(n: number): string {
+	return n.toLocaleString('fr-FR');
+}
+
+/** Part en pourcentage, avec au plus `digits` décimales et une espace insécable avant le signe : `formatPercent(0.123)` donne « 12 % », `formatPercent(0.123, 1)` « 12,3 % ». */
+export function formatPercent(ratio: number, digits = 0): string {
+	const value = (ratio * 100).toLocaleString('fr-FR', { maximumFractionDigits: digits });
+	return `${value} %`;
+}
+
+/** Date au format JJ/MM/AAAA. Une date `AAAA-MM-JJ` se lit telle quelle, un horodatage dans le fuseau du navigateur. Une autre chaîne est renvoyée telle quelle. */
 export function formatDate(d: string | null | undefined): string {
 	if (!d) return '';
-	const parts = d.split('-');
-	if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-	return d;
+	if (!/^\d{4}-\d{2}-\d{2}/.test(d)) return d;
+	// `AAAA-MM-JJ` se lit à minuit UTC : formatée dans un autre fuseau, la date passerait parfois à la veille.
+	const dateOnly = d.length === 10;
+	return new Date(d).toLocaleDateString('fr-FR', dateOnly ? { timeZone: 'UTC' } : {});
 }
 
 const PUBLICATION_DATE_FORMATS: Record<DatePrecision, Intl.DateTimeFormatOptions> = {

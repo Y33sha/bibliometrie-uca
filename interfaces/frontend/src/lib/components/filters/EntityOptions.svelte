@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatNumber } from '#lib/utils.js';
 	import { untrack } from 'svelte';
 	import { displayEntityLabel, type EntityKind } from '#lib/entityLabels.js';
 	import { cachedEntityFacet, loadEntityFacet, type EntityFacetEntity } from '#lib/entityFacets.js';
@@ -143,7 +144,7 @@
 	{/if}
 </div>
 {#if hiddenCount > 0}
-	<button type="button" class="option-row facet-more" onclick={() => (showAll = true)}>{hiddenCount.toLocaleString('fr-FR')} autres</button>
+	<button type="button" class="option-row facet-more" onclick={() => (showAll = true)}>{formatNumber(hiddenCount)} autres</button>
 {:else if showAll}
 	<button type="button" class="option-row facet-more" onclick={() => (showAll = false)}>Réduire</button>
 {/if}

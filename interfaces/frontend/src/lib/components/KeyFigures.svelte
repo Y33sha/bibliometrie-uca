@@ -1,9 +1,12 @@
 <script module lang="ts">
-	/** `open` colore le chiffre en vert open access. `tooltip` s'affiche au survol. `icon` est le nom d'une icône Flaticon UIcons, sans le préfixe `fi-rr-`. */
-	export type KeyFigure = { value: string; label: string; tone?: 'open'; tooltip?: string; icon?: string };
+	import type { LucideIcon } from '@lucide/svelte';
+
+	/** `open` colore le chiffre en vert open access. `tooltip` s'affiche au survol. `icon` est une icône Lucide. */
+	export type KeyFigure = { value: string; label: string; tone?: 'open'; tooltip?: string; icon?: LucideIcon };
 </script>
 
 <script lang="ts">
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	// Rangée de chiffres clés en tête d'un dashboard : icône facultative à gauche, gros chiffre, libellé discret dessous.
 	let {
 		items,
@@ -18,8 +21,8 @@
 <div class="key-figures">
 	{#if period}<div class="key-figures-period">{period}</div>{/if}
 	{#each items as item (item.label)}
-		<div class="key-figure" class:open={item.tone === 'open'} title={item.tooltip}>
-			{#if item.icon}<i class="fi fi-rr-{item.icon} key-figure-icon" aria-hidden="true"></i>{/if}
+		<div class="key-figure" class:open={item.tone === 'open'} use:tooltip={item.tooltip}>
+			{#if item.icon}<span class="key-figure-icon"><item.icon size="1em" /></span>{/if}
 			<div>
 				<div class="key-figure-value">{item.value}</div>
 				<div class="key-figure-label">{item.label}</div>

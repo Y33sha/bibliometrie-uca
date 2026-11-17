@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { sectionLabels } from "#lib/labels.js";
+  import { formatNumber } from "#lib/utils.js";
   import TableScroll from '#lib/components/TableScroll.svelte';
   import IconButton from "#lib/components/IconButton.svelte";
   import PageHeader from "#lib/components/PageHeader.svelte";
@@ -6,10 +8,10 @@
   import { activeTabId, type TabDef } from "#lib/tabs.js";
   import { page } from "$app/state";
   import { onMount } from "svelte";
-  import { api, errorMessage, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
+  import { api, apiOnce, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
   import { STRUCTURE_TYPES } from "#lib/structureTypes.js";
   import { structureLabel } from "#lib/structureLabels.js";
-  import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
+  import { confirmDialog, toastError } from "#lib/dialogs.svelte.js";
   import Modal from "#lib/components/Modal.svelte";
   import Tooltip from "#lib/components/Tooltip.svelte";
   import { autofocus } from "#lib/actions/focus.js";
@@ -94,7 +96,7 @@
       perimModal = null;
       await load();
     } catch (e) {
-      toast(errorMessage(e), "error");
+      toastError(e);
     }
   }
 
@@ -104,7 +106,7 @@
       await perimetersApi.remove(id);
       await load();
     } catch (e) {
-      toast(errorMessage(e), "error");
+      toastError(e);
     }
   }
 
@@ -172,7 +174,7 @@
 
   /** Plafond d'interrogations : zéro retire la borne. */
   function capLabel(value: number): string {
-    return value > 0 ? `${value.toLocaleString("fr-FR")} par run` : "Illimité";
+    return value > 0 ? `${formatNumber(value)} par run` : "Illimité";
   }
 
   function delayLabel(value: number): string {
@@ -206,7 +208,7 @@
       applyBrandHue(saved.value as number);
       await load();
     } catch (e) {
-      toast("Erreur : " + errorMessage(e), "error");
+      toastError(e);
       if (institution.brandHue !== null) previewBrandHue(institution.brandHue);
     }
     hueDraft = null;
@@ -225,7 +227,7 @@
   async function loadCountries() {
     [perimeterCountries, countries] = await Promise.all([
       api<PerimeterCountry[]>("/api/perimeters/countries"),
-      api<Country[]>("/api/countries"),
+      apiOnce<Country[]>("/api/countries"),
     ]);
   }
 
@@ -234,7 +236,7 @@
       await configApi.setValue(INSTITUTION_COUNTRY_KEY, code);
       await load();
     } catch (e) {
-      toast("Erreur : " + errorMessage(e), "error");
+      toastError(e);
     }
   }
 
@@ -243,7 +245,7 @@
     try {
       await configApi.setValue(LABORATORY_TYPES_KEY, next);
     } catch (e) {
-      toast("Erreur : " + errorMessage(e), "error");
+      toastError(e);
     }
     await load();
   }
@@ -300,7 +302,7 @@
       editingKey = null;
       await load();
     } catch (e) {
-      toast("Erreur : " + errorMessage(e), "error");
+      toastError(e);
     }
     saving = false;
   }
@@ -311,7 +313,7 @@
   });
 </script>
 
-<PageHeader title="Configuration" />
+<PageHeader title={sectionLabels['admin/config']} />
 
 <!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires : focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
 {#snippet inlineEdit(key: string)}

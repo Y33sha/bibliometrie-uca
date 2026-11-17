@@ -19,8 +19,10 @@ from domain.source_records.identifiers import (
 from domain.source_records.metadata_correction.rules import (
     MetadataCorrectionRule,
     MetadataForCorrection,
+    NoticeOfDoi,
     doc_type_correction,
     is_dissertation_identifier,
+    notice_doi_correction,
     origin_doc_type_correction,
 )
 from domain.types import JsonValue
@@ -69,6 +71,7 @@ def correct_source_record(
     *,
     origin_doc_type: str | None = None,
     missing_hal_ids: Set[str] = frozenset(),
+    notice: NoticeOfDoi | None = None,
 ) -> UnaryCorrection | None:
     """Corrige un enregistrement source depuis ses valeurs d'avant correction, reconstruites à partir de `corrections` et de ses `identifiers`. Renvoie `None` si les valeurs courantes sont déjà les valeurs corrigées.
 
@@ -80,6 +83,7 @@ def correct_source_record(
         corrections: colonne `corrections` courante.
         origin_doc_type: type corrigé du dépôt HAL d'origine de l'enregistrement source ScanR ; il prime sur son type.
         missing_hal_ids: dépôts HAL introuvables dans HAL.
+        notice: erratum ou avis Crossref de l'un des DOI propres de l'enregistrement source (`notice_doi_correction`).
     """
     before = hydrate_raw_view(facts, corrections)
     corrected = doc_type_correction(before)
@@ -91,6 +95,8 @@ def correct_source_record(
         doc_type, doc_type_rule = corrected.value, corrected.rule.value
     if origin := origin_doc_type_correction(doc_type, origin_doc_type):
         doc_type, doc_type_rule = origin.value, origin.rule.value
+    if copy := notice_doi_correction(doc_type, before, notice):
+        doc_type, doc_type_rule = copy.value, copy.rule.value
     rules: set[str] = set()
     if doc_type_rule is not None:
         new_corrections[CorrectionKey.DOC_TYPE] = stash_entry(before.doc_type, doc_type_rule)

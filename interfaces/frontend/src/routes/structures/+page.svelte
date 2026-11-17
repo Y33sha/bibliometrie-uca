@@ -9,19 +9,18 @@
 	import FilterLayout from '#lib/components/filters/FilterLayout.svelte';
 	import FilterPanel from '#lib/components/filters/FilterPanel.svelte';
 	import FilterPanelToggle from '#lib/components/filters/FilterPanelToggle.svelte';
-	import { columnLabels } from '#lib/labels.js';
+	import { columnLabels, sectionLabels } from '#lib/labels.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { structures as structuresApi, errorMessage } from '#lib/api/index.js';
+	import { structures as structuresApi } from '#lib/api/index.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useFilteredList } from '#lib/composables/useFilteredList.svelte.js';
 	import { facetDefs } from '#lib/filterRegistry.js';
 	import { STRUCTURE_FILTER_GROUPS, structureFilters } from '#lib/structureFilters.js';
-	import { toast } from '#lib/dialogs.svelte.js';
-	import { withBase } from '#lib/paths.js';
+	import { toast, toastError } from '#lib/dialogs.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
-	import { halCollectionUrl, paramsToQuery } from '#lib/utils.js';
+	import { halCollectionUrl } from '#lib/utils.js';
 	import IdentifierLink from '#lib/components/IdentifierLink.svelte';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import IconButton from '#lib/components/IconButton.svelte';
@@ -57,12 +56,6 @@
 				facets: facetDefs(FILTERS),
 			}),
 	});
-
-	function exportCsvUrl(): string {
-		const params = list.filterParams();
-		params.set('sort', list.sort);
-		return withBase(`/api/structures/export.csv?${paramsToQuery(params)}`);
-	}
 
 	// Volet d'édition d'une structure, en session admin : ouvert tant que `?structure=<id>` figure dans l'URL.
 	const drawer = useDrawerParam('structure', isAdmin);
@@ -121,16 +114,16 @@
 			list.listing.load();
 			drawer.open(created.id);
 		} catch (e) {
-			toast('Erreur: ' + errorMessage(e), 'error');
+			toastError(e);
 		}
 	}
 
 	onMount(list.restore);
 </script>
 
-<PageHeader title="Labos" hidden />
+<PageHeader title={sectionLabels.structures} hidden />
 
-<ListToolbar bind:search={list.search} placeholder="Rechercher par nom ou acronyme" onsearch={list.onSearchInput} list={list.listing} one="structure" many="structures" exportUrl={exportCsvUrl()} countBelow>
+<ListToolbar bind:search={list.search} placeholder="Rechercher par nom ou acronyme" onsearch={list.onSearchInput} list={list.listing} one="structure" many="structures" exportUrl={list.exportUrl('/api/structures/export.csv')} countBelow>
 	{#snippet leading()}
 		<FilterPanelToggle bind:open={list.panel.open} active={list.activeCount} />
 	{/snippet}

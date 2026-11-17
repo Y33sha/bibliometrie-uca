@@ -14,7 +14,7 @@
 	import { useFilteredList } from '#lib/composables/useFilteredList.svelte.js';
 	import { facetDefs } from '#lib/filterRegistry.js';
 	import { PARTNER_FILTER_GROUPS, PARTNER_FILTERS } from '#lib/partnerFilters.js';
-	import { rorFullUrl } from '#lib/utils.js';
+	import { formatNumber, rorFullUrl } from '#lib/utils.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Partner = components['schemas']['StructurePartner'];
@@ -79,7 +79,7 @@
 						<td>{p.country_name ?? p.country_code ?? ''}</td>
 						<td class="muted">{p.types.map((t) => typeLabels.get(t) ?? t).join(', ')}</td>
 						<td class="num">
-							<a href={resolve(`structures/${labId}?tab=publications&partner_ror=${p.ror_id}`)}>{p.publications.toLocaleString('fr-FR')}</a>
+							<a href={resolve(`structures/${labId}?tab=publications&partner_ror=${p.ror_id}`)}>{formatNumber(p.publications)}</a>
 						</td>
 					</tr>
 				{/each}
