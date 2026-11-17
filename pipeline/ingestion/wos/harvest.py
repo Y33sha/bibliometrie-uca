@@ -12,7 +12,7 @@ from sqlalchemy import Connection
 from pipeline.ingestion.common.harvester import (
     HarvestWindow,
     SourceHarvester,
-    stage_document,
+    stage_records,
 )
 from pipeline.ingestion.wos.api import WosClient, get_records, get_records_found
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
@@ -39,12 +39,11 @@ def harvest_year(
 ) -> None:
     """Moissonne les records d'une année, page après page.
 
-    Une page vide est retentée après une pause ; trois pages vides de suite arrêtent l'année. Les écritures sont comptées dans `metrics`.
+    Une page vide est retentée après une pause. Une première requête sans réponse, ou trois pages vides de suite, lèvent une `RuntimeError` : l'année est en échec. Les écritures sont comptées dans `metrics`.
     """
     data = client.fetch_page(year, 1, affiliations)
     if not data:
-        logger.error("requête impossible")
-        return
+        raise RuntimeError("requête impossible")
 
     total_count = get_records_found(data)
     first_record = 1
@@ -56,8 +55,7 @@ def harvest_year(
         if not records:
             consecutive_failures += 1
             if consecutive_failures >= 3:
-                logger.error("3 pages vides consécutives à firstRecord=%s, arrêt", first_record)
-                break
+                raise RuntimeError(f"3 pages vides consécutives à firstRecord={first_record}")
             logger.warning(
                 "Page vide à firstRecord=%s, nouvelle tentative après pause...", first_record
             )
@@ -68,9 +66,7 @@ def harvest_year(
         consecutive_failures = 0
         page_num += 1
 
-        for record in records:
-            stage_document(conn, metrics, source="wos", record=record)
-        conn.commit()
+        stage_records(conn, metrics, "wos", records)
         progress.advance(len(records))
         first_record += len(records)
 
@@ -89,7 +85,7 @@ def harvest_year(
 class WosHarvester(SourceHarvester[WosClient]):
     """Moissonnage WoS des records des affiliations du périmètre, année par année.
 
-    Une erreur sur une année est journalisée, et le moissonnage passe à la suivante.
+    Une erreur sur une année émet un signal `harvest_error`, et le moissonnage passe à la suivante.
     """
 
     SOURCE = "wos"

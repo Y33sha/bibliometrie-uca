@@ -12,8 +12,8 @@ Relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software
 
 ### Phase 1 — Erreurs du moissonnage
 
-- [ ] Une année en échec dans `SourceHarvester._harvest_by_year` émet un signal et compte une erreur. La phase passe en avertissement. Test de non-régression.
-- [ ] Les documents d'une page annulée par le rollback sortent des métriques.
+- [x] Une année en échec dans `SourceHarvester._harvest_by_year` émet un signal et compte une erreur. La phase passe en avertissement. Test de non-régression. Même traitement pour un lot en échec du moissonnage par personne, et pour les deux échecs d'année journalisés sans exception par WoS.
+- [x] Les documents d'une page annulée par le rollback sortent des métriques : `stage_records` compte un lot après son commit.
 
 ### Phase 2 — Exécuteur des tâches
 

@@ -68,6 +68,30 @@ def test_l_executeur_ecrit_le_bilan_de_chaque_section_dans_l_ordre_des_taches(co
     ]
 
 
+def test_le_bilan_d_une_tache_en_erreur_partielle_garde_ses_compteurs(contexte, caplog):
+    """Un signal `harvest_error` laisse les compteurs, erreurs comprises ; une source coupée donne « interrompue »."""
+
+    def _metriques(code: str) -> PhaseMetrics:
+        metrics = PhaseMetrics(new=2, errors=1)
+        metrics.signals.append({"level": "warning", "code": code, "message": ""})
+        return metrics
+
+    tasks = (
+        Task("hal", run=lambda _ctx: _metriques("harvest_error"), section="Sources", label="HAL"),
+        Task(
+            "wos", run=lambda _ctx: _metriques("source_unavailable"), section="Sources", label="WoS"
+        ),
+    )
+
+    with caplog.at_level(logging.INFO, logger="test"):
+        execute_tasks(tasks, contexte())
+
+    assert [record.getMessage() for record in caplog.records][-2:] == [
+        "  ├─ HAL : 2 nouveaux, 1 erreur",
+        "  └─ WoS : interrompue",
+    ]
+
+
 def test_un_groupe_parallele_ouvre_une_file_par_source(contexte):
     """Les tâches d'une même source s'enchaînent dans une file, dans l'ordre. Les sources s'exécutent en même temps : la première tâche de chaque source attend l'autre à une barrière."""
     barriere = threading.Barrier(2, timeout=5)

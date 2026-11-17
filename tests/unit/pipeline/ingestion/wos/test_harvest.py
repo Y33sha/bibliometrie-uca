@@ -2,7 +2,7 @@
 
 Pas de réseau ni de base : un faux client sert des réponses scriptées, la configuration et l'écriture dans `staging` sont remplacées, et la fixture `pauses` intercepte `time.sleep`.
 
-Les tests vérifient le pilotage : pagination sur `firstRecord`, abandon après trois pages vides consécutives, plafond de l'API, isolement de l'échec d'une année, refus d'une configuration incomplète, arrêt sur circuit-breaker.
+Les tests vérifient le pilotage : pagination sur `firstRecord`, échec de l'année après trois pages vides consécutives, plafond de l'API, isolement de l'échec d'une année, refus d'une configuration incomplète, arrêt sur circuit-breaker.
 """
 
 from __future__ import annotations
@@ -71,8 +71,9 @@ def test_ventilation_par_issue_de_l_ecriture(ecritures):
     assert (metrics.new, metrics.updated) == (1, 1)
 
 
-def test_requete_impossible(ecritures):
-    assert _extraire(_client([None])).total == 0
+def test_une_requete_impossible_met_l_annee_en_echec(ecritures):
+    with pytest.raises(RuntimeError, match="requête impossible"):
+        _extraire(_client([None]))
 
 
 def test_aucun_record_trouve(ecritures):
@@ -80,9 +81,10 @@ def test_aucun_record_trouve(ecritures):
     assert ecritures == []
 
 
-def test_trois_pages_vides_consecutives_arretent_l_annee(ecritures):
+def test_trois_pages_vides_consecutives_mettent_l_annee_en_echec(ecritures):
     client = _client([_reponse([], total=10)] * 3)
-    assert _extraire(client).total == 0
+    with pytest.raises(RuntimeError, match="3 pages vides"):
+        _extraire(client)
     assert client.fetch_page.call_count == 3
 
 
@@ -106,10 +108,11 @@ def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
 
 
 def test_run_isole_l_echec_d_une_annee(configuration, ecritures):
-    """Une année en erreur laisse la suivante s'exécuter."""
+    """Une année en erreur laisse la suivante s'exécuter, et compte une erreur."""
     configuration(annees=[2023, 2024])
-    client = _client([RuntimeError("API en panne"), _reponse(_records("W1"), total=1)])
-    assert moissonneur(WosHarvester, client).run(arguments_du_run()).new == 1
+    client = _client([None, _reponse(_records("W1"), total=1)])
+    metrics = moissonneur(WosHarvester, client).run(arguments_du_run())
+    assert (metrics.new, metrics.errors) == (1, 1)
 
 
 def test_run_survit_a_un_comptage_impossible(configuration, ecritures):

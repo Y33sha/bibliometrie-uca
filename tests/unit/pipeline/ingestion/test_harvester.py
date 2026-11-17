@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.common.harvester.SourceHarvester`.
 
-Couvre le moissonnage par année, le bilan et la source sans configuration.
+Couvre le moissonnage par année, l'écriture d'un lot, le bilan et la source sans configuration.
 
 Sans base ni réseau : un faux moissonneur déterministe et une connexion simulée.
 """
@@ -20,7 +20,10 @@ from pipeline.ingestion.common.harvester import (
     HarvestWindow,
     SourceHarvester,
     run_harvest,
+    stage_records,
 )
+from pipeline.ingestion.common.staging import StagingStore
+from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 @pytest.fixture
@@ -105,13 +108,21 @@ class TestExtractionParAnnee:
         assert breaker.tripped
 
     def test_une_erreur_sur_une_annee_passe_a_la_suivante(self, logger, caplog):
-        """L'erreur est journalisée, la page en cours annulée, et les écritures déjà comptées restent dans le bilan."""
+        """L'erreur est journalisée, la page en cours annulée, et les pages déjà écrites restent dans le bilan."""
         ext = _ParAnnee(logger, {2023: 2, 2024: 3, 2025: 1}, failing=2024)
         with caplog.at_level(logging.ERROR):
             metrics = ext.run(_args())
         assert (metrics.new, metrics.unchanged) == (3, 1)
         ext.conn.rollback.assert_called_once()
         assert "réponse illisible" in caplog.text
+
+    def test_une_annee_en_echec_compte_une_erreur_et_emet_un_signal(self, logger):
+        """Le signal met la phase en avertissement : le moissonnage quotidien suivant repart de la même date."""
+        metrics = _ParAnnee(logger, {2023: 2, 2024: 3}, failing=2024).run(_args())
+        assert metrics.errors == 1
+        assert [(s["code"], s["message"]) for s in metrics.signals] == [
+            ("harvest_error", "HAL 2024 : réponse illisible")
+        ]
 
     def test_une_erreur_de_decompte_compte_l_annee_pour_zero(self, logger):
         ext = _ParAnnee(logger, {2023: 2, 2024: 3})
@@ -122,6 +133,32 @@ class TestExtractionParAnnee:
             return ext.volumes[year]
 
         assert sum(ext._count(count_year, year) for year in ext.volumes) == 2
+
+
+class TestEcritureDUnLot:
+    """`stage_records` compte les écritures d'un lot après son commit."""
+
+    def test_le_lot_commite_entre_dans_les_metriques(self, ecritures, conn):
+        metrics = PhaseMetrics()
+        stage_records(conn, metrics, "hal", [{"halId_s": "hal-1"}, {"halId_s": "hal-2"}])
+        assert metrics.new == 2
+        conn.commit.assert_called_once()
+
+    def test_un_lot_interrompu_reste_hors_des_metriques(self, ecritures, conn, monkeypatch):
+        """L'appelant annule les écritures du lot : les documents écrits avant l'erreur sortent du bilan."""
+        ecrire = StagingStore.upsert
+
+        def upsert(store, **kwargs):
+            if kwargs["source_id"] == "hal-2":
+                raise ValueError("document illisible")
+            return ecrire(store, **kwargs)
+
+        monkeypatch.setattr(StagingStore, "upsert", upsert)
+        metrics = PhaseMetrics(new=5)
+        with pytest.raises(ValueError, match="document illisible"):
+            stage_records(conn, metrics, "hal", [{"halId_s": "hal-1"}, {"halId_s": "hal-2"}])
+        assert metrics == PhaseMetrics(new=5)
+        conn.commit.assert_not_called()
 
 
 def test_une_source_non_configuree_est_sautee_avec_un_signal(contexte):

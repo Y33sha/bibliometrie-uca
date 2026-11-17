@@ -43,3 +43,16 @@ def test_suit_le_marqueur_jusqu_a_sa_repetition(identifiants_rh, ecritures):
     assert query == "producedDateY_i:[2024 TO 2025]"
     assert fq == 'authIdHal_s:("jean-dupont") OR authIdRefIdExt_s:("070463980")'
     assert [c.args[2] for c in client.fetch_page_cursor.call_args_list] == ["*", "c1"]
+
+
+def test_un_lot_en_echec_compte_une_erreur_et_emet_un_signal(identifiants_rh, ecritures):
+    identifiants_rh(["0000-0001-2345-6789"])
+    client = MagicMock()
+    client.fetch_page_cursor.side_effect = RuntimeError("réponse illisible")
+
+    metrics = moissonneur(HalPersonHarvester, client).run(arguments_du_run())
+
+    assert metrics.errors == 1
+    assert [(s["code"], s["message"]) for s in metrics.signals] == [
+        ("harvest_error", "HAL lot 1 : réponse illisible")
+    ]

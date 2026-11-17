@@ -157,12 +157,13 @@ def _execute(task: Task, ctx: PhaseContext) -> PhaseMetrics:
 
 
 def _outcome(metrics: PhaseMetrics) -> str:
-    """Renvoie le bilan d'une tâche : sa ligne de bilan, l'obstacle à son exécution, ou ses compteurs."""
+    """Renvoie le bilan d'une tâche : sa ligne de bilan, l'obstacle à son exécution, ou ses compteurs. Un signal d'une erreur partielle (`harvest_error`) laisse les compteurs, erreurs comprises."""
     if metrics.report is not None:
         return metrics.report
-    if any(s["code"] == "source_unconfigured" for s in metrics.signals):
+    codes = {s["code"] for s in metrics.signals}
+    if "source_unconfigured" in codes:
         return "sautée, accès non configuré"
-    if metrics.signals:
+    if codes - {"harvest_error"}:
         return "interrompue"
     return metrics.as_summary()
 

@@ -1,6 +1,6 @@
 """Moissonnage d'une source par l'identifiant des personnes RH, identifiant confirmé ou authentifié : socle commun des tâches `harvest_by_person`.
 
-Chaque source est interrogée par lots de personnes, page après page, sur la plage d'années du moissonnage. Les lots réunissent les personnes qui copublient (`person_batches`). Une requête réunit tous les identifiants des personnes du lot, dans les types acceptés par la source (`PERSON_SEARCH_IDENTIFIERS`). Les lots partent en parallèle, dans la limite de requêtes simultanées de la source (`MAX_CONCURRENT`). Un document ramené par plusieurs lots est écrit une fois par run. Une erreur sur un lot est journalisée, et le moissonnage passe au suivant.
+Chaque source est interrogée par lots de personnes, page après page, sur la plage d'années du moissonnage. Les lots réunissent les personnes qui copublient (`person_batches`). Une requête réunit tous les identifiants des personnes du lot, dans les types acceptés par la source (`PERSON_SEARCH_IDENTIFIERS`). Les lots partent en parallèle, dans la limite de requêtes simultanées de la source (`MAX_CONCURRENT`). Un document ramené par plusieurs lots est écrit une fois par run. Une erreur sur un lot émet un signal `harvest_error`, et le moissonnage passe au suivant.
 """
 
 from __future__ import annotations
@@ -27,14 +27,14 @@ from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,
     SourceHarvester,
-    stage_page,
+    stage_records,
 )
 from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.common.person_batches import compose_batches, read_batching_inputs
 from pipeline.ingestion.payload_readers import payload_reader
-from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
+from pipeline.runtime.observability.signals import signal_harvest_error
 
 # Identifiants d'une personne ou d'un lot de personnes, par type.
 type Identifiers = Mapping[PersonIdentifierType, list[str]]
@@ -124,24 +124,34 @@ class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
 
             def on_page(batch: _Batch, page: Page) -> None:
                 try:
-                    stage_page(
+                    stage_records(
                         self.conn,
                         metrics,
                         self.SOURCE,
-                        page,
+                        page.records,
                         keep=keep,
                         entry_mode=StagingEntryMode.PERSON_IDENTIFIER,
                     )
                 except Exception as e:
                     self.conn.rollback()
-                    scoped_logger(self.logger, self.SOURCE, batch.label).error(
-                        "erreur d'écriture : %s — page sautée", e
+                    signal_harvest_error(
+                        metrics,
+                        self.SOURCE,
+                        batch.label,
+                        e,
+                        next_step="page sautée",
+                        logger=self.logger,
                     )
 
             def on_end(batch: _Batch, error: Exception | None) -> None:
                 if error is not None and not isinstance(error, SourceUnavailableError):
-                    scoped_logger(self.logger, self.SOURCE, batch.label).error(
-                        "erreur : %s — passage au suivant", error
+                    signal_harvest_error(
+                        metrics,
+                        self.SOURCE,
+                        batch.label,
+                        error,
+                        next_step="passage au lot suivant",
+                        logger=self.logger,
                     )
                 progress.advance(batch.persons)
 

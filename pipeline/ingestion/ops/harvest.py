@@ -9,7 +9,7 @@ from collections.abc import Mapping
 
 from domain.normalize import normalize_text
 from domain.types import JsonValue
-from pipeline.ingestion.common.harvester import HarvestWindow, SourceHarvester, stage_document
+from pipeline.ingestion.common.harvester import HarvestWindow, SourceHarvester, stage_records
 from pipeline.ingestion.ops.api import (
     SEARCH_MAX,
     SEARCH_PAGE,
@@ -116,8 +116,5 @@ class OpsHarvester(SourceHarvester[None]):
             ):
                 continue
             staged.add(key)
-            stage_document(
-                self.conn, metrics, source=self.SOURCE, record=family_document(body, key)
-            )
-            self.conn.commit()
+            stage_records(self.conn, metrics, self.SOURCE, [family_document(body, key)])
         return metrics
