@@ -4,6 +4,7 @@ import logging
 
 import httpx2
 
+from pipeline.ingestion.common.harvester import HarvestWindow
 from pipeline.ingestion.ops import harvest as ops_harvest
 from pipeline.ingestion.ops.api import (
     OVERLOAD_PAUSE,
@@ -35,10 +36,27 @@ def test_depassement_du_plafond_de_recherche_journalise(monkeypatch, caplog):
     monkeypatch.setattr(ops_harvest, "search_page", lambda body: (SEARCH_MAX + 1, [_hit(())]))
     harvester = ops_harvest.OpsHarvester(None, logging.getLogger("test_ops"), None)  # type: ignore[arg-type]
     with caplog.at_level(logging.WARNING):
-        hits = harvester._search("univ clermont auvergne")
-    assert len(hits) == SEARCH_MAX // SEARCH_PAGE
+        hits, total = harvester._search("univ clermont auvergne")
+    assert (len(hits), total) == (SEARCH_MAX // SEARCH_PAGE, SEARCH_MAX + 1)
     assert [r.getMessage() for r in caplog.records] == [
         f"[OPS · univ clermont auvergne] {SEARCH_MAX + 1} résultats, seuls les {SEARCH_MAX} premiers sont accessibles"
+    ]
+
+
+def test_un_depassement_du_plafond_de_recherche_emet_un_signal(monkeypatch):
+    """La phase passe en avertissement : des familles du déposant manquent au moissonnage."""
+    harvester = ops_harvest.OpsHarvester(None, logging.getLogger("test_ops"), None)  # type: ignore[arg-type]
+    monkeypatch.setattr(harvester, "_api_ids", lambda: ["univ clermont auvergne"])
+    monkeypatch.setattr(harvester, "_years", lambda window: [2021])
+    monkeypatch.setattr(harvester, "_search", lambda form: ([], SEARCH_MAX + 1))
+
+    metrics = harvester.run(HarvestWindow())
+
+    assert [(s["code"], s["message"]) for s in metrics.signals] == [
+        (
+            "harvest_incomplete",
+            f"OPS univ clermont auvergne : 0 documents reçus sur {SEARCH_MAX + 1} annoncés",
+        )
     ]
 
 

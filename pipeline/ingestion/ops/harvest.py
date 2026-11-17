@@ -24,6 +24,7 @@ from pipeline.ingestion.ops.family import family_key, family_members, first_prio
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
+from pipeline.runtime.observability.signals import signal_harvest_incomplete
 
 
 def family_document(body: JsonValue, key: str) -> dict[str, JsonValue]:
@@ -62,22 +63,32 @@ class OpsHarvester(SourceHarvester[None]):
         forms = frozenset(normalize_text(f) for f in self._api_ids())
         years = frozenset(self._years(window))
         publications: dict[str, str] = {}
+        capped: list[tuple[str, int, int]] = []
         searched = search_forms(forms)
         with track_progress(len(searched), self._label("déposants"), self.logger) as progress:
             for form in searched:
-                for hit in self._search(form):
+                hits, total = self._search(form)
+                if total > SEARCH_MAX:
+                    capped.append((form, len(hits), total))
+                for hit in hits:
                     if kept_hit(hit, forms, years):
                         publications.setdefault(hit.family_id, hit.publication)
                 progress.advance()
-        return self._harvest_at_once(
+        metrics = self._harvest_at_once(
             len(publications),
             lambda progress: self._stage_families(publications, years, progress),
             scope="familles",
         )
+        for form, received, total in capped:
+            signal_harvest_incomplete(
+                metrics, self.SOURCE, form, received=received, announced=total
+            )
+        return metrics
 
-    def _search(self, form: str) -> list[SearchHit]:
-        """Renvoie les `SEARCH_MAX` premiers résultats de la recherche de `form`, toutes dates confondues. OPS refuse les rangs suivants, donc leurs résultats sont absents du moissonnage. Un dépassement est journalisé."""
+    def _search(self, form: str) -> tuple[list[SearchHit], int]:
+        """Renvoie les `SEARCH_MAX` premiers résultats de la recherche de `form`, toutes dates confondues, et le nombre de résultats annoncé. OPS refuse les rangs suivants, donc leurs résultats sont absents du moissonnage : un dépassement est journalisé, et `run` le signale (`harvest_incomplete`)."""
         hits: list[SearchHit] = []
+        total = 0
         start = 1
         while start <= SEARCH_MAX:
             body = get_json(
@@ -94,7 +105,7 @@ class OpsHarvester(SourceHarvester[None]):
             start += SEARCH_PAGE
             if start > total or not page:
                 break
-        return hits
+        return hits, total
 
     def _stage_families(
         self, publications: Mapping[str, str], years: frozenset[int], progress: Progress

@@ -15,6 +15,7 @@ Relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software
 - [x] Une année en échec dans `SourceHarvester._harvest_by_year` émet un signal et compte une erreur. La phase passe en avertissement. Test de non-régression. Même traitement pour un lot en échec du moissonnage par personne, et pour les deux échecs d'année journalisés sans exception par WoS.
 - [x] Les documents d'une page annulée par le rollback sortent des métriques : `stage_records` compte un lot après son commit.
 - [x] Un moissonnage OpenAlex arrêté avant le nombre de works annoncé journalise le point d'arrêt de la pagination (page vide ou sans curseur suivant, curseur demandé). Au-delà de 1 % d'écart, il émet un signal `harvest_incomplete`. Des runs passés ont perdu jusqu'à neuf dixièmes d'une année sans signal.
+- [x] Les plafonds d'API émettent le même signal : 100 000 records par requête WoS, 2 000 résultats par graphie de déposant OPS.
 
 ### Phase 2 — Exécuteur des tâches
 
