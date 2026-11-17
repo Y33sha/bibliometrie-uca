@@ -6,7 +6,7 @@
 	import EntityBreadcrumb from '#lib/components/EntityBreadcrumb.svelte';
 	import EntityStatus from '#lib/components/EntityStatus.svelte';
 	import { page } from '$app/state';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { api } from '#lib/api/index.js';
 	import { plural } from '#lib/plural.js';
 	import IdentifierLink from '#lib/components/IdentifierLink.svelte';
@@ -114,24 +114,18 @@
 		}
 	}
 
-	function onTabSwitch(tab: string) {
-		// Les onglets "publications" et "theses" sont gérés par leurs ListView respectives, qui chargent leurs données dans leur propre onMount.
-		if (tab === 'dashboard') loadDashboard();
-		if (tab === 'addresses' && !addresses.loaded) addresses.load();
-	}
+	// Chargement de l'onglet affiché, à sa première ouverture, d'où que vienne le changement d'onglet : barre d'onglets, lien, retour arrière. Les onglets-listes chargent leurs données au montage.
+	$effect(() => {
+		if (!lab) return;
+		if (activeTab === 'dashboard' && !dashboardLoaded) untrack(loadDashboard);
+		if (activeTab === 'addresses' && !addresses.loaded) untrack(() => addresses.load());
+	});
 
-	onMount(async () => {
-		// Restore cross-tab state from URL (les filtres publications sont restaurés par PublicationsListView lui-même).
+	onMount(() => {
+		// Page des adresses lue dans l'URL ; les onglets-listes lisent leurs propres paramètres.
 		const restored = url.restoreFromUrl(page.url.searchParams);
 		if (restored.addrPage) addresses.page = restored.addrPage as number;
-
-		if (!(await loadProfile())) return;
-		// Load data for the active tab (publications est auto-géré).
-		if (activeTab === 'dashboard') {
-			loadDashboard();
-		} else if (activeTab === 'addresses') {
-			addresses.load();
-		}
+		void loadProfile();
 	});
 </script>
 
@@ -163,8 +157,7 @@
 	<!-- Tabs -->
 	<TabNav
 		{tabs}
-		onswitch={onTabSwitch}
-		afterNavigate={syncUrl}
+		keep={['structure']}
 	/>
 
 	<!-- Tab: Dashboard -->
@@ -185,11 +178,13 @@
 												value: formatNumber(ongoingThesesCount),
 												label: plural(ongoingThesesCount, 'thèse en cours', 'thèses en cours'),
 												icon: GraduationCap,
+												link: { tab: 'theses', params: { doc_type: 'ongoing_thesis' } },
+												hoverColor: 'var(--key-figure-theses)',
 											},
 										]
 									: []),
 								...(personsCount > 0
-									? [{ value: formatNumber(personsCount), label: plural(personsCount, 'personne'), icon: User, href: '?tab=persons' }]
+									? [{ value: formatNumber(personsCount), label: plural(personsCount, 'personne'), icon: User, link: { tab: 'persons' }, hoverColor: 'var(--key-figure-persons)' }]
 									: []),
 							]
 						: []}
@@ -217,7 +212,7 @@
 	<!-- Tab: Thèses -->
 	{#if activeTab === 'theses'}
 		<div class="tab-content">
-			<ThesesListView labId={lab.id} urlSync={false} apiKey={`lab-${lab.id}-theses`} />
+			<ThesesListView labId={lab.id} basePath={`/structures/${labId}`} apiKey={`lab-${lab.id}-theses`} />
 		</div>
 	{/if}
 
@@ -226,7 +221,7 @@
 		<div class="tab-content">
 			<PersonsListView
 				labId={lab.id}
-				urlSync={false}
+				basePath={`/structures/${labId}`}
 				apiKey={`lab-${lab.id}-persons`}
 			/>
 		</div>

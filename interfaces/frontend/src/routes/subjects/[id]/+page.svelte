@@ -187,7 +187,7 @@
         <PublicationsListView
           apiKey={`subject-${data.subject.label_normalized}-publications`}
           context={{ kind: 'subject', id: data.subject.label_normalized }}
-          urlSync={false}
+          basePath={`/subjects/${encodeURIComponent(subjectKey)}`}
         />
       {/key}
     {/if}

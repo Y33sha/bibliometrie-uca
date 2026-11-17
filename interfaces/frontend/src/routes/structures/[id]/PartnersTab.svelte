@@ -32,7 +32,7 @@
 		perPage: 50,
 		apiKey: () => `lab-${labId}-partners`,
 		defaultSort: 'publications_desc',
-		urlSync: () => false,
+		urlSync: () => true,
 		basePath: () => `/structures/${labId}`,
 		facets: (buildParams) =>
 			useFacets({

@@ -1,19 +1,21 @@
 <script module lang="ts">
 	import type { LucideIcon } from '@lucide/svelte';
+	import type { TabLink } from '#lib/tabs.js';
 
-	/** `tooltip` s'affiche au survol. `icon` est une icône Lucide. Avec `href`, le chiffre est un lien, et son icône prend au survol la couleur `hoverColor`. */
+	/** `tooltip` s'affiche au survol. `icon` est une icône Lucide. Avec `link`, le chiffre mène à un onglet de la page, et son icône prend au survol la couleur `hoverColor`. */
 	export type KeyFigure = {
 		value: string;
 		label: string;
 		tooltip?: string;
 		icon?: LucideIcon;
-		href?: string;
+		link?: TabLink;
 		hoverColor?: string;
 	};
 </script>
 
 <script lang="ts">
 	import { tooltip } from '#lib/actions/tooltip.svelte.js';
+	import { tabHref } from '#lib/tabs.js';
 	// Rangée de chiffres clés en tête d'un dashboard : icône facultative à gauche, gros chiffre, libellé discret dessous.
 	let {
 		items,
@@ -36,8 +38,8 @@
 <div class="key-figures">
 	{#if period}<div class="key-figures-period">{period}</div>{/if}
 	{#each items as item (item.label)}
-		{#if item.href}
-			<a class="key-figure key-figure-link" href={item.href} style:--hover-color={item.hoverColor} use:tooltip={item.tooltip}>
+		{#if item.link}
+			<a class="key-figure key-figure-link" href={tabHref(item.link)} style:--hover-color={item.hoverColor} use:tooltip={item.tooltip}>
 				{@render content(item)}
 			</a>
 		{:else}

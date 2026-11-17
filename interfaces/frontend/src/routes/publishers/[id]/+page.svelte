@@ -88,7 +88,7 @@
 	</div>
 
 	<!-- Tabs -->
-	<TabNav {tabs} />
+	<TabNav {tabs} keep={['publisher']} />
 
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
@@ -112,6 +112,8 @@
 			<SerialsListView
 				apiKey={`publisher-${publisherId}-journals`}
 				externalFilters={{ publisherId }}
+				urlSync
+				basePath={`/publishers/${publisherId}`}
 			/>
 		</div>
 	{/if}
@@ -119,7 +121,7 @@
 	<!-- Tab: Monographies -->
 	{#if activeTab === 'monographs'}
 		<div class="tab-content">
-			<MonographsListView apiKey={`publisher-${publisherId}-monographs`} externalFilters={{ publisherId }} />
+			<MonographsListView apiKey={`publisher-${publisherId}-monographs`} externalFilters={{ publisherId }} urlSync basePath={`/publishers/${publisherId}`} />
 		</div>
 	{/if}
 

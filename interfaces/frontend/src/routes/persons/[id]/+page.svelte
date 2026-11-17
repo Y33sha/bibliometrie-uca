@@ -5,7 +5,7 @@
 	import { columnLabels, sectionLabels } from '#lib/labels.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { api, apiDetail, contributions } from '#lib/api/index.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { formatCount, plural } from '#lib/plural.js';
@@ -160,11 +160,12 @@
 		return true;
 	}
 
-	function onTabSwitch(tab: string) {
-		// L'onglet "publications" est géré par <PublicationsListView> qui charge ses données dans son propre onMount à chaque (re)montage.
-		if (tab === 'theses' && !thesesLoaded) loadTheses();
-		if (tab === 'addresses' && !addresses.loaded) openAddressTab();
-	}
+	// Chargement de l'onglet affiché, à sa première ouverture, d'où que vienne le changement d'onglet : barre d'onglets, lien, retour arrière. L'onglet des publications charge ses données au montage.
+	$effect(() => {
+		if (!profile) return;
+		if (activeTab === 'theses' && !thesesLoaded) untrack(loadTheses);
+		if (activeTab === 'addresses' && !addresses.loaded) untrack(openAddressTab);
+	});
 
 	async function loadProfile(id: string) {
 		try {
@@ -176,9 +177,6 @@
 			error = true;
 			return;
 		}
-		if (activeTab === 'addresses') openAddressTab();
-		else if (activeTab === 'theses') loadTheses();
-		// publications : géré par <PublicationsListView> qui charge tout seul.
 	}
 
 	onMount(async () => {
@@ -224,7 +222,7 @@
 	</div>
 
 	<!-- Tabs -->
-	<TabNav {tabs} onswitch={onTabSwitch} />
+	<TabNav {tabs} keep={['person']} />
 
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
@@ -242,6 +240,8 @@
 									value: formatNumber(thesesCount),
 									label: plural(thesesCount, 'thèse liée', 'thèses liées'),
 									icon: GraduationCap,
+									link: { tab: 'theses' },
+									hoverColor: 'var(--key-figure-theses)',
 								},
 							]
 						: []}

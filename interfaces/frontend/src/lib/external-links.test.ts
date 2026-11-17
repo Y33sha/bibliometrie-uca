@@ -51,6 +51,8 @@ const ROUTE_COMPOSEE = /^(questionUrl\(|r\.href$)/;
 /* `resolve` compose un chemin de l'application sous le préfixe de déploiement, `withBase` un
  * chemin de l'API ; `loginUrl` y ajoute la page de retour après connexion, `list.exportUrl` les filtres d'une vue de liste. */
 const ROUTE = /^(resolve|withBase|loginUrl|list\.exportUrl)\(/;
+/* Lien vers un onglet de la page courante : une requête seule, sans chemin ni hôte (`lib/tabs.ts`). */
+const ONGLET = /^tabHref\(/;
 const TABLE_IDENTIFIANTS = /^(EXT_META\[|meta\.url\()/;
 /* Fiche DOAJ servie par l'API, dont l'hôte est vérifié côté serveur. Liens vers le portail d'une
  * source ou d'une plateforme, composés par l'API : l'hôte y est écrit dans le code et
@@ -61,7 +63,7 @@ const VERIFIE_COTE_SERVEUR = /^[a-z]+\.(doaj_url|espacenet_url|record_url|record
  * des données, le serveur vérifie seulement le schéma `http` ou `https`
  * (`domain/publications/access.py`). */
 const COPIE_OUVERTE = /^(copy\.url|accessUrl)$/;
-const REGLES = [COMPOSITION, INTERNE, ROUTE_COMPOSEE, ROUTE, TABLE_IDENTIFIANTS, VERIFIE_COTE_SERVEUR, COPIE_OUVERTE];
+const REGLES = [COMPOSITION, INTERNE, ROUTE_COMPOSEE, ROUTE, ONGLET, TABLE_IDENTIFIANTS, VERIFIE_COTE_SERVEUR, COPIE_OUVERTE];
 
 const URL_LITTERALE = /https?:\/\/([A-Za-z0-9._-]+)/g;
 // Attribut `href`, sous sa forme longue `href={…}` ou raccourcie `{href}`.

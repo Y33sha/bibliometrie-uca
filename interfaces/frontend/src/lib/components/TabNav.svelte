@@ -1,19 +1,18 @@
 <script lang="ts">
 	import { formatNumber } from '#lib/utils.js';
 	import { page } from '$app/state';
-	import { setQueryParam } from '#lib/url.js';
+	import { replaceQuery } from '#lib/url.js';
 	import { horizontalOverflow } from '#lib/actions/horizontalOverflow.js';
 	import { activeTabId, type TabDef } from '#lib/tabs.js';
 
+	// Onglets d'une page, inscrits dans l'URL (`?tab=`, omis pour le premier). Les autres paramètres de l'URL appartiennent à l'onglet affiché (filtres, tri, page d'une liste) : un changement d'onglet les efface, sauf ceux de `keep`.
 	interface Props {
 		tabs: TabDef[];
-		/** Appelé après la mise à jour de l'URL. Sert au chargement paresseux. */
-		onswitch?: (tab: string) => void;
-		/** Appelé une fois la navigation terminée (ex. resynchroniser l'URL). */
-		afterNavigate?: () => void;
+		/** Paramètres de l'URL propres à la page, gardés d'un onglet à l'autre : le volet de la fiche, par exemple. */
+		keep?: string[];
 	}
 
-	let { tabs, onswitch, afterNavigate }: Props = $props();
+	let { tabs, keep = [] }: Props = $props();
 
 	const defaultTab = $derived(tabs[0]?.id ?? '');
 
@@ -21,9 +20,11 @@
 
 	function switchTab(tab: string) {
 		if (tab === activeTab) return;
-		const nav = setQueryParam('tab', tab === defaultTab ? null : tab);
-		if (afterNavigate) nav.then(afterNavigate);
-		onswitch?.(tab);
+		const current = new URLSearchParams(window.location.search);
+		const params = new URLSearchParams();
+		for (const key of keep) for (const value of current.getAll(key)) params.append(key, value);
+		if (tab !== defaultTab) params.set('tab', tab);
+		void replaceQuery(window.location.pathname, params);
 	}
 </script>
 

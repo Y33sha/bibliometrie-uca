@@ -30,6 +30,9 @@
 ### 2. Évaluation
 
 - [x] Liens depuis les chiffres clés du dashboard : publications vers la liste, open access, top 10 % et collaboration internationale vers la vue Statistiques, en pourcentage par année. L'icône prend sa couleur au survol.
+- [x] Liens depuis les chiffres propres à la fiche : thèses en cours d'un laboratoire vers l'onglet Thèses filtré, personnes vers l'onglet Personnes, thèses liées d'une personne vers son onglet Thèses.
+  - Tous les onglets-listes des fiches inscrivent leurs filtres dans l'URL ; un changement d'onglet efface les paramètres de l'onglet quitté, sauf le volet de la fiche.
+  - Une fiche charge l'onglet affiché d'où que vienne le changement d'onglet : barre d'onglets, lien, retour arrière.
 
 ### 3. Mise à jour de la documentation
 

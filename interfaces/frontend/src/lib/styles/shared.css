@@ -91,6 +91,14 @@
 	--green: #36a558;
 	--open-access-logo: #f68212; /* cadenas ouvert du logo open access */
 
+	/* Chiffres clés d'un dashboard : couleur de l'icône d'un chiffre cliquable, au survol. */
+	--key-figure-publications: #f68212;
+	--key-figure-open-access: var(--open);
+	--key-figure-citations: var(--gold);
+	--key-figure-collaboration: var(--doctype-article);
+	--key-figure-theses: var(--doctype-theses);
+	--key-figure-persons: #894d97;
+
 	/* Graphiques : couleurs des séries sans couleur propre, dans l'ordre d'attribution (`chartColor()`). */
 	--chart-1: #4e79a7;
 	--chart-2: #f28e2b;

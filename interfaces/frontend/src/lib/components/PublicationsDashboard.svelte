@@ -7,6 +7,7 @@
 	import Star from '@lucide/svelte/icons/star';
 	import type { Snippet } from 'svelte';
 	import { tooltip } from '#lib/actions/tooltip.svelte.js';
+	import { tabHref, type TabLink } from '#lib/tabs.js';
 	import { api } from '#lib/api/index.js';
 	import type { components } from '#lib/api/schema.js';
 	import KeyFigures, { type KeyFigure } from '#lib/components/KeyFigures.svelte';
@@ -149,7 +150,8 @@
 			value: formatNumber(total),
 			label: plural(total, 'publication'),
 			icon: BookOpen,
-			href: publicationsHref({}, publicationsDocTypes()),
+			link: publicationsTab({}, publicationsDocTypes()),
+			hoverColor: 'var(--key-figure-publications)',
 		},
 		...(total > 0
 			? [
@@ -157,8 +159,8 @@
 						value: percent(openAccess, total),
 						label: 'en open access',
 						icon: LockOpen,
-						href: statsHref('oa_access', 'year', publicationsDocTypes(), 'part'),
-						hoverColor: 'var(--open-access-logo)',
+						link: statsTab('oa_access', 'year', publicationsDocTypes(), 'part'),
+						hoverColor: 'var(--key-figure-open-access)',
 					},
 				]
 			: []),
@@ -168,9 +170,8 @@
 						value: percent(topCited, withCitationClass),
 						label: 'dans le top 10 % des plus citées',
 						icon: Star,
-						href: statsHref('citation_class', 'year', publicationsDocTypes(), 'part'),
-						hoverColor: 'var(--gold)',
-						tooltip: `D'après OpenAlex, sur les ${formatNumber(withCitationClass)} publications pourvues de l'indicateur (${percent(withCitationClass, total)} du corpus)`,
+						link: statsTab('citation_class', 'year', publicationsDocTypes(), 'part'),
+						hoverColor: 'var(--key-figure-citations)',
 					},
 				]
 			: []),
@@ -180,8 +181,8 @@
 						value: percent(collab.international_count, collab.total_count),
 						label: 'en collaboration internationale',
 						icon: Globe,
-						href: statsHref('collaboration', 'year', publicationsDocTypes(), 'part'),
-						hoverColor: 'var(--doctype-article)',
+						link: statsTab('collaboration', 'year', publicationsDocTypes(), 'part'),
+						hoverColor: 'var(--key-figure-collaboration)',
 					},
 				]
 			: []),
@@ -218,25 +219,25 @@
 			})),
 	);
 
-	/** Lien vers l'onglet Publications de la fiche, sur les années du dashboard et les types `docTypes` (tous à défaut) : `settings` choisit la vue et les réglages du graphique. */
-	function publicationsHref(settings: Record<string, string>, docTypes: string[] | null): string {
-		const params = new URLSearchParams({ tab: 'publications', ...settings });
-		if (docTypes) params.set('doc_type', docTypes.join(','));
-		if (years.length) params.set('year', years.join(','));
-		return '?' + paramsToQuery(params);
+	/** Onglet Publications de la fiche, sur les années du dashboard et les types `docTypes` (tous à défaut) : `settings` choisit la vue et les réglages du graphique. */
+	function publicationsTab(settings: Record<string, string>, docTypes: string[] | null): TabLink {
+		const params: Record<string, string> = { ...settings };
+		if (docTypes) params.doc_type = docTypes.join(',');
+		if (years.length) params.year = years.join(',');
+		return { tab: 'publications', params };
 	}
 
-	/** Lien vers la vue Statistiques : un indicateur, une comparaison (vide pour « au total »), en valeur absolue ou en pourcentage. */
-	function statsHref(indicator: string, groupBy: string, docTypes: string[] | null, mode: 'absolu' | 'part' = 'absolu'): string {
-		return publicationsHref({ view: 'stats', indicator, group_by: groupBy, mode }, docTypes);
+	/** Vue Statistiques de l'onglet Publications : un indicateur, une comparaison (vide pour « au total »), en valeur absolue ou en pourcentage. */
+	function statsTab(indicator: string, groupBy: string, docTypes: string[] | null, mode: 'absolu' | 'part' = 'absolu'): TabLink {
+		return publicationsTab({ view: 'stats', indicator, group_by: groupBy, mode }, docTypes);
 	}
 
 	const typeValues = $derived(orderedPivotValues('doc_type_grouped', types));
 	const topCountries = $derived(countries ? (collab?.rows ?? []).slice(0, 5) : []);
 </script>
 
-{#snippet statsLink(href: string)}
-	<a class="stats-link" {href} aria-label="Explorer dans la vue Statistiques" use:tooltip={'Ouvrir dans la vue Statistiques, filtrable'}>Explorer <ArrowRight size={13} /></a>
+{#snippet statsLink(link: TabLink)}
+	<a class="stats-link" href={tabHref(link)} aria-label="Explorer dans la vue Statistiques" use:tooltip={'Ouvrir dans la vue Statistiques, filtrable'}>Explorer <ArrowRight size={13} /></a>
 {/snippet}
 
 {#if !loaded}
@@ -245,12 +246,12 @@
 	<KeyFigures items={keyFigures} {period} />
 	<div class="dash-grid">
 		<div class="dash-card">
-			<h2 class="with-link">Publications par année{@render statsLink(statsHref(oaBreakdown, 'year', publicationsDocTypes()))}</h2>
+			<h2 class="with-link">Publications par année{@render statsLink(statsTab(oaBreakdown, 'year', publicationsDocTypes()))}</h2>
 			<StackedBarChart labels={yearLabels} series={accessSeries} />
 		</div>
 		{@render subjects?.()}
 		<div class="dash-card">
-			<h2 class="with-link">Types de documents{@render statsLink(statsHref('doc_type_grouped', '', null))}</h2>
+			<h2 class="with-link">Types de documents{@render statsLink(statsTab('doc_type_grouped', '', null))}</h2>
 			<BarChart
 				labels={typeValues.map((v) => pivotValueLabel('doc_type_grouped', v))}
 				values={typeValues.map((v) => sum(types.filter((r) => r.doc_type_grouped === v)))}
