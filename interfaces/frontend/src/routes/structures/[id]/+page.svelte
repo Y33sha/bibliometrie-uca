@@ -43,6 +43,7 @@
 	// --- State ---
 	let lab: Structure | null = $state(null);
 	let thesesCount = $state(0);
+	let membersCount = $state(0);
 	let error = $state(false);
 
 	// L'onglet « Adresses » est réservé à la session admin.
@@ -68,7 +69,6 @@
 	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les thèses en cours, les personnes rattachées au laboratoire et les sujets. Les pays partenaires cèdent la place au nuage des citations : quatre graphiques au plus.
 	let dashboardLoaded = $state(false);
 	let ongoingThesesCount = $state(0);
-	let personsCount = $state(0);
 
 	// `useUrlFilters` ne gère ici que les keys cross-onglets (tab, addresses). Les filtres publications/thèses/personnes sont gérés par leurs ListView.
 	const url = useUrlFilters({
@@ -88,16 +88,10 @@
 	}
 
 	async function loadDashboard() {
-		// Le décompte reprend le réglage par défaut de l'onglet Personnes : personnes retenues, à période de présence actuelle dans le laboratoire.
 		// Le décompte des thèses en cours reprend le filtre « En cours » de l'onglet Thèses.
 		const ongoingTheses = new URLSearchParams({ lab_id: String(labId), doc_type: 'ongoing_thesis', per_page: '1' });
-		const persons = new URLSearchParams({ laboratory: String(labId), exclusion: 'none', per_page: '1' });
-		const [ongoingThesesPage, personsPage] = await Promise.all([
-			api<{ total: number }>(`/api/publications?${ongoingTheses}`, { key: 'lab-ongoing-theses' }),
-			api<{ total: number }>(`/api/persons?${persons}`, { key: 'lab-persons' }),
-		]);
+		const ongoingThesesPage = await api<{ total: number }>(`/api/publications?${ongoingTheses}`, { key: 'lab-ongoing-theses' });
 		ongoingThesesCount = ongoingThesesPage.total;
-		personsCount = personsPage.total;
 		dashboardLoaded = true;
 	}
 
@@ -107,6 +101,7 @@
 			const profileData = await api<LabProfile>(`/api/structures/${labId}`);
 			lab = profileData.structure;
 			thesesCount = profileData.theses_count;
+			membersCount = profileData.members_count;
 			return true;
 		} catch {
 			error = true;
@@ -183,8 +178,8 @@
 											},
 										]
 									: []),
-								...(personsCount > 0
-									? [{ value: formatNumber(personsCount), label: plural(personsCount, 'personne'), icon: User, link: { tab: 'persons' }, hoverColor: 'var(--key-figure-persons)' }]
+								...(membersCount > 0
+									? [{ value: formatNumber(membersCount), label: plural(membersCount, 'personne'), icon: User, link: { tab: 'persons' }, hoverColor: 'var(--key-figure-persons)' }]
 									: []),
 							]
 						: []}
@@ -221,6 +216,7 @@
 		<div class="tab-content">
 			<PersonsListView
 				labId={lab.id}
+				labHasMembers={membersCount > 0}
 				basePath={`/structures/${labId}`}
 				apiKey={`lab-${lab.id}-persons`}
 			/>

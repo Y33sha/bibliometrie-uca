@@ -23,6 +23,7 @@
 	let {
 		apiKey = 'persons-dir',
 		labId,
+		labHasMembers = true,
 		urlSync = true,
 		basePath = '/persons',
 		perPage = 50,
@@ -32,6 +33,8 @@
 		apiKey?: string;
 		/** Contexte labo fixe : restreint l'annuaire aux personnes du laboratoire (période de présence ou contribution), et présélectionne le laboratoire dans la facette Laboratoires. */
 		labId?: number;
+		/** Le laboratoire `labId` compte des personnes à période de présence actuelle. Sinon, la liste s'ouvre sans les présélections Base RH et Laboratoires. */
+		labHasMembers?: boolean;
 		urlSync?: boolean;
 		basePath?: string;
 		perPage?: number;
@@ -48,7 +51,7 @@
 	let listVersion = $state(0);
 
 	// svelte-ignore state_referenced_locally
-	const FILTERS = personFilters(labId);
+	const FILTERS = personFilters(labId, labHasMembers);
 
 	// Décomptes des cases à cocher, et des éléments des filtres de présence (identifiants, éléments à confirmer), servis en deux options « avec » et « sans ».
 	const presenceFacets = Object.fromEntries(

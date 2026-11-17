@@ -6268,6 +6268,11 @@ export interface components {
             forms: components["schemas"]["NameFormOut"][];
             /** Theses Count */
             theses_count: number;
+            /**
+             * Members Count
+             * @description Personnes retenues à période de présence actuelle dans la structure.
+             */
+            members_count: number;
         };
         /** StructureInfo */
         StructureInfo: {

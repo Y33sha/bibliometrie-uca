@@ -36,4 +36,11 @@ describe('personFilters', () => {
 	it("présélectionne le laboratoire de l'onglet d'un laboratoire", () => {
 		expect(initialValues(personFilters(12)).checkbox.labs).toEqual(['12']);
 	});
+
+	it("ne présélectionne ni la base RH ni le laboratoire d'un laboratoire sans personne présente", () => {
+		const values = initialValues(personFilters(12, false));
+		expect(values.checkbox.labs).toEqual([]);
+		expect(values.checkbox.rh).toEqual([]);
+		expect(values.checkbox.exclusion).toEqual(['none']);
+	});
 });
