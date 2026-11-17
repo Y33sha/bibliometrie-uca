@@ -146,6 +146,8 @@ class PublicationFilters:
     """Valeurs `yes` et `no`, combinées en OR. `yes` retient les publications à paiement d'APC imputé au budget d'une structure du périmètre."""
     citation_tops: list[str] = field(default_factory=list)
     """Valeurs de `CitationTop`, combinées en OR."""
+    retracted: list[str] = field(default_factory=list)
+    """Valeurs `yes` et `no`, combinées en OR."""
     country_values: list[str] = field(default_factory=list)
     language_codes: list[str] = field(default_factory=list)
     hal_status_values: list[str] = field(default_factory=list)
@@ -260,6 +262,7 @@ class PublicationsFacetsResponse(Model):
     """Rempli seulement avec `person_id` ou des laboratoires. Une publication compte dans chaque position occupée."""
     source_counts: dict[str, YesNoCount]
     apc: list[FacetOption]
+    retracted: list[FacetOption]
     citation_tops: list[FacetOption]
     """Une publication du top 1 % compte aussi dans le top 10 %."""
     countries: list[FacetOption]

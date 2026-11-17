@@ -436,6 +436,11 @@ def apc_clause(has_apc: list[str], perimeter_structure_ids: list[int]) -> WhereC
     )
 
 
+def retracted_clause(retracted: list[str]) -> WhereClause | None:
+    """Renvoie le filtre `yes` / `no` des publications rétractées (`publications.is_retracted`)."""
+    return _toggle_clause(retracted, "p.is_retracted", {})
+
+
 def in_perimeter_person_clause(
     in_perimeter: list[str], person_id: int | None
 ) -> WhereClause | None:

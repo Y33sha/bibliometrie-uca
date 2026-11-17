@@ -5431,6 +5431,8 @@ export interface components {
             };
             /** Apc */
             apc: components["schemas"]["FacetOption"][];
+            /** Retracted */
+            retracted: components["schemas"]["FacetOption"][];
             /**
              * Citation Tops
              * @description Une publication du top 1 % compte aussi dans le top 10 %.
@@ -6888,6 +6890,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -6943,6 +6946,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -7020,6 +7024,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -7115,6 +7120,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -7172,6 +7178,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -7229,6 +7236,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -7542,6 +7550,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;

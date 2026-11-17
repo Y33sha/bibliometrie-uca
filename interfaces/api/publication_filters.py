@@ -55,6 +55,7 @@ class PublicationFilterParams:
     excluded_doc_type: Annotated[str, Query()] = ""
     has_apc: Annotated[str, Query()] = ""
     citation_top: Annotated[str, Query()] = ""
+    retracted: Annotated[str, Query()] = ""
     country: Annotated[str, Query()] = ""
     language: Annotated[str, Query()] = ""
     partner_ror: Annotated[str, Query()] = ""
@@ -94,6 +95,9 @@ class PublicationFilterParams:
             has_apc=parse_vocabulary_csv(self.has_apc, allowed=TOGGLE_VALUES, param="has_apc"),
             citation_tops=parse_vocabulary_csv(
                 self.citation_top, allowed=frozenset(CitationTop), param="citation_top"
+            ),
+            retracted=parse_vocabulary_csv(
+                self.retracted, allowed=TOGGLE_VALUES, param="retracted"
             ),
             country_values=parse_str_csv(self.country),
             language_codes=parse_str_csv(self.language),
