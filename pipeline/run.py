@@ -14,7 +14,6 @@ import io
 import logging
 import signal
 import sys
-import textwrap
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -24,7 +23,6 @@ from typing import NoReturn, cast
 from domain.pipeline_runs import PhaseStatus
 from domain.sources.registry import Source
 from infrastructure.observability.log import (
-    PHASE_MARKER,
     RUN_END_MARKER,
     RUN_MARKER,
     configure_root_logging,
@@ -39,20 +37,14 @@ from pipeline.ingestion.api_params import request_budget
 from pipeline.ingestion.credentials import source_credentials_missing
 from pipeline.phases import PERIMETER_STRUCTURES, PHASES
 from pipeline.runtime.context import PhaseContext, RunOptions
-from pipeline.runtime.execution import log, phase_context
+from pipeline.runtime.execution import configure_pipeline_log, log, phase_context
 from pipeline.runtime.lock import PipelineAlreadyRunningError, pipeline_lock
 from pipeline.runtime.modes import MODE_NAMES
 from pipeline.runtime.observability.exception_chain import failure_message, is_user_interruption
+from pipeline.runtime.observability.log_format import banner, phase_title, setting
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import set_bar_stream, write_above_bars
 from pipeline.task_runner import run_phase
-
-set_console_writer(write_above_bars)
-set_bar_stream(console_stream())
-
-# Seuil du root logger, destinataire des modules qui appellent `logging.getLogger(__name__)` : les bibliothèques tierces y écrivent trop d'informations pour les laisser passer.
-configure_root_logging(logging.WARNING)
-
 
 PHASE_NAMES = [phase.name for phase in PHASES]
 
@@ -243,98 +235,27 @@ def _select_phases_to_run(args: argparse.Namespace) -> list[Phase]:
     return selected
 
 
-PHASE_TITLE_WIDTH = 48
-"""Largeur du texte dans le cadre d'un titre, la même pour tous."""
-
-
-def _framed(lines: list[str]) -> list[str]:
-    """Encadre `lines`, chacune repliée à la largeur du cadre.
-
-    Un terminal reçoit un cadre de largeur constante, une sortie capturée deux filets horizontaux.
-    """
-    if not sys.stdout.isatty():
-        return ["─" * 40, *lines, "─" * 40]
-
-    wrapped_lines = [
-        wrapped for line in lines for wrapped in textwrap.wrap(line, PHASE_TITLE_WIDTH)
-    ]
-    width = PHASE_TITLE_WIDTH + 4
-    return [
-        f"╔{'═' * width}╗",
-        *[f"║  {line.ljust(width - 2)}║" for line in wrapped_lines],
-        f"╚{'═' * width}╝",
-    ]
-
-
-def _phase_title(name: str, label: str) -> list[str]:
-    """Renvoie les lignes d'ouverture d'une phase : son nom et son libellé."""
-    return _framed([f"{PHASE_MARKER}{name}", label])
-
-
-PIPELINE_TITLE = (
-    "┏┓ ╻┏┓ ╻  ╻┏━┓┏┳┓┏━╸╺┳╸┏━┓╻┏━╸",
-    "┣┻┓┃┣┻┓┃  ┃┃ ┃┃┃┃┣╸  ┃ ┣┳┛┃┣╸",
-    "┗━┛╹┗━┛┗━╸╹┗━┛╹ ╹┗━╸ ╹ ╹┗╸╹┗━╸",
-)
-"""« BIBLIOMETRIE » en caractères de filets, en tête de la bannière d'une exécution."""
-
-_SETTING_KEY_WIDTH = 9
-"""Largeur d'une clé de réglage et de ses points de conduite, dans la bannière."""
-
-
-def _setting(key: str, value: str) -> list[str]:
-    """Renvoie les lignes « clé ···· valeur » de la bannière, la valeur repliée sous elle-même."""
-    head = f"{key} {'·' * (_SETTING_KEY_WIDTH - len(key))} "
-    wrapped = textwrap.wrap(value, PHASE_TITLE_WIDTH - len(head)) or [""]
-    return [head + wrapped[0], *(" " * len(head) + continuation for continuation in wrapped[1:])]
-
-
-def _banner(settings: list[str]) -> list[str]:
-    """Encadre le titre et les réglages d'une exécution, avec une ombre.
-
-    Un terminal reçoit le cadre, au moins aussi large que celui d'une phase. Une sortie capturée reçoit deux filets et le titre en texte.
-    """
-    if not sys.stdout.isatty():
-        return ["─" * 40, "PIPELINE BIBLIOMÉTRIQUE", *settings, "─" * 40]
-
-    settings = [f"  {setting}" for setting in settings]
-    drawing_width = max(map(len, PIPELINE_TITLE))
-    width = max(
-        PHASE_TITLE_WIDTH + 4, drawing_width + 4, *(len(setting) + 2 for setting in settings)
-    )
-    # Un même retrait pour toutes les lignes du dessin : centrées une à une, elles se décaleraient.
-    indent = " " * ((width - drawing_width) // 2)
-    body = ["", *(indent + line for line in PIPELINE_TITLE), "", *settings, ""]
-    tab = "┤ PIPELINE ├"
-    return [
-        f"┌───{tab}{'─' * (width - 3 - len(tab))}┐",
-        *(f"│{line.ljust(width)}│▒" for line in body),
-        f"└{'─' * width}┘▒",
-        f" {'▒' * (width + 2)}",
-    ]
-
-
 def _run_title(args: argparse.Namespace, phases: list[Phase]) -> list[str]:
     """Renvoie les lignes d'ouverture d'une exécution : son mode, puis ses réglages distincts du lancement par défaut."""
-    settings = _setting("mode", args.mode)
+    settings = setting("mode", args.mode)
 
     if args.years:
         first, last = args.years
         if first == last:
-            settings += _setting("année", str(first))
+            settings += setting("année", str(first))
         else:
-            settings += _setting("années", f"{first}-{last}")
+            settings += setting("années", f"{first}-{last}")
 
     if args.only or args.from_phase:
-        settings += _setting("phases", ", ".join(phase.name for phase in phases))
+        settings += setting("phases", ", ".join(phase.name for phase in phases))
     elif args.no_extras:
-        settings += _setting("phases", "sans les enrichissements terminaux")
+        settings += setting("phases", "sans les enrichissements terminaux")
 
     options = [flag.banner for flag in _RUN_FLAGS if flag.banner and getattr(args, flag.dest)]
     if options:
-        settings += _setting("options", ", ".join(options))
+        settings += setting("options", ", ".join(options))
 
-    return _banner(settings)
+    return banner(settings)
 
 
 def _context(options: RunOptions) -> PhaseContext:
@@ -357,7 +278,7 @@ def _run_one_phase(
     try:
         # Ligne vide devant le cadre, pour le séparer de la sortie de la phase précédente.
         log.info("")
-        for line in _phase_title(name, phase.label):
+        for line in phase_title(name, phase.label):
             log.info("%s", line)
         phase_started_at = datetime.datetime.now(datetime.UTC)
         t0_phase = time.time()
@@ -461,7 +382,17 @@ def _execute_phases(options: RunOptions, phases_to_run: list[Phase]) -> None:
     log.info("=" * 60)
 
 
+def _configure_logging() -> None:
+    """Configure les sorties du run : lignes de journal et barres d'avancement sur un même flux console, journal du pipeline, seuil du root logger."""
+    set_console_writer(write_above_bars)
+    set_bar_stream(console_stream())
+    # Le root logger reçoit les lignes des modules qui appellent `logging.getLogger(__name__)` : les bibliothèques tierces y écrivent trop d'informations pour les laisser passer.
+    configure_root_logging(logging.WARNING)
+    configure_pipeline_log()
+
+
 def main() -> None:
+    _configure_logging()
     # Sur une faute de segmentation dans une extension C, `faulthandler` écrit la pile de chaque thread sur la sortie d'erreur. Il exige un vrai descripteur de fichier, absent sous la sortie capturée d'un test.
     with contextlib.suppress(ValueError, io.UnsupportedOperation):
         faulthandler.enable()

@@ -31,8 +31,8 @@ Relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software
 
 ### Phase 4 — Point d'entrée
 
-- [ ] `main()` configure le logger racine et le flux console. L'import de `pipeline/run.py` reste sans effet de bord. Même chose pour le logger de `pipeline/runtime/execution.py`.
-- [ ] Le rendu de la bannière passe de `pipeline/run.py` à `pipeline/runtime/observability/log_format.py`.
+- [x] `main()` configure le logger racine et le flux console. L'import de `pipeline/run.py` reste sans effet de bord. Même chose pour le logger de `pipeline/runtime/execution.py`.
+- [x] Le rendu de la bannière passe de `pipeline/run.py` à `pipeline/runtime/observability/log_format.py`, avec le cadre des phases dont il partage la largeur.
 
 ### Phase 5 — Docstrings
 
