@@ -113,6 +113,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
         columns: [
           { key: "interrogated", label: "Interrogés" },
           { key: "refreshed", label: "Rafraîchis" },
+          { key: "new", label: "Nouveaux" },
           { key: "disappeared", label: "Disparus" },
           { key: "duration_s", label: "Durée", duration: true },
         ],

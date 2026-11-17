@@ -65,6 +65,8 @@ def _summary(metrics: PhaseMetrics) -> dict[str, float | None]:
     return {
         "interrogated": metrics.total,
         "refreshed": metrics.updated,
+        # Document renvoyé sous un autre identifiant natif que celui cherché.
+        "new": metrics.new,
         "unchanged": metrics.unchanged,
         "disappeared": metrics.extras.get("disappeared", 0),
         "duration_s": metrics.duration_s,

@@ -19,8 +19,8 @@ Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy
 
 ### Phase 2 — Observabilité
 
-- [ ] Le `_summary` de `fetch_stale` compte `new` : documents renvoyés sous un autre identifiant natif.
-- [ ] La ligne « Total » s'écrit seulement pour une phase de moissonnage à plusieurs tâches. Pour `fetch_truncated`, elle redit la ligne de bilan de l'unique tâche.
+- [x] Le `_summary` de `fetch_stale` compte `new` : documents renvoyés sous un autre identifiant natif. La table de la phase dans l'administration a sa colonne « Nouveaux ».
+- [x] La ligne « Total » s'écrit seulement quand une phase de moissonnage a exécuté plusieurs tâches. Pour `fetch_truncated`, ou `harvest` restreint à une source, elle redit la ligne de bilan de l'unique tâche. Elle passe de `pipeline/run.py` à `run_phase`, qui connaît les tâches exécutées : une phase sautée perd sa ligne « Total : rien à faire ».
 
 ### Phase 3 — Canaux de `fetch_missing`
 
