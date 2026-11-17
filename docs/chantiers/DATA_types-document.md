@@ -91,7 +91,7 @@ Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur
 - [x] « Rétracté » lu sur `has_retraction`, sans exclusion des avis. 6959cb793
 - [x] Réconciliation : un enregistrement source d'un type exclu n'entre dans aucune partition. Un erratum groupé avec l'article par une clé partagée faisait supprimer la publication de l'article. 9fabea3e9
 - [x] Copie d'un avis Crossref (même DOI, même titre, ou WoS) typée comme l'avis. Un document d'un autre type perd le DOI de l'avis (`AVIS_VS_ARTICLE`) et reçoit le DOI de l'œuvre corrigée, déclaré par l'avis, si son titre est proche. Colonne `source_record_identifiers.added_by`. Oneshot `requeue_notice_orphans` pour les articles détachés. 3664b493a, 7b6cddfaa, 94d99f4eb
-- [x] Mesures du 2026-11-17 : aucune publication d'erratum ou d'avis ; 518 relations vers un avis (439 Crossref, 79 par titre) ; 8 publications rétractées. Les articles détachés ont retrouvé leur publication, sauf 13701 (DOI d'un corrigendum d'un autre article) et 706745, en double par le titre.
+- [x] Mesures du 2026-11-17 : aucune publication d'erratum ou d'avis ; 518 relations vers un avis (439 Crossref, 79 par titre) ; 8 publications rétractées. Les articles détachés ont retrouvé leur publication, sauf deux dépôts HAL à DOI d'avis sans œuvre corrigée déclarée, doublons d'erreurs de HAL : fusionnés à la main (148617 ; 291196, après la priorité de la fusion manuelle sur les clés automatiques dans un pont de la réconciliation).
 - [x] Lien d'accès d'une publication rétractée : « Rétracté » en rouge, vers le DOI de l'avis de rétractation, à défaut celui de la publication ; page et listes.
 - [x] Facette « Rétractation » des publications, avec les filtres de la revue et de l'éditeur.
 
