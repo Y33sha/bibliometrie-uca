@@ -105,6 +105,7 @@ Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur
 
 - [x] Adresses d'en-tête HTTP `Link` recopiées par OpenAlex comme localisations, écartées : profils ORCID, pages de navigation d'entrepôts. 1 694 enregistrements sources en base locale. a82e4423f
 - [x] Règle `DOI_ISBN_CHAPTER_TO_BOOK_CHAPTER` : un enregistrement source `other` à DOI de chapitre (ISBN, `.ch`, un à trois chiffres) devient `book_chapter`. Base locale : 81 publications, chapitres de Wiley. 4af130011
+- [x] Pièces d'un jeu de données : la règle `DATACITE_PACKAGE_PIECE` les fond dans la publication du parent quand DataCite déclare `IsPartOf` (2 175 pièces). Nakala ne déclare pas la collection, sans DOI enregistré, qui réunit parfois une série de conférences : ses pièces restent des publications distinctes (257102).
 
 ### Phase 5 — Résumés de conférence
 
@@ -122,7 +123,6 @@ Mesures du 2026-11-03, publications du périmètre : 1 895 communications rattac
 
 ## Questions ouvertes
 
-- Pièces d'un corpus Nakala (257102) : publications distinctes, ou éléments d'un jeu de données.
 - Films, bandes-annonces et MOOC en `recorded_talk` par la correspondance de HAL `VIDEO` et DataCite `Audiovisual`.
 - « Meeting report » publié en revue, typé `article` par toutes les sources (176417, 180148, 16340) : quel signal pour le typer `conference_abstract` ?
 - Article corrigé ou rétracté absent de la base, cible d'un erratum ou d'un avis du périmètre : moissonnage par DOI (`fetch_missing`) ?
