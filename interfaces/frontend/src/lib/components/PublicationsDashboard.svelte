@@ -3,8 +3,10 @@
 	import Globe from '@lucide/svelte/icons/globe';
 	import GraduationCap from '@lucide/svelte/icons/graduation-cap';
 	import LockOpen from '@lucide/svelte/icons/lock-open';
+	import Maximize2 from '@lucide/svelte/icons/maximize-2';
 	import Star from '@lucide/svelte/icons/star';
 	import type { Snippet } from 'svelte';
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import { api } from '#lib/api/index.js';
 	import type { components } from '#lib/api/schema.js';
 	import KeyFigures, { type KeyFigure } from '#lib/components/KeyFigures.svelte';
@@ -27,6 +29,7 @@
 	type Row = PivotResponse['rows'][number];
 
 	// Dashboard des publications d'une entité, calculé par le moteur de la page Statistiques. Le corpus est celui de l'onglet Publications, restreint à la famille « Publications » et aux années récentes. La répartition par types de documents compte toutes les familles, sur les mêmes années.
+	// Un graphique que la vue Statistiques sait reproduire mène à elle, dans l'onglet Publications de la fiche, avec les filtres du graphique posés.
 	let {
 		context,
 		apiKey,
@@ -198,9 +201,21 @@
 			})),
 	);
 
+	/** Lien vers la vue Statistiques de l'onglet Publications : un indicateur, une comparaison (vide pour « au total »), les types du graphique s'il en restreint, et ses années. */
+	function statsHref(indicator: string, groupBy: string, docTypes: string[] | null): string {
+		const params = new URLSearchParams({ tab: 'publications', view: 'stats', indicator, group_by: groupBy });
+		if (docTypes) params.set('doc_type', docTypes.join(','));
+		if (years.length) params.set('year', years.join(','));
+		return '?' + paramsToQuery(params);
+	}
+
 	const typeValues = $derived(orderedPivotValues('doc_type_grouped', types));
 	const topCountries = $derived(countries ? (collab?.rows ?? []).slice(0, 5) : []);
 </script>
+
+{#snippet statsLink(href: string)}
+	<a class="stats-link" {href} aria-label="Ouvrir dans la vue Statistiques" use:tooltip={'Ouvrir dans la vue Statistiques, filtrable'}><Maximize2 size={13} /></a>
+{/snippet}
 
 {#if !loaded}
 	<div class="loading">Chargement…</div>
@@ -208,12 +223,12 @@
 	<KeyFigures items={keyFigures} {period} />
 	<div class="dash-grid">
 		<div class="dash-card">
-			<h2>Publications par année</h2>
+			<h2 class="with-link">Publications par année{@render statsLink(statsHref(oaBreakdown, 'year', publicationsDocTypes()))}</h2>
 			<StackedBarChart labels={yearLabels} series={accessSeries} />
 		</div>
 		{@render subjects?.()}
 		<div class="dash-card">
-			<h2>Types de documents</h2>
+			<h2 class="with-link">Types de documents{@render statsLink(statsHref('doc_type_grouped', '', null))}</h2>
 			<BarChart
 				labels={typeValues.map((v) => pivotValueLabel('doc_type_grouped', v))}
 				values={typeValues.map((v) => sum(types.filter((r) => r.doc_type_grouped === v)))}
@@ -254,6 +269,24 @@
 {/if}
 
 <style>
+	/* Titre d'un graphique reproductible : l'icône du lien vers la vue Statistiques se range au bout du filet. */
+	.with-link {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.stats-link {
+		display: inline-flex;
+		padding: 3px;
+		margin: -3px 0;
+		border-radius: var(--radius);
+		color: var(--text-faint);
+	}
+	.stats-link:hover {
+		background: var(--hover);
+		color: var(--accent);
+	}
 	.scatter-head {
 		display: flex;
 		align-items: baseline;

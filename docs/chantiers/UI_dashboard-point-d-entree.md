@@ -22,8 +22,10 @@
 
 ### 1. Graphiques déjà reproductibles
 
-- [ ] Publications par année et types de documents : lien vers la vue Statistiques, filtres du dashboard posés.
-- [ ] Captures avant et après des quatre fiches.
+- [x] Publications par année et types de documents : lien vers la vue Statistiques, filtres du dashboard posés.
+  - Le graphique des types compte les thèses en cours, la vue Statistiques les exclut : l'écart vaut leur nombre.
+  - « au total » ne survivait pas à l'URL : une comparaison vide n'y était pas écrite (71a5be26).
+- [x] Captures avant et après des quatre fiches.
 
 ### 2. Évaluation
 
