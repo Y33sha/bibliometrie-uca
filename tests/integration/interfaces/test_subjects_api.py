@@ -167,6 +167,32 @@ class TestGetSubject:
         assert ppn["vocabulary"] == "rameau"
         assert (ppn["ancestors"], ppn["children"]) == ([], [])
 
+    def _nested_same_label(self) -> tuple[str, int, int, int]:
+        """Sème un domaine et un champ OpenAlex de même libellé, un sujet sous le champ et un autre sous le domaine ; renvoie le libellé commun et les trois `id` des nœuds descendants."""
+        same, topic_label, sibling_label = uniq("Social"), uniq("Topic"), uniq("Economics")
+        domain = seed_subject(same, code=uniq("domains/"))
+        field = seed_subject(same, code=uniq("fields/"), level=2, parent_id=domain)
+        topic = seed_subject(topic_label, code=uniq("topics/"), level=3, parent_id=field)
+        sibling = seed_subject(sibling_label, code=uniq("fields/"), level=2, parent_id=domain)
+        _publications(domain, field, topic, sibling)
+        return same, field, topic, sibling
+
+    def test_nested_nodes_of_same_label_appear_once_among_ancestors(self, client):
+        same, _, topic, _ = self._nested_same_label()
+        r = client.get(f"/api/subjects/{_key(topic)}")
+        assert r.status_code == 200
+        [openalex] = r.json()["vocabulary_subjects"]
+        assert [a["label"] for a in openalex["ancestors"]] == [same]
+
+    def test_subject_absent_from_its_own_ancestors_and_children(self, client):
+        same, _, topic, sibling = self._nested_same_label()
+        r = client.get(f"/api/subjects/{normalize_text(same)}")
+        assert r.status_code == 200
+        domain, field = sorted(r.json()["vocabulary_subjects"], key=lambda v: v["level"])
+        assert domain["ancestors"] == field["ancestors"] == []
+        assert [c["label_normalized"] for c in domain["children"]] == [_key(sibling)]
+        assert [c["label_normalized"] for c in field["children"]] == [_key(topic)]
+
     def test_returns_neighbors_and_links_between_neighbors(self, client):
         main, n1, n2 = (seed_subject(uniq(name)) for name in ("Main", "Neighbor1", "Neighbor2"))
         _publications(main, n1, n2, count=2)
