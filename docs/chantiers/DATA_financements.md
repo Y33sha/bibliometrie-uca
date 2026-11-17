@@ -55,7 +55,6 @@ Points à trancher avant de coder :
 - **Financements.** Un référentiel des financements identifiés : financeur, numéro normalisé, acronyme, titre, programme, année. Un code ANR se normalise en `ANR-AA-PROG-NNNN`, sans suffixe de partenaire. Un numéro européen est le numéro de la convention. Les numéros des autres financeurs restent bruts au niveau source.
 - **Liens.** Publication–financeur et publication–financement, avec les sources qui les attestent. Une mention de financeur sans numéro donne seulement le lien au financeur.
 - **Textes libres.** Non lus : ils n'apportent presque rien aux codes ANR.
-- **Nom des tables.** `grants` désigne déjà les droits SQL (`infrastructure/db/grants.py`) : `funders` et `awards` évitent la confusion.
 
 ## Phasage
 
