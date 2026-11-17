@@ -55,7 +55,7 @@ function row(rows: ComparisonRow[], key: string): ComparisonRow {
 
 // Ordre d'affichage des sources, tel que `/api/sources` le sert.
 vi.mock('#lib/api/index.js', () => ({
-	api: async () =>
+	apiOnce: async () =>
 		['hal', 'openalex', 'wos'].map((value) => ({ value, label_fr: value }))
 }));
 
