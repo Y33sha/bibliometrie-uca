@@ -96,7 +96,6 @@
 			<PublicationsDashboard
 				context={{ kind: 'publisher', id: publisherId }}
 				apiKey="publisher-dashboard"
-				countries={false}
 				oaBreakdown="oa_voie"
 			>
 				{#snippet subjects()}

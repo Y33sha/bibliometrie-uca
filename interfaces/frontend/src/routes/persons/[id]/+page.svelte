@@ -233,7 +233,6 @@
 					apiKey="person-detail-dashboard"
 					thesesFigure={false}
 					citationFigure={false}
-					countries={false}
 					figures={thesesCount > 0
 						? [
 								{

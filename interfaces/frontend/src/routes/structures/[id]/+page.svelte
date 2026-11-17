@@ -66,7 +66,7 @@
 		pageParam: 'apage',
 	});
 
-	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les thèses en cours, les personnes rattachées au laboratoire et les sujets. Les pays partenaires cèdent la place au nuage des citations : quatre graphiques au plus.
+	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les thèses en cours, les personnes rattachées au laboratoire et les sujets.
 	let dashboardLoaded = $state(false);
 	let ongoingThesesCount = $state(0);
 
@@ -164,7 +164,6 @@
 					apiKey="lab-dashboard"
 					thesesFigure={false}
 					citationScatter
-					countries={false}
 					figures={dashboardLoaded
 						? [
 								...(ongoingThesesCount > 0

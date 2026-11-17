@@ -150,7 +150,6 @@
 			<PublicationsDashboard
 				context={{ kind: 'serial', id: serialId }}
 				apiKey="serial-dashboard"
-				countries={false}
 				oaBreakdown="oa_voie"
 			>
 				{#snippet subjects()}

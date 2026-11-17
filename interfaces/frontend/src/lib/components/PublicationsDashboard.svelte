@@ -14,8 +14,6 @@
 	import BarChart from '#lib/components/charts/BarChart.svelte';
 	import StackedBarChart from '#lib/components/charts/StackedBarChart.svelte';
 	import YearScatterChart from '#lib/components/charts/YearScatterChart.svelte';
-	import { cssColor } from '#lib/components/charts/cssVar.js';
-	import { countryName } from '#lib/countryNames.js';
 	import { defaultYears } from '#lib/defaultYears.js';
 	import { publicationsDocTypes } from '#lib/docTypes.svelte.js';
 	import { orderedPivotValues, pivotValueColor, pivotValueDescription, pivotValueLabel } from '#lib/pivotValues.js';
@@ -37,7 +35,6 @@
 		thesesFigure = true,
 		citationFigure = true,
 		citationScatter = false,
-		countries = true,
 		oaBreakdown = 'oa_access',
 		figures = [],
 		subjects,
@@ -51,8 +48,6 @@
 		citationFigure?: boolean;
 		/** Affiche le nuage des citations ou du FWCI de chaque publication, par année. */
 		citationScatter?: boolean;
-		/** Affiche les pays partenaires. */
-		countries?: boolean;
 		/** Découpage des publications par année : niveau d'accès, ou modèle open access. */
 		oaBreakdown?: 'oa_access' | 'oa_voie';
 		/** Chiffres clés propres à la page, après ceux du dashboard. */
@@ -233,7 +228,6 @@
 	}
 
 	const typeValues = $derived(orderedPivotValues('doc_type_grouped', types));
-	const topCountries = $derived(countries ? (collab?.rows ?? []).slice(0, 5) : []);
 </script>
 
 {#snippet statsLink(link: TabLink)}
@@ -273,18 +267,6 @@
 					points={scatterPoints}
 					valueLabel={scatterValue === 'citations' ? 'Citations' : 'FWCI'}
 					reference={scatterValue === 'fwci' ? 1 : undefined}
-				/>
-			</div>
-		{/if}
-		{#if topCountries.length}
-			<div class="dash-card">
-				<h2>Pays partenaires</h2>
-				<BarChart
-					labels={topCountries.map((c) => countryName(c.code) ?? c.code.toUpperCase())}
-					values={topCountries.map((c) => c.value)}
-					color={cssColor('doctype-article')}
-					datasetLabel="Publications"
-					horizontal
 				/>
 			</div>
 		{/if}
