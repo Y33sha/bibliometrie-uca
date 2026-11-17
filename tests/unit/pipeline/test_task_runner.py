@@ -205,7 +205,7 @@ def test_une_phase_ecartee_par_sa_condition_le_signale_sans_executer_ses_taches(
         "essai",
         "Essai",
         (tache,),
-        Block.COLLECTION,
+        Block.HARVESTING,
         when=lambda ctx: ctx.options.policy.fetch_stale,
     )
 

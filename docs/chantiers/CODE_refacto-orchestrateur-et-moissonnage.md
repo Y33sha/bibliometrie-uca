@@ -25,7 +25,7 @@ Relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software
 
 ### Phase 3 — Déclaration des phases
 
-- [x] `Phase.harvesting` disparaît au profit de `block is Block.COLLECTION`, vrai pour les mêmes phases.
+- [x] `Phase.harvesting` disparaît au profit de `block is Block.HARVESTING`, vrai pour les mêmes phases.
 - [ ] Les modules de phase exportent leurs étapes et leurs tâches sous un seul nom (`TASKS` ou `STEPS`).
 - [x] `Phase.when` et `Task.when` reçoivent le même argument. Le message d'une phase écartée vaut pour toute condition. « Sautée en mode X » suppose une condition sur le mode : la ligne devient « Sautée », le mode figurant dans la bannière du run.
 

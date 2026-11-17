@@ -303,7 +303,7 @@ def _run_one_phase(
             )
 
         duration = time.time() - t0_phase
-        if phase.block is Block.COLLECTION:
+        if phase.block is Block.HARVESTING:
             log.info("")
             log.info("Total : %s", metrics.as_summary())
         recorder.record(

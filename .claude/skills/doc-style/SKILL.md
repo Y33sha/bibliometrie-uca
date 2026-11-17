@@ -50,7 +50,7 @@ allowed-tools: Read, Edit, Bash, Grep, Glob
 - **Vocabulaire du code.** Employer les mots de la documentation des données (`docs/donnees/`) et du pipeline (`docs/pipeline/01-vue-d-ensemble.md`). « Notice » désigne seulement une notice du Sudoc. `styles/Maison/Lexique.yml` signale les mots écartés hors contexte. Sept mots dépendent du contexte et restent au contrôle manuel :
   - « document », « enregistrement » seul, pour une ligne de `source_records` → « enregistrement source » ;
   - « signature » désigne seulement la chaîne d'adresse ; pour une ligne de `source_contributions` → « contribution source » ;
-  - « extraction » pour la collecte des sources → « moissonnage » ;
+  - « extraction » pour l'interrogation des sources → « moissonnage ». Le moissonnage comprend les phases `fetch_*` ;
   - « agrégat » au sens du DDD → « entité ». Au sens SQL (`COUNT`, `SUM`), le mot reste ;
   - « rapprocher », « rapprochement », « apparier » → « rattacher » (enregistrement source à une publication, à une revue, à un éditeur ; contribution à une personne), « fusionner » (deux entités en une) ;
   - « enrichissement » désigne seulement les phases qui suivent la résolution des entités, dans une description du pipeline ;

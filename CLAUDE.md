@@ -55,7 +55,7 @@
 
 A jour au 2026-11-16. `uv run python -m interfaces.cli.dev.pipeline_tree` affiche l'arborescence complète (blocs, phases, étapes, tâches).
 
-Collecte
+Moissonnage
 `harvest` — Moissonnage par affiliation (HAL, OpenAlex, WoS, ScanR, theses.fr, DataCite, INSPIRE-HEP, OPS)
 `harvest_by_person` — Moissonnage par identifiant des personnes RH (ORCID, idHAL, IdRef)
 `fetch_missing` — Recherche dans chaque source des documents trouvés dans une autre (hal-id, NNT, numéro de brevet, DOI), sources en parallèle

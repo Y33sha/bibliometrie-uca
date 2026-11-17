@@ -166,7 +166,7 @@ def interface(children: Iterable[Step | Task]) -> tuple[frozenset[str], frozense
 class Block(StrEnum):
     """Bloc du premier niveau de l'arborescence du pipeline. Il regroupe les phases à l'affichage, sans effet sur l'exécution."""
 
-    COLLECTION = "Collecte"
+    HARVESTING = "Moissonnage"
     SOURCE_RECORDS = "Enregistrements sources"
     ENTITIES = "Entités"
     DERIVED_DATA = "Données dérivées"

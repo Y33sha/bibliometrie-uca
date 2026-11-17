@@ -6,7 +6,7 @@ Le pipeline moissonne les sources, normalise leurs données, puis déduit les pu
 
 | Notion | Code | Définition |
 |---|---|---|
-| moissonnage | phases `harvest` et `harvest_by_person`, protocole `Harvester` | Collecte des sources |
+| moissonnage | bloc `Block.HARVESTING` : phases `harvest`, `harvest_by_person` et `fetch_*` | Interrogation des sources vers `staging`, sur le périmètre puis par recherches ciblées |
 | bloc | `Block` | Regroupement de phases à l'affichage |
 | phase | `Phase` | Unité du run dans les journaux, l'administration, `--from` et `--only` |
 | étape | `Step` | Regroupement de tâches d'une phase, décrit par une phrase d'entrées → sorties |
@@ -19,7 +19,7 @@ Le module de chaque phase déclare ses étapes et ses tâches. L'arborescence do
 
 Les phases s'exécutent dans cet ordre.
 
-**Collecte** ([page](02-harvest.md))
+**Moissonnage** ([page](02-harvest.md))
 
 - `harvest` interroge les sources sur les affiliations du périmètre.
 - `harvest_by_person` interroge les sources sur les identifiants des personnes du référentiel RH.
