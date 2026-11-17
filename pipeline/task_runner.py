@@ -14,7 +14,12 @@ from itertools import pairwise
 from pipeline.graph import Phase, Step, Task, leaves
 from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import PhaseContext
-from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, nothing_to_do, step
+from pipeline.runtime.observability.log_format import (
+    BRANCH,
+    LAST_BRANCH,
+    nothing_to_do,
+    open_section,
+)
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.parallel import run_parallel
 
@@ -98,18 +103,18 @@ class _Tree:
     def _open(self, section: str | None) -> None:
         """Écrit le titre de `section`, sauf section déjà ouverte ou absente."""
         if section is not None and section != self._opened:
-            step(self._logger, section)
+            open_section(self._logger, section)
             self._opened = section
             self._quiet = True
 
 
 def _sections(children: Sequence[Step | Task]) -> dict[str, str | None]:
-    """Renvoie le titre de section de chaque tâche, par nom de tâche : celui de l'étape de premier niveau qui la contient, à défaut sa `section`."""
+    """Renvoie la section de chaque tâche, par nom de tâche : celle de l'étape de premier niveau qui la contient, à défaut la sienne."""
     sections: dict[str, str | None] = {}
     for child in children:
-        label = child.label if isinstance(child, Step) else None
+        step_section = child.section if isinstance(child, Step) else None
         for task in leaves((child,)):
-            sections[task.name] = label if label is not None else task.section
+            sections[task.name] = step_section if step_section is not None else task.section
     return sections
 
 

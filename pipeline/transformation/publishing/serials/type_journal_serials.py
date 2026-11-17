@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishing` : typage en revue des entrées de type inconnu contenant surtout des articles.
+"""Tâche de la phase `publishing` : typage en revue des entrées de type inconnu contenant surtout des articles.
 
 Une entrée de type `unknown` est une revue quand la majorité stricte de ses enregistrements sources sont des articles, d'après leur type brut, toutes sources confondues (`domain/serials/containers.py`). Le typage en recueil d'actes passe avant.
 """
@@ -18,7 +18,7 @@ from pipeline.transformation.publishing.serials.type_proceedings_serials import 
 )
 
 LABEL = "Typage des revues"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 
 def run_type_journal_serials(conn: Connection, logger: logging.Logger) -> PhaseMetrics:

@@ -1,6 +1,6 @@
-"""Écriture par lots des corrections de métadonnées, commune aux sous-étapes.
+"""Écriture par lots des corrections de métadonnées, commune aux tâches.
 
-Chaque sous-étape calcule ses mises à jour, puis les écrit avec un commit par lot : un run interrompu garde les lots écrits, et le journal de transactions reste borné.
+Chaque tâche calcule ses mises à jour, puis les écrit avec un commit par lot : un run interrompu garde les lots écrits, et le journal de transactions reste borné.
 """
 
 from collections.abc import Callable

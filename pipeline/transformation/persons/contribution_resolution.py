@@ -52,8 +52,8 @@ from pipeline.runtime.observability.log_format import (
     LAST_BRANCH,
     breakdown,
     inflect,
+    open_section,
     quantity,
-    step,
 )
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger
 from pipeline.runtime.observability.progress import Progress, track_progress, waiting
@@ -572,7 +572,7 @@ def resolve_contributions(
             decisions |= batch_decisions
     _log_identified(logger, decisions, pinned)
 
-    step(logger, "Création de nouvelles personnes")
+    open_section(logger, "Création de nouvelles personnes")
     undecidable = sum(1 for d in unidentified if d.outcome == ContributionOutcome.SKIP)
     creations = sum(1 for d in decisions.values() if d.outcome == ContributionOutcome.CREATE)
     logger.info(

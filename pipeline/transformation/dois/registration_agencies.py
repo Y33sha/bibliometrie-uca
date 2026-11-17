@@ -21,8 +21,8 @@ from pipeline.runtime.observability.log_format import (
     LAST_BRANCH,
     inflect,
     nothing_to_do,
+    open_section,
     quantity,
-    step,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
@@ -60,7 +60,7 @@ def resolve(
         for prefix in prefix_store.get_prefixes_to_resolve()
         if str(DoiPrefix.try_parse(prefix)) == prefix
     ]
-    step(log, "Agences d'enregistrement des préfixes DOI")
+    open_section(log, "Agences d'enregistrement des préfixes DOI")
     if not prefixes:
         nothing_to_do(log)
     else:

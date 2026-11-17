@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `finalize` : suppression des éditeurs vides.
+"""Tâche de la phase `finalize` : suppression des éditeurs vides.
 
 Un éditeur vide n'a ni revue, ni monographie, ni enregistrement source, ni publication, ni préfixe DOI, ni paiement APC. Les formes de nom de l'éditeur supprimé sont supprimées avec lui. Le journal garde le nom de chaque éditeur supprimé.
 """
@@ -11,7 +11,7 @@ from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 LABEL = "Éditeurs vides"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 _DELETE_EMPTY_PUBLISHERS = text("""
     DELETE FROM publishers p

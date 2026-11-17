@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishing` : rattachement des enregistrements sources à leur éditeur.
+"""Tâche de la phase `publishing` : rattachement des enregistrements sources à leur éditeur.
 
 Le rattachement se calcule sur tous les enregistrements sources qui nomment un éditeur (`biblio.publisher`, `biblio.publisher_openalex_id`), selon `domain.publishers.attachment`. Une production hébergée sans être publiée reste sans éditeur (`source_record_has_publisher`), d'après son type de document d'avant correction et la série ou le volume décrits. Les éditeurs nouveaux sont créés avec leurs formes de nom. Un enregistrement source qui change d'éditeur est marqué pour la réconciliation.
 """
@@ -22,7 +22,7 @@ from pipeline.transformation.publishing.publishers.store import PublisherStore
 from pipeline.transformation.publishing.source_record_links import changed_links, write_links
 
 LABEL = "Rattachement des enregistrements sources aux éditeurs"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 _RECORDS = text(f"""
     SELECT id, source, publisher_id,

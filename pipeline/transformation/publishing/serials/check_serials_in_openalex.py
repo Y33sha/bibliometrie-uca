@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishing` : métadonnées des revues dans OpenAlex.
+"""Tâche de la phase `publishing` : métadonnées des revues dans OpenAlex.
 
 Sont cherchées les métadonnées des revues jamais cherchées, ou cherchées depuis plus de `serial_openalex_recheck_after_days` jours. Une revue à ISSN prend la source OpenAlex de ses ISSN, celle qui a le plus de works quand ses ISSN en désignent plusieurs. Une revue sans ISSN prend la source la plus fréquente parmi ses enregistrements sources OpenAlex sans ISSN. La recherche pose l'identifiant OpenAlex de la revue et son type s'il est inconnu. Elle réécrit ses appartenances aux listes de `serial_lists`. Une source retenue par plusieurs revues donne son identifiant à celle qui a le plus de publications, et ses listes à toutes.
 
@@ -25,7 +25,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
 
 LABEL = "Métadonnées des revues dans OpenAlex"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 FetchSources = Callable[[SourceFilter, Sequence[str]], list[OpenAlexSource] | None]
 """`(filtre, valeurs) -> sources` : sources OpenAlex d'un lot d'ISSN ou d'identifiants, `None` si la requête échoue."""

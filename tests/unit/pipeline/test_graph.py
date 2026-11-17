@@ -25,13 +25,13 @@ def test_noms_uniques():
     assert len(names) == len(set(names))
 
 
-def test_une_tache_placee_dans_une_etape_titree_ecrit_sous_le_titre_de_l_etape():
-    """La `section` d'une tâche placée dans une étape titrée serait ignorée par l'exécuteur."""
+def test_une_tache_placee_dans_une_etape_a_section_ecrit_sous_la_section_de_l_etape():
+    """La `section` d'une tâche placée dans une étape à section serait ignorée par l'exécuteur."""
     in_steps = [
         task.name
         for phase in PHASES
         for child in phase.children
-        if isinstance(child, Step) and child.label is not None
+        if isinstance(child, Step) and child.section is not None
         for task in child.tasks
         if task.section is not None
     ]

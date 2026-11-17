@@ -1,4 +1,4 @@
-"""Sous-étape `doi_targets` de la phase `metadata_correction` : cible du DOI des formes secondaires.
+"""Tâche `doi_targets` de la phase `metadata_correction` : cible du DOI des formes secondaires.
 
 Le DOI d'une forme secondaire DataCite a pour cible le DOI de l'œuvre principale présente en base :
 
@@ -6,7 +6,7 @@ Le DOI d'une forme secondaire DataCite a pour cible le DOI de l'œuvre principal
 - forme variante ou copie d'entrepôt → version publiée (`IsVariantFormOf`) ;
 - pièce d'un dataset → dataset parent (`IsPartOf`, ou collection figshare de même titre pour un fichier complémentaire figshare).
 
-Un DOI à suffixe de version sans cible déclarée a pour cible sa forme sans version, si c'est le DOI `primary` ou `derived` d'un enregistrement source. Sinon, sa cible est sa version la plus récente en base. La cible tient lieu du DOI pour tous les enregistrements sources ayant ce DOI. La sous-étape `matchable` écarte de la réconciliation l'enregistrement source DataCite de la forme secondaire.
+Un DOI à suffixe de version sans cible déclarée a pour cible sa forme sans version, si c'est le DOI `primary` ou `derived` d'un enregistrement source. Sinon, sa cible est sa version la plus récente en base. La cible tient lieu du DOI pour tous les enregistrements sources ayant ce DOI. La tâche `matchable` écarte de la réconciliation l'enregistrement source DataCite de la forme secondaire.
 
 La table `doi_targets` est réécrite à chaque passage : une relation disparue, ou une cible sortie de la base, retire la cible.
 """

@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishing` : calcul des espaces de noms DOI des revues.
+"""Tâche de la phase `publishing` : calcul des espaces de noms DOI des revues.
 
 Les couples (DOI, revue) des enregistrements sources de toutes les sources désignent les espaces de noms (`domain/serials/doi_namespaces.py`). La table `serial_doi_namespaces` est recalculée en entier à chaque passage.
 """
@@ -18,7 +18,7 @@ from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 LABEL = "Espaces de noms DOI"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 
 class DoiSerialRow(NamedTuple):

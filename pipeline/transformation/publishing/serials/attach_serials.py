@@ -1,4 +1,4 @@
-"""Sous-étapes de la phase `publishing` : ISSN des séries, rattachement des enregistrements sources à leur revue.
+"""Tâches de la phase `publishing` : ISSN des séries, rattachement des enregistrements sources à leur revue.
 
 `sync_issns` donne une ligne de `serial_issns` à chaque ISSN valide d'une série (`biblio.journal`), à vérifier dans le Sudoc.
 
@@ -46,10 +46,10 @@ from pipeline.transformation.publishing.serials.store import SerialStore
 from pipeline.transformation.publishing.source_record_links import write_links
 
 SYNC_LABEL = "ISSN des séries"
-"""Libellé de la sous-étape `sync_issns` dans le journal de la phase."""
+"""Libellé de la tâche `sync_issns` dans le journal de la phase."""
 
 ATTACH_LABEL = "Rattachement des enregistrements sources aux publications en série"
-"""Libellé de la sous-étape `attach_serials` dans le journal de la phase."""
+"""Libellé de la tâche `attach_serials` dans le journal de la phase."""
 
 _SERIES = text(f"""
     SELECT id, source, publication_id, publisher_id, biblio,

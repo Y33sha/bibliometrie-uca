@@ -1,4 +1,4 @@
-"""Sous-étape des cooccurrences de la phase `subjects` : recalcul de `usage_count` et rafraîchissement des vues `subject_labels` et `subject_cooccurrences`."""
+"""Tâche des cooccurrences de la phase `subjects` : recalcul de `usage_count` et rafraîchissement des vues `subject_labels` et `subject_cooccurrences`."""
 
 import logging
 

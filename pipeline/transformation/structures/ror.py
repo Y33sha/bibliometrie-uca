@@ -23,7 +23,7 @@ from infrastructure.db.tables import (
 )
 from pipeline.http.dump_download import DumpUnavailableError
 from pipeline.ingestion.complements.ror import ZenodoRorDumpSource, dump_version
-from pipeline.runtime.observability.log_format import LAST_BRANCH, step
+from pipeline.runtime.observability.log_format import LAST_BRANCH, open_section
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unavailable
 
@@ -151,7 +151,7 @@ def run_refresh_ror(
         metrics.details["ror"] = {"version": version, "imported": False}
         return metrics
 
-    step(logger, "Référentiel ROR")
+    open_section(logger, "Référentiel ROR")
     last = store.last_imported_version()
     published = source.published_version()
     if last and published and dump_version(last) == published:

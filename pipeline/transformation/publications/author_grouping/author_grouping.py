@@ -28,7 +28,12 @@ from domain.contributions.author_grouping import (
 from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.cpu import available_cpus
-from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do, quantity, step
+from pipeline.runtime.observability.log_format import (
+    LAST_BRANCH,
+    nothing_to_do,
+    open_section,
+    quantity,
+)
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress, waiting
 from pipeline.transformation.publications.author_grouping.store import (
@@ -255,10 +260,10 @@ def build_contributions(
     if rebuild:
         marked = store.mark_all()
         conn.commit()
-        step(logger, "%s marquées à réaligner", quantity(marked, "publication"))
+        open_section(logger, "%s marquées à réaligner", quantity(marked, "publication"))
     dirty = store.snapshot_queued_publications()
     publication_ids = [publication_id for publication_id, _ in dirty]
-    step(logger, "auteurs à aligner dans %s", quantity(len(publication_ids), "publication"))
+    open_section(logger, "auteurs à aligner dans %s", quantity(len(publication_ids), "publication"))
     if not publication_ids:
         store.delete_processed_marks()
         store.drop_snapshot()
@@ -280,7 +285,7 @@ def build_contributions(
     # Marquages relevés des publications supprimées.
     store.delete_processed_marks()
     store.drop_snapshot()
-    step(logger, "Recouvrement des listes d'auteurs")
+    open_section(logger, "Recouvrement des listes d'auteurs")
     t0 = time.perf_counter()
     with waiting(LAST_BRANCH, logger) as line:
         store.refresh_alignment()
@@ -304,7 +309,7 @@ def _build(ctx: PhaseContext) -> PhaseMetrics:
 
 def _attributes(ctx: PhaseContext) -> PhaseMetrics:
     """Recalcule les attributs des contributions en file. Les attributs ont leur propre file : l'affiliation d'une contribution source change sans changer sa contribution."""
-    step(ctx.logger, "Attributs des contributions")
+    open_section(ctx.logger, "Attributs des contributions")
     t0 = time.perf_counter()
     with (
         waiting(f"{LAST_BRANCH}en cours", ctx.logger) as line,

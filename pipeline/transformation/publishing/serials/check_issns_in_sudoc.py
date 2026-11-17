@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishing` : vérification des ISSN dans le Sudoc.
+"""Tâche de la phase `publishing` : vérification des ISSN dans le Sudoc.
 
 Sont vérifiés les ISSN de `serial_issns` jamais vérifiés. La notice Sudoc de chaque ISSN donne son support, son statut et son titre, ceux de ses ISSN annulés, et ses liens vers d'autres ISSN (`read_sudoc_record`). Les ISSN de la même publication sur un autre support reçoivent leur ligne, vérifiée au run suivant. `attach_serials` en dérive le titre de chaque revue.
 
@@ -24,7 +24,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
 
 LABEL = "Vérification des ISSN dans le Sudoc"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 COMMIT_EVERY = 10
 """Lots d'ISSN par commit."""

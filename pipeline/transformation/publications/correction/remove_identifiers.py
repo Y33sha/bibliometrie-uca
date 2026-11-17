@@ -1,4 +1,4 @@
-"""Sous-étape `remove_identifiers` de la phase `metadata_correction` : retrait d'identifiants par groupe d'enregistrements sources de même DOI. Un groupe réunit les enregistrements sources ayant son DOI dans `source_record_identifiers`, de rôle autre que `related`. Un enregistrement source appartient à un groupe par DOI.
+"""Tâche `remove_identifiers` de la phase `metadata_correction` : retrait d'identifiants par groupe d'enregistrements sources de même DOI. Un groupe réunit les enregistrements sources ayant son DOI dans `source_record_identifiers`, de rôle autre que `related`. Un enregistrement source appartient à un groupe par DOI.
 
 Un DOI partagé par des œuvres distinctes (ouvrage et chapitre, chapitres de titres différents, volume d'actes et communication, numéro de revue et article, avis et article, enregistrement source d'une autre œuvre) est retiré du ou des mauvais côtés. Sinon, la réconciliation fusionnerait ces œuvres. Un enregistrement source qui détient le DOI en `primary` ou `derived` le garde. Un DOI à cible dans `doi_targets` est celui d'une forme secondaire : aucun membre de son groupe ne le perd. Un DOI inconnu de doi.org est retiré de tous les enregistrements sources qui le citent.
 
@@ -6,7 +6,7 @@ Un document qui porte le DOI d'un erratum ou d'un avis Crossref le perd, et reç
 
 Quand une partie du groupe perd le DOI, les enregistrements sources qui le gardent perdent les clés de confirmation partagées avec ceux qui le perdent. Exemple : le dépôt HAL d'une communication, recopié par l'enregistrement source OpenAlex du volume d'actes. Le cas de chaque identifiant retiré, DOI compris, est inscrit dans `source_record_identifiers.removed_by`.
 
-Les types lus sont ceux corrigés par la sous-étape unaire. Chaque passage repart de tous les identifiants : un enregistrement source à conflit disparu retrouve ses identifiants au run suivant.
+Les types lus sont ceux corrigés par la tâche unaire. Chaque passage repart de tous les identifiants : un enregistrement source à conflit disparu retrouve ses identifiants au run suivant.
 """
 
 import logging
@@ -44,16 +44,16 @@ from pipeline.transformation.publications.correction.correction_store import (
 )
 
 CLUSTER_IDENTIFIER_RULES = frozenset(case.value for case in DoiClusterCase)
-"""Règles de retrait d'identifiants de la sous-étape : les cas de `DoiClusterCase`."""
+"""Règles de retrait d'identifiants de la tâche : les cas de `DoiClusterCase`."""
 
 
 def _source_identifiers(row: DoiClusterRow) -> tuple[SourceIdentifier, ...]:
-    """Renvoie les identifiants de l'enregistrement source, hors ceux ajoutés par cette sous-étape."""
+    """Renvoie les identifiants de l'enregistrement source, hors ceux ajoutés par cette tâche."""
     return tuple(i for i in row.identifiers if i.added_by not in CLUSTER_IDENTIFIER_RULES)
 
 
 def _base_identifiers(row: DoiClusterRow) -> list[SourceIdentifier]:
-    """Renvoie les identifiants de l'enregistrement source laissés actifs par l'étape unaire, avant cette sous-étape."""
+    """Renvoie les identifiants de l'enregistrement source laissés actifs par l'étape unaire, avant cette tâche."""
     return active(with_removals(_source_identifiers(row), CLUSTER_IDENTIFIER_RULES, {}))
 
 

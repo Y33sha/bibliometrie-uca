@@ -146,7 +146,7 @@ def test_une_etape_de_premier_niveau_donne_le_titre_de_section_de_ses_taches(con
             "revues",
             "ISSN → revues",
             (Step("issn", "ISSN → ISSN-L", (tache("sync"), tache("sudoc"))), tache("attach")),
-            label="Revues",
+            section="Revues",
         ),
         Step("editeurs", "noms → éditeurs", (tache("editeurs", section="Éditeurs"),)),
     )

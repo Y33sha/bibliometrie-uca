@@ -1,4 +1,4 @@
-"""Sous-étape `serial_by_doi` de la phase `metadata_correction` : rattachement de la revue manquante par l'espace de noms des DOI (`attach_serial_by_doi`), d'après la table `serial_doi_namespaces`."""
+"""Tâche `serial_by_doi` de la phase `metadata_correction` : rattachement de la revue manquante par l'espace de noms des DOI (`attach_serial_by_doi`), d'après la table `serial_doi_namespaces`."""
 
 import logging
 from collections.abc import Mapping, Sequence

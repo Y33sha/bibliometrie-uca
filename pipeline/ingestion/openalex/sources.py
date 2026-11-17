@@ -1,6 +1,6 @@
 """Client OpenAlex des sources et des listes de revues.
 
-`/sources` reçoit des lots d'ISSN ou d'identifiants, en filtre à `|` de `SOURCES_BATCH` valeurs au plus. Les requêtes passent par `http_request_with_retry` : nouvelles tentatives, backoff et circuit-breaker de la source. La sous-étape cliente reçoit seulement les fonctions de requête, et consulte l'état du circuit-breaker.
+`/sources` reçoit des lots d'ISSN ou d'identifiants, en filtre à `|` de `SOURCES_BATCH` valeurs au plus. Les requêtes passent par `http_request_with_retry` : nouvelles tentatives, backoff et circuit-breaker de la source. La tâche cliente reçoit seulement les fonctions de requête, et consulte l'état du circuit-breaker.
 """
 
 from __future__ import annotations

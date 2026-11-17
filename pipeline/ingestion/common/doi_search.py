@@ -38,7 +38,7 @@ def get_missing_dois(
 ) -> list[str]:
     """Renvoie les DOI à chercher dans la cible : DOI des publications du périmètre absents de la cible, nettoyés et sans doublon.
 
-    Les candidats viennent de la vue `candidate_dois` : DOI des enregistrements sources, cibles des relations entre publications, DOI DataCite déduits des identifiants arXiv. La forme sans version de chaque DOI à suffixe de version s'ajoute aux candidats. Quand elle existe, elle devient la cible des versions (sous-étape `doi_targets`). Le périmètre est celui du run précédent ; les DOI des enregistrements sources créés pendant le run attendent le run suivant.
+    Les candidats viennent de la vue `candidate_dois` : DOI des enregistrements sources, cibles des relations entre publications, DOI DataCite déduits des identifiants arXiv. La forme sans version de chaque DOI à suffixe de version s'ajoute aux candidats. Quand elle existe, elle devient la cible des versions (tâche `doi_targets`). Le périmètre est celui du run précédent ; les DOI des enregistrements sources créés pendant le run attendent le run suivant.
 
     Un DOI est absent de la cible s'il manque à son `staging` et à tous les DOI de ses enregistrements sources, DOI retirés par la correction compris : une source renvoie un même document pour chacun de ses DOI.
 

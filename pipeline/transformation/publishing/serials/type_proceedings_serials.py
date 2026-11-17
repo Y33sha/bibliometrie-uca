@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishing` : typage des recueils d'actes.
+"""Tâche de la phase `publishing` : typage des recueils d'actes.
 
 Une revue est un recueil d'actes dans les cas suivants (`domain/serials/containers.py`) :
 
@@ -26,7 +26,7 @@ from pipeline.transformation.publishing.serials.serial_label import serial_label
 from pipeline.transformation.publishing.serials.store import TYPE_NOT_MANUAL, SerialStore
 
 LABEL = "Typage des recueils d'actes"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 _BY_RECORDS = "articles de congrès"
 _BY_DATED_TITLE = "titre daté"

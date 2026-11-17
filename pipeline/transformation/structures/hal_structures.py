@@ -16,7 +16,7 @@ from infrastructure.db.queues import Queue, enqueue
 from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
 from pipeline.ingestion.hal.api import HAL_STRUCTURES_BATCH
 from pipeline.ingestion.hal.structures import HalStructure, parse_hal_structure
-from pipeline.runtime.observability.log_format import LAST_BRANCH, step
+from pipeline.runtime.observability.log_format import LAST_BRANCH, open_section
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
 
@@ -299,7 +299,7 @@ def run_refresh_hal_structures(
 ) -> PhaseMetrics:
     """Charge les structures à lire, puis reconstruit les relations, y compris quand HAL devient inaccessible."""
     metrics = PhaseMetrics()
-    step(logger, "Référentiel des structures HAL")
+    open_section(logger, "Référentiel des structures HAL")
     ids = store.ids_to_fetch(refresh_stale=refresh_stale)
     if not ids:
         logger.info("%sAucune structure à charger", LAST_BRANCH)

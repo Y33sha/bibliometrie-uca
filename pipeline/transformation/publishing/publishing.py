@@ -82,7 +82,7 @@ _IDENTIFIED: dict[str, Callable[[PhaseMetrics], int]] = {
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques de la phase : celles des tâches, dans l'ordre de leur exécution, et la table d'observabilité."""
     metrics = PhaseMetrics()
-    # Les compteurs et signaux des sous-étapes remontent à la phase : une source coupée la fait passer en avertissement.
+    # Les compteurs et signaux des tâches remontent à la phase : une source coupée la fait passer en avertissement.
     for sub in by_task.values():
         metrics.merge(sub)
 
@@ -97,7 +97,7 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
             for name, identified in _IDENTIFIED.items()
         ]
     }
-    # DOAJ : ligne à part (sous-étape conditionnelle, métrique propre).
+    # DOAJ : ligne à part (tâche conditionnelle, métrique propre).
     metrics.details["summary"] = {
         "doaj_matched": by_task["enrich_serials_from_doaj"].extras.get("matched", 0)
     }
@@ -594,13 +594,13 @@ STEPS = (
         "doi_prefixes",
         "préfixes DOI → éditeur titulaire de chaque préfixe, agence du préfixe inconnu de doi.org",
         (_RESOLVE_CROSSREF_PUBLISHERS, _RESOLVE_DATACITE_PUBLISHERS),
-        label="Préfixes DOI",
+        section="Préfixes DOI",
     ),
     Step(
         "publishers",
         "noms d'éditeur des enregistrements sources → éditeur de chaque enregistrement source, sans doublon",
         (_ATTACH_PUBLISHERS, _MERGE_DUPLICATE_PUBLISHERS),
-        label="Éditeurs",
+        section="Éditeurs",
     ),
     Step(
         "serials",
@@ -624,12 +624,12 @@ STEPS = (
             ),
             _LEARN_SERIAL_DOI_NAMESPACES,
         ),
-        label="Publications en série",
+        section="Publications en série",
     ),
     Step(
         "monographs",
         "ISBN et titres des enregistrements sources → monographie de chaque enregistrement source, rattachée à sa collection, typée",
         (_ATTACH_MONOGRAPHS, _LINK_MONOGRAPHS_TO_COLLECTIONS, _TYPE_PROCEEDINGS_VOLUMES),
-        label="Monographies",
+        section="Monographies",
     ),
 )

@@ -317,7 +317,7 @@ STEPS = (
                 label="Adresses orphelines",
             ),
         ),
-        label="Maintenance des tables",
+        section="Maintenance des tables",
     ),
 )
 

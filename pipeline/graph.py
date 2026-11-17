@@ -44,7 +44,7 @@ class Task:
     parallel_group: str | None = None
     """Groupe de tâches consécutives exécutées en parallèle, une file par source, nommé dans sa phase."""
     section: str | None = None
-    """Titre de la sous-étape ouverte par une tâche placée hors d'une étape. `None` : la tâche écrit sous le titre courant."""
+    """Section de la tâche au journal, hors d'une étape de premier niveau qui en a une. `None` : la tâche écrit sous la section courante."""
     label: str | None = None
     """Libellé de la ligne de bilan. `None` : la tâche écrit elle-même ses lignes."""
     threshold: int = DEFAULT_THRESHOLD
@@ -136,8 +136,8 @@ class Step:
     summary: str
     """Entrées → sorties de l'étape."""
     children: tuple[Step | Task, ...]
-    label: str | None = None
-    """Titre de section au journal des tâches d'une étape de premier niveau. `None` : chaque tâche écrit sous sa `section` ou sous son propre titre."""
+    section: str | None = None
+    """Section des tâches d'une étape de premier niveau, au journal. `None` : chaque tâche écrit sous sa propre `section`."""
 
     @property
     def tasks(self) -> tuple[Task, ...]:

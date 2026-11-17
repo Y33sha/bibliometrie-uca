@@ -1,4 +1,4 @@
-"""Seconde sous-étape de la phase `subjects`, après l'ingestion des liens `publication_subjects` : recalcul des données dérivées de ces liens.
+"""Seconde tâche de la phase `subjects`, après l'ingestion des liens `publication_subjects` : recalcul des données dérivées de ces liens.
 
 - `subjects.usage_count` : nombre de publications distinctes par sujet.
 - `subject_labels` : vue matérialisée des sujets regroupés par libellé normalisé, tous vocabulaires confondus, avec leur nombre de publications.

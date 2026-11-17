@@ -45,7 +45,7 @@ from pipeline.runtime.observability.signals import (
 from pipeline.transformation.publishing.serials.store import OA_MODEL_NOT_MANUAL, TYPE_NOT_MANUAL
 
 LABEL = "Import du DOAJ"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 ISSN_KEYS = (
     "Journal ISSN (print version)",

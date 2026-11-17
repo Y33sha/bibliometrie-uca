@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `finalize` : suppression des revues vides.
+"""Tâche de la phase `finalize` : suppression des revues vides.
 
 Une revue vide n'a ni enregistrement source, ni publication, ni monographie, ni paiement APC. Une revue vide reste quand l'un de ses ISSN est cité par la série d'un enregistrement source : supprimée, elle serait recréée au passage suivant. Elle reste aussi quand l'un de ses ISSN est relié à un autre par un lien entre titres ou entre revue principale et supplément. Les lignes d'ISSN d'une revue supprimée restent, sans revue. Le journal garde le titre et l'éditeur de chaque revue supprimée.
 """
@@ -13,7 +13,7 @@ from pipeline.transformation.publishing.serials.serial_label import serial_label
 from pipeline.transformation.publishing.serials.store import SerialSummary
 
 LABEL = "Publications en série vides"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 _EMPTY_SERIALS = text("""
     WITH cited AS (

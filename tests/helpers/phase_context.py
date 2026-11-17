@@ -26,7 +26,7 @@ class FakeConnection:
 class FakeOpenTransaction:
     """Doublure de `OpenTransaction` : chaque appel ouvre une transaction sur la même connexion.
 
-    Le nombre de transactions ouvertes est retenu : un test vérifie ainsi qu'une phase isole ses sous-étapes dans des transactions distinctes.
+    Le nombre de transactions ouvertes est retenu : un test vérifie ainsi qu'une phase isole ses tâches dans des transactions distinctes.
     """
 
     def __init__(self) -> None:

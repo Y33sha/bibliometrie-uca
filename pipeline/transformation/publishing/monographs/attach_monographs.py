@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishing` : rattachement des enregistrements sources à leur monographie.
+"""Tâche de la phase `publishing` : rattachement des enregistrements sources à leur monographie.
 
 Le rattachement se calcule sur tous les enregistrements sources qui décrivent un volume (`biblio.monograph`), selon `domain.monographs.attachment`. Chaque volume reprend sa monographie existante. Plusieurs monographies existantes d'un même volume fusionnent dans la plus ancienne. Un volume sans monographie existante en crée une. La monographie reçoit les champs qui lui manquent. Un enregistrement source hors de tout volume perd sa monographie. Un enregistrement source qui change de monographie est marqué pour la réconciliation.
 """
@@ -16,7 +16,7 @@ from pipeline.transformation.publishing.monographs.store import MonographStore
 from pipeline.transformation.publishing.source_record_links import changed_links, write_links
 
 LABEL = "Rattachement des enregistrements sources aux monographies"
-"""Libellé de la sous-étape dans le journal de la phase."""
+"""Libellé de la tâche dans le journal de la phase."""
 
 _RECORDS = text("""
     SELECT id, monograph_id, publisher_id, biblio

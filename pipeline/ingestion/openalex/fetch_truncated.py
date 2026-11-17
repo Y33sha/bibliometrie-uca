@@ -23,7 +23,7 @@ from pipeline.ingestion.openalex.api import fetch_work
 from pipeline.ingestion.openalex.fields import extract_openalex_id
 from pipeline.ingestion.openalex.payload import BULK_AUTHORSHIPS_CAP
 from pipeline.runtime.context import PhaseContext
-from pipeline.runtime.observability.log_format import inflect, quantity, step
+from pipeline.runtime.observability.log_format import inflect, open_section, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 """Plafond OpenAlex 10 req/s."""
@@ -61,7 +61,7 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
     truncated = list(conn.execute(_SELECT_TRUNCATED_SQL).scalars())
     if not truncated:
         return PhaseMetrics()
-    step(
+    open_section(
         log,
         "%s de %d auteurs, potentiellement %s",
         quantity(len(truncated), "document"),
