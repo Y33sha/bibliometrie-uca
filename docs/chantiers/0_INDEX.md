@@ -9,7 +9,7 @@
 
 ### Non commencé
 
-- [Facettes du dashboard](UI_facettes-du-dashboard.md)
+- [Dashboard, point d'entrée de la vue Statistiques](UI_dashboard-point-d-entree.md)
 - [Financements](DATA_financements.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Refactorisation : fin du moissonnage](CODE_refacto-fin-du-moissonnage.md)
