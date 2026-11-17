@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { tooltip } from '#lib/actions/tooltip.svelte.js';
 	import { formatNumber } from '#lib/utils.js';
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
@@ -102,7 +101,6 @@
 			<th>Identifiants</th>
 			<th>{columnLabels.type}</th>
 			<th>{columnLabels.country}</th>
-			<th>Préfixes DOI</th>
 			<th class="num sortable" onclick={() => setSort('serials')}>
 				Publications en série <SortChevron direction={sortDirection(list.sort, 'serials')} />
 			</th>
@@ -131,20 +129,13 @@
 				</td>
 				<td class="muted">{publisherTypeLabel(p.publisher_type)}</td>
 				<td class="muted">{p.country?.toUpperCase() ?? ''}</td>
-				<td>
-					<div class="tag-list">
-						{#each p.doi_prefixes as dp (dp.prefix)}
-							<span class="tag id-badge" use:tooltip={`RA : ${dp.ra}${dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}`}>{dp.prefix}</span>
-						{/each}
-					</div>
-				</td>
 				<!-- Un décompte non nul mène à l'onglet correspondant de la fiche. -->
 				<td class="num">{#if p.serial_count}<a href={resolve(`publishers/${p.id}?tab=serials`)}>{formatNumber(p.serial_count)}</a>{:else}0{/if}</td>
 				<td class="num">{#if p.publication_count}<a href={resolve(`publishers/${p.id}?tab=publications`)}>{formatNumber(p.publication_count)}</a>{:else}0{/if}</td>
 			</tr>
 		{/each}
 		{#if list.listing.items.length === 0}
-			<TableStatusRow loading={list.listing.loading} error={list.listing.error} colspan={isAdmin() ? 8 : 7} emptyText="Aucun éditeur ne correspond aux filtres." />
+			<TableStatusRow loading={list.listing.loading} error={list.listing.error} colspan={isAdmin() ? 7 : 6} emptyText="Aucun éditeur ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>
