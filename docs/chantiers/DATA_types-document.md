@@ -118,7 +118,7 @@ Mesures du 2026-11-03, publications du périmètre : 1 895 communications rattac
 
 ### Phase 6 — Documentation
 
-- [ ] Mise à jour de la documentation.
+- [x] Mise à jour de la documentation.
 
 ## Questions ouvertes
 

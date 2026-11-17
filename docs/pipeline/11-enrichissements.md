@@ -1,10 +1,10 @@
 # Enrichissements
 
-*À jour le 2026-11-16.*
+*À jour le 2026-11-17.*
 
 ## Relations entre publications (`relations`)
 
-Peuple la table `publication_relations`. Une relation rattache deux publications apparentées : preprint et version publiée, article et supplément de données, chapitre et ouvrage, article et erratum, data paper et jeu de données…
+Peuple la table `publication_relations`. Une relation rattache deux publications apparentées : preprint et version publiée, article et supplément de données, chapitre et ouvrage, data paper et jeu de données… Les errata et les avis de rétractation, hors des publications, sont désignés par leur DOI. La phase pose aussi l'indicateur « Rétracté » des publications.
 
 La table est reconstruite à chaque exécution, à partir de signaux indépendants appliqués dans l'ordre ci-dessous.
 
@@ -12,7 +12,7 @@ La table est reconstruite à chaque exécution, à partir de signaux indépendan
 
 **Clés de confirmation partagées.** Deux publications aux DOI distincts qui partagent un identifiant (HAL, PMID, NNT, CDS) ou un DOI arXiv sont apparentées. La relation se déduit de leurs types de document.
 
-**Titre.** Un erratum est relié à l'article cité dans son titre, un preprint à sa version publiée de même titre. Ce titre doit désigner une seule publication.
+**Titre.** Un erratum ou un avis est relié à l'article cité dans son titre, un preprint à sa version publiée de même titre. Ce titre doit désigner une seule publication.
 
 ## Sujets (`subjects`)
 
