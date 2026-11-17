@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software Design* (John Ousterhout). La [fiche précédente](archived/2026-11-17_CODE_refacto-orchestrateur-et-moissonnage.md) couvre l'orchestrateur et la phase `harvest`.
+Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software Design* (John Ousterhout). La [fiche précédente](2026-11-17_CODE_refacto-orchestrateur-et-moissonnage.md) couvre l'orchestrateur et la phase `harvest`.
 
 ## Décisions
 

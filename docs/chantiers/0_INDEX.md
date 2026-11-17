@@ -12,12 +12,12 @@
 - [Dashboard, point d'entrée de la vue Statistiques](UI_dashboard-point-d-entree.md)
 - [Financements](DATA_financements.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Refactorisation : fin du moissonnage](CODE_refacto-fin-du-moissonnage.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
 ## Chantiers archivés
 
+- 2026-11-17 — [Refactorisation : fin du moissonnage](archived/2026-11-17_CODE_refacto-fin-du-moissonnage.md)
 - 2026-11-17 — [Types de document](archived/2026-11-17_DATA_types-document.md)
 - 2026-11-17 — [Refactorisation : orchestrateur et moissonnage](archived/2026-11-17_CODE_refacto-orchestrateur-et-moissonnage.md)
 - 2026-11-16 — [Duplications du frontend](archived/2026-11-16_UI_duplications-du-frontend.md)
