@@ -1,6 +1,6 @@
 """Socle des moissonneurs : patron commun et écriture d'un document dans `staging`.
 
-Le patron gère l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur source indisponible. Chaque source hérite de `SourceHarvester` et implémente `run()`. La pagination reste propre à chaque source.
+Le patron gère l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur source indisponible. Chaque source hérite de `SourceHarvester` et implémente `run()`.
 """
 
 from __future__ import annotations

@@ -36,8 +36,8 @@ Relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software
 
 ### Phase 5 — Docstrings
 
-- [ ] `pipeline/runtime/modes.py` : suppression de la liste des modes dans la docstring du module, incomplète et redondante avec `MODES`. Docstring de `ModePolicy.vacuum_full`.
-- [ ] `pipeline/ingestion/common/harvester.py` : suppression de « La pagination reste propre à chaque source ». Cinq sources paginent par `stage_pages`.
+- [x] `pipeline/runtime/modes.py` : suppression de la liste des modes dans la docstring du module, incomplète et redondante avec `MODES`. Docstring de `ModePolicy.vacuum_full`.
+- [x] `pipeline/ingestion/common/harvester.py` : suppression de « La pagination reste propre à chaque source ». Cinq sources paginent par `stage_pages`.
 
 ## Questions ouvertes
 
