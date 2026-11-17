@@ -60,10 +60,8 @@
 	--focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent-mid) 20%, transparent); /* halo d'un champ qui a le focus, bordé de --accent-mid */
 
 	/* Barre de navigation */
-	--nav-public: oklch(0.475 0.067 var(--brand-hue));
-	--nav-public-menu: oklch(0.429 0.061 var(--brand-hue)); /* sous-menus déroulants */
-	--nav-admin: var(--accent-light);                      /* session admin : barre claire, texte en --accent */
-	--nav-admin-menu: #ffffff;
+	--nav-bg: oklch(0.475 0.067 var(--brand-hue));
+	--nav-menu-bg: oklch(0.429 0.061 var(--brand-hue)); /* sous-menus déroulants */
 
 	/* États */
 	--success: #25734a;        /* contraste de 4,5:1 au moins en texte sur --success-light */

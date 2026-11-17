@@ -137,9 +137,9 @@
 
 <a class="skip-link" href="#contenu">Aller au contenu</a>
 
-<header class="site-header" class:admin={adminLook()}>
+<header class="site-header">
   <a class="site-brand" href={resolve('')}>
-    <img src={asset(adminLook() ?"connectome.svg" : "favicon-menu.svg")} alt="" class="site-icon" />
+    <img src={asset(adminLook() ? "connectome.svg" : "favicon-menu.svg")} alt="" class="site-icon" />
     <span class="site-title">{siteTitle()}</span>
   </a>
   <nav id="site-nav" class="site-nav" class:open={mobileNavOpen} aria-label="Navigation principale">
@@ -185,10 +185,8 @@
     width: auto;
     margin-right: 10px;
   }
-  /* Couleurs de la barre en variables : la session admin les redéfinit (barre claire, repère du mode d'administration). */
+  /* Couleurs du texte et des états de la barre, sur fond sombre. */
   .site-header {
-    --nav-bg: var(--nav-public);
-    --nav-menu-bg: var(--nav-public-menu);
     --nav-fg: var(--text-inverse);
     --nav-fg-soft: rgba(255, 255, 255, 0.85);
     --nav-hover: rgba(255, 255, 255, 0.1);
@@ -205,16 +203,6 @@
     top: 0;
     /* Au-dessus des dropdowns de page (facettes, filtres d'entité… tous à z-index 100) : la navigation globale reste toujours visible, y compris quand un panneau déployé recouvre la zone d'en-tête sur un viewport scrollable. Les surcouches modales (dialogues, tooltips, lightbox) restent volontairement au-dessus (z-index ≥ 1000). */
     z-index: 300;
-  }
-  .site-header.admin {
-    --nav-bg: var(--nav-admin);
-    --nav-menu-bg: var(--nav-admin-menu);
-    --nav-fg: var(--accent);
-    --nav-fg-soft: var(--accent);
-    --nav-hover: color-mix(in srgb, var(--accent) 8%, transparent);
-    --nav-active: color-mix(in srgb, var(--accent) 14%, transparent);
-    --nav-rule: color-mix(in srgb, var(--accent) 20%, transparent);
-    box-shadow: inset 0 -1px 0 var(--nav-rule);
   }
   .nav-toggle {
     display: none;
