@@ -32,7 +32,7 @@ from infrastructure.observability.log import (
     set_log_phase,
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder, start_run
-from pipeline.graph import Block, Phase
+from pipeline.graph import Block, Phase, Task, reads_from
 from pipeline.ingestion.api_params import request_budget
 from pipeline.ingestion.credentials import source_credentials_missing
 from pipeline.phases import PERIMETER_STRUCTURES, PHASES
@@ -44,7 +44,7 @@ from pipeline.runtime.observability.exception_chain import failure_message, is_u
 from pipeline.runtime.observability.log_format import banner, phase_title, setting
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import set_bar_stream, write_above_bars
-from pipeline.task_runner import run_phase
+from pipeline.task_runner import execute_tasks, run_phase
 
 PHASE_NAMES = [phase.name for phase in PHASES]
 
@@ -266,9 +266,15 @@ def _context(options: RunOptions) -> PhaseContext:
 
 
 def _run_one_phase(
-    phase: Phase, *, options: RunOptions, recorder: PhaseExecutionRecorder
+    phase: Phase,
+    *,
+    options: RunOptions,
+    recorder: PhaseExecutionRecorder,
+    prerequisites: Sequence[Task] = (),
 ) -> tuple[str, float]:
     """Exécute une phase et enregistre son observabilité. Renvoie son nom et sa durée.
+
+    `prerequisites` s'exécute en tête de la phase, avant sa condition et sa précondition : sa durée et son échec sont ceux de la phase.
 
     Une interruption clavier ou une exception est enregistrée, puis termine le processus. `--from <phase>` reprend la séquence à la phase interrompue.
     """
@@ -284,6 +290,7 @@ def _run_one_phase(
         t0_phase = time.time()
         ctx = _context(options)
         try:
+            execute_tasks(prerequisites, ctx)
             metrics = run_phase(phase, ctx)
         except (KeyboardInterrupt, Exception) as e:
             _stop_on_failure(
@@ -363,12 +370,21 @@ def _execute_phases(options: RunOptions, phases_to_run: list[Phase]) -> None:
     if recorder.run_id is not None:
         log.info("%s%d", RUN_MARKER, recorder.run_id)
 
-    # Avant toute phase, même avec `--only` ou `--from` : les phases lisent le périmètre sans le recalculer.
-    PERIMETER_STRUCTURES.run(_context(options))
+    # En tête de la première phase qui les lit, même avec `--only` ou `--from` : les phases lisent les structures des périmètres sans les recalculer.
+    perimeter_phase = next(
+        (phase for phase in phases_to_run if reads_from(phase.children, PERIMETER_STRUCTURES)),
+        None,
+    )
 
     t0_total = time.time()
     phase_results = [
-        _run_one_phase(phase, options=options, recorder=recorder) for phase in phases_to_run
+        _run_one_phase(
+            phase,
+            options=options,
+            recorder=recorder,
+            prerequisites=(PERIMETER_STRUCTURES,) if phase is perimeter_phase else (),
+        )
+        for phase in phases_to_run
     ]
 
     elapsed_total = time.time() - t0_total

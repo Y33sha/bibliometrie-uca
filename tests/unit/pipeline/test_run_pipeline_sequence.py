@@ -223,6 +223,35 @@ class TestRunOnePhase:
         assert record["signals"][0]["message"] == "la source est à bout de budget"
         assert "run_pipeline --from persons" in caplog.text
 
+    def test_echec_d_une_tache_prealable_consigne_sur_la_phase(self, caplog):
+        """La phase est en échec, avant sa condition, et la commande de reprise la nomme."""
+
+        def _en_echec(ctx):
+            raise RuntimeError("périmètre illisible")
+
+        executee: list[str] = []
+        phase = Phase(
+            "persons",
+            "Libellé",
+            (Task("essai", run=lambda ctx: executee.append("essai") or PhaseMetrics()),),
+            Block.ENTITIES,
+            when=lambda ctx: False,
+        )
+        recorder = _FakeRecorder()
+        with pytest.raises(SystemExit) as sortie, caplog.at_level(logging.INFO):
+            run_pipeline._run_one_phase(
+                phase,
+                options=_HAL,
+                recorder=recorder,
+                prerequisites=(Task("perimeter_structures", run=_en_echec),),
+            )
+
+        assert sortie.value.code == 1
+        assert executee == []
+        (record,) = recorder.records
+        assert (record["phase"], record["status"]) == ("persons", "error")
+        assert "run_pipeline --from persons" in caplog.text
+
     def test_toute_exception_consignee_comme_un_echec(self):
         """Une exception imprévue (erreur HTTP, clé absente…) termine la phase, consignée comme un échec."""
 
@@ -292,6 +321,55 @@ class TestExecutePhases:
 
         assert [r["phase"] for r in run_prepare.records] == ["une", "deux"]
         assert run_prepare.closed
+
+    def test_les_structures_des_perimetres_precedent_la_premiere_phase_qui_les_lit(
+        self, run_prepare, monkeypatch
+    ):
+        """Leur durée compte dans la phase qui les lit ; une phase sans lecteur avant elle les précède."""
+        ordre: list[str] = []
+        monkeypatch.setattr(
+            run_pipeline,
+            "PERIMETER_STRUCTURES",
+            Task(
+                "perimeter_structures",
+                writes=("perimeter_structures",),
+                run=lambda ctx: ordre.append("perimeter_structures") or PhaseMetrics(),
+            ),
+        )
+
+        def _lectrice(name: str) -> Phase:
+            tache = Task(
+                "essai",
+                reads=("perimeter_structures",),
+                run=lambda ctx: ordre.append(name) or PhaseMetrics(),
+            )
+            return Phase(name, "Libellé", (tache,), Block.ENTITIES)
+
+        une = _phase(lambda ctx: ordre.append("une") or PhaseMetrics(), name="une")
+        run_pipeline._execute_phases(_HAL, [une, _lectrice("deux"), _lectrice("trois")])
+
+        assert ordre == ["une", "perimeter_structures", "deux", "trois"]
+        durees = {r["phase"]: r["metrics"]["task_durations_s"] for r in run_prepare.records}
+        assert "perimeter_structures" in durees["deux"]
+        assert "perimeter_structures" not in durees["trois"]
+
+    def test_sans_lecteur_les_structures_des_perimetres_restent_en_l_etat(
+        self, run_prepare, monkeypatch
+    ):
+        appels: list[str] = []
+        monkeypatch.setattr(
+            run_pipeline,
+            "PERIMETER_STRUCTURES",
+            Task(
+                "perimeter_structures",
+                writes=("perimeter_structures",),
+                run=lambda ctx: appels.append("perimeter_structures") or PhaseMetrics(),
+            ),
+        )
+
+        run_pipeline._execute_phases(_HAL, [_phase(lambda ctx: PhaseMetrics())])
+
+        assert appels == []
 
     def test_wos_ecartee_des_sources_consignees(self, run_prepare):
         """WoS est interrogée seulement sur demande : son crédit d'appels est limité."""

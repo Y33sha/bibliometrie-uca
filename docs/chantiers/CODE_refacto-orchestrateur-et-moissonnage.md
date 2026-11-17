@@ -21,7 +21,7 @@ Relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software
 - [x] La dernière ligne d'une phase sans section prend `└─` (`harvest`, `harvest_by_person`, `fetch_stale`).
 - [x] `Task.progress_bar` disparaît. Toutes les tâches à barre sont sans section, et une ligne sans section va déjà au seul journal : l'attribut ne décidait rien, et le module `progress` n'a rien à signaler.
 - [ ] La ligne de bilan d'une tâche se produit d'une seule façon. Il en existe trois : `label` et compteurs, `label` et `PhaseMetrics.report`, tâche sans `label` qui écrit elle-même.
-- [ ] `PERIMETER_STRUCTURES` passe par l'exécuteur : durée mesurée, exécution enregistrée, échec journalisé avec la commande de reprise.
+- [x] `PERIMETER_STRUCTURES` passe par l'exécuteur : durée mesurée, exécution enregistrée, échec journalisé avec la commande de reprise. La tâche s'exécute en tête de la première phase du run qui lit ses écritures (`harvest` ou `affiliations`), avant sa condition : sa durée et son échec sont ceux de cette phase.
 
 ### Phase 3 — Déclaration des phases
 

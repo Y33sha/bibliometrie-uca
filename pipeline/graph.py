@@ -91,6 +91,11 @@ def _writes_read(reader: Task, writer: Task) -> list[str]:
     return [r for r in reader.reads if any(_affected_by(r, w) for w in writer.writes)]
 
 
+def reads_from(children: Iterable[Step | Task], writer: Task) -> bool:
+    """Indique si une tâche de `children` lit une donnée écrite par `writer`."""
+    return any(_writes_read(task, writer) for task in leaves(children))
+
+
 def concurrent(a: Task, b: Task) -> bool:
     """Indique si deux tâches s'exécutent en même temps : même groupe parallèle, sources différentes."""
     return (

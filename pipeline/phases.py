@@ -157,7 +157,7 @@ PERIMETER_STRUCTURES = Task(
     writes=("perimeter_structures",),
     run=_refresh_perimeter_structures,
 )
-"""Matérialisation des structures des périmètres, exécutée par l'orchestrateur avant toute phase."""
+"""Matérialisation des structures des périmètres, exécutée par l'orchestrateur en tête de la première phase du run qui lit ses écritures."""
 
 
 def _qualified(phase: str, task: Task) -> Task:
