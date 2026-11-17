@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { tooltip } from '#lib/actions/tooltip.svelte.js';
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { loadEntityFacet } from '#lib/entityFacets.js';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
@@ -80,6 +80,13 @@
 		onchange();
 	}
 
+	// Le panneau fermé, le focus passe au bouton qui le rouvre, rendu visible par la fermeture.
+	async function close() {
+		panel.open = false;
+		await tick();
+		document.querySelector<HTMLElement>('[aria-controls="filter-panel"]')?.focus();
+	}
+
 	function clear(filter: ListFilter) {
 		clearValue(filter, values);
 		onchange();
@@ -144,7 +151,7 @@
 <aside id="filter-panel" class="filter-panel" aria-label="Filtres" bind:this={aside} onpointerdowncapture={setAnchor} onkeydowncapture={setAnchor} onwheel={() => (anchor = null)} ontouchmove={() => (anchor = null)}>
 	<div class="filter-panel-head">
 		<span class="filter-panel-title">Filtres</span>
-		<button type="button" class="btn-text filter-panel-close" onclick={() => (panel.open = false)}>Fermer</button>
+		<button type="button" class="btn-text filter-panel-close" onclick={close}>Fermer</button>
 	</div>
 	{#each sections as s (s.group.key)}
 		{@const shown = s.filters.filter(visible)}
@@ -189,9 +196,9 @@
 		gap: 4px;
 		padding-bottom: 16px;
 	}
-	/* En-tête du panneau, sur écran étroit seulement : sur grand écran, le bouton de la barre d'outils nomme et ferme le panneau. */
+	/* En-tête du panneau : son nom et sa fermeture. Sur grand écran, il s'aligne sur la première ligne de la barre d'outils de la liste. */
 	.filter-panel-head {
-		display: none;
+		display: flex;
 		align-items: baseline;
 		justify-content: space-between;
 		padding: 4px 0 6px;
@@ -263,9 +270,12 @@
 		width: 100%;
 		margin: 2px 0 6px;
 	}
-	@media not all and (min-width: 1100px) {
+	@media (min-width: 1100px) {
 		.filter-panel-head {
-			display: flex;
+			align-items: center;
+			height: 36px;
+			margin: 34px 0 12px;
+			padding: 0 6px;
 		}
 	}
 </style>

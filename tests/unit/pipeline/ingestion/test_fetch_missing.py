@@ -7,6 +7,7 @@ import dataclasses
 import logging
 from collections.abc import Callable
 
+from domain.sources.registry import DOI_SEARCHABLE_SOURCES
 from pipeline.graph import Phase
 from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -78,12 +79,9 @@ def test_hal_channels_then_parallel_doi_with_skip(contexte):
     ).run(contexte(mode="full"))
 
     channels = {r["key"] for r in metrics.details["table"]["rows"]}
-    assert {
-        "hal-id",
-        "NNT",
-        "openalex",
-    } <= channels  # canaux HAL et source configurée pour la recherche par DOI
-    assert "scanr" not in channels  # source non configurée pour la recherche par DOI : sautée
+    # Canaux HAL et source configurée pour la recherche par DOI, clés par nom de tâche.
+    assert {"hal_by_id", "hal_by_nnt", "doi.openalex"} <= channels
+    assert "doi.scanr" not in channels  # source non configurée pour la recherche par DOI : sautée
     assert any(s["code"] == "source_unconfigured" for s in metrics.signals)
     assert metrics.new == 8  # 2 (hal-id) + 1 (NNT) + 5 (openalex)
 
@@ -153,3 +151,10 @@ def test_les_recherches_par_hal_id_suivent_le_filtre_des_sources(contexte):
     calls.clear()
     phase().run(contexte(mode="daily", sources={"scanr"}))
     assert calls == ["scanr"]
+
+
+def test_chaque_source_interrogeable_par_doi_a_sa_recherche_sous_son_etape():
+    by_step = {step.name: {task.name for task in step.tasks} for step in _FETCH_MISSING.children}
+
+    for source in DOI_SEARCHABLE_SOURCES:
+        assert f"doi.{source}" in by_step[source]

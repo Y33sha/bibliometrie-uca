@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="256" height="256">
-  <g stroke="#000" stroke-width="0.55" stroke-linecap="round" fill="none">
+  <g stroke="#ddd" stroke-width="0.55" stroke-linecap="round" fill="none">
     <path d="M11.5 3.2H20.5 M11.5 3.2L5 7.6 M11.5 3.2L12.3 9.6 M20.5 3.2L20.3 9 M20.5 3.2L26.6 7.6
              M5 7.6L12.3 9.6 M5 7.6L1.3 13.6 M12.3 9.6L20.3 9 M20.3 9L26.6 7.6 M26.6 7.6L30.6 13.4
              M12.3 9.6L6.7 14.8 M12.3 9.6L18.2 16.4 M20.3 9L24.6 13.4 M24.6 13.4L30.6 13.4 M24.6 13.4L18.2 16.4
@@ -7,7 +7,7 @@
              M3.1 19.6L7.8 20.6 M18.2 16.4L23.1 19.8 M18.2 16.4L14.7 22.4 M23.1 19.8L28.6 19.6 M30.6 13.4L28.6 19.6
              M7.8 20.6L14.7 22.4 M7.8 20.6L9.1 28.2 M14.7 22.4L20.6 25.2 M23.1 19.8L20.6 25.2 M9.1 28.2L14.7 22.4"/>
   </g>
-  <g stroke="#000" stroke-width="0.5">
+  <g stroke="#ddd" stroke-width="0.5">
     <circle cx="11.5" cy="3.2" r="1.1" fill="#f7bf50"/>
     <circle cx="20.5" cy="3.2" r="1.1" fill="#f7bf50"/>
     <circle cx="5" cy="7.6" r="1.1" fill="#f17b7b"/>

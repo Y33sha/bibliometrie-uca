@@ -146,6 +146,8 @@ class PublicationFilters:
     """Valeurs `yes` et `no`, combinées en OR. `yes` retient les publications à paiement d'APC imputé au budget d'une structure du périmètre."""
     citation_tops: list[str] = field(default_factory=list)
     """Valeurs de `CitationTop`, combinées en OR."""
+    retracted: list[str] = field(default_factory=list)
+    """Valeurs `yes` et `no`, combinées en OR."""
     country_values: list[str] = field(default_factory=list)
     language_codes: list[str] = field(default_factory=list)
     hal_status_values: list[str] = field(default_factory=list)
@@ -189,6 +191,9 @@ class PublicationListItem(Model):
     oa_status: str
     access_url: str | None
     """Lien d'accès (`domain.publications.access.access_url`)."""
+    is_retracted: bool
+    retraction_doi: str | None
+    """DOI à consulter pour la rétractation (`retraction_doi`)."""
     license: str | None
     """Licence de la version éditeur."""
     citation_top: str | None
@@ -257,6 +262,7 @@ class PublicationsFacetsResponse(Model):
     """Rempli seulement avec `person_id` ou des laboratoires. Une publication compte dans chaque position occupée."""
     source_counts: dict[str, YesNoCount]
     apc: list[FacetOption]
+    retracted: list[FacetOption]
     citation_tops: list[FacetOption]
     """Une publication du top 1 % compte aussi dans le top 10 %."""
     countries: list[FacetOption]
@@ -284,6 +290,9 @@ class PublicationDetailCore(Model):
     """Agence d'enregistrement du préfixe DOI (Crossref, DataCite), d'après `doi_prefixes`."""
     doc_type: str
     oa_status: str
+    is_retracted: bool
+    retraction_doi: str | None
+    """DOI à consulter pour la rétractation (`retraction_doi`)."""
     license: str | None
     """Licence de la version éditeur."""
     deposit_license: str | None

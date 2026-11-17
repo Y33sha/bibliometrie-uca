@@ -2,6 +2,7 @@
 	import { formatNumber } from '#lib/utils.js';
 	import { cssColor } from '#lib/components/charts/cssVar.js';
 	import { Chart } from '#lib/components/charts/chart.js';
+	import { yearAxis } from '#lib/components/charts/yearAxis.js';
 
 	// Nuage de points par année : un point par élément, décalé dans la largeur de son année pour limiter les recouvrements.
 	// `detail` s'affiche sous `label` dans l'infobulle.
@@ -44,10 +45,9 @@
 		}
 		if (!canvas || points.length === 0) return;
 		const color = cssColor('accent-mid');
-		const minX = years[0] - 0.5;
-		const maxX = years[years.length - 1] + 0.5;
+		const xAxis = yearAxis(years);
 		const scattered: Datum[] = points.map((p) => ({ x: p.year + jitter(p.key), y: p.value, point: p }));
-		const referenceLine: Datum[] = reference === undefined ? [] : [{ x: minX, y: reference }, { x: maxX, y: reference }];
+		const referenceLine: Datum[] = reference === undefined ? [] : [{ x: xAxis.min, y: reference }, { x: xAxis.max, y: reference }];
 		chart = new Chart(canvas, {
 			type: 'scatter',
 			data: {
@@ -106,16 +106,7 @@
 					},
 				},
 				scales: {
-					x: {
-						type: 'linear',
-						min: minX,
-						max: maxX,
-						grid: { display: false },
-						ticks: {
-							stepSize: 1,
-							callback: (value) => (Number.isInteger(value) ? String(value) : ''),
-						},
-					},
+					x: { ...xAxis, grid: { display: false } },
 					y: {
 						beginAtZero: true,
 						title: { display: true, text: valueLabel },

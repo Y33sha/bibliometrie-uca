@@ -43,6 +43,7 @@ from domain.source_records.metadata_correction.shared_doi import (
     SecondaryFormDeclaration,
 )
 from domain.source_records.metadata_correction.unary import UnaryCorrection
+from domain.source_records.notices import CROSSREF_WITHDRAWAL_UPDATE, withdrawn_original_doi
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
 from domain.types import JsonValue
@@ -432,6 +433,7 @@ class SourceRecordCorrectionStore:
             """)
         ).all()
         identifiers = fetch_identifiers(self._conn)
+        withdrawn = self.fetch_withdrawn_duplicate_dois()
         return [
             MatchabilityRow(
                 r.id,
@@ -442,10 +444,45 @@ class SourceRecordCorrectionStore:
                     r.urls,
                     identifiers.get(r.id, ()),
                     r.primary_doi_target_recorded,
+                    frozenset(
+                        i.value
+                        for i in identifiers.get(r.id, ())
+                        if i.id_type is SourceIdentifierType.DOI and i.value in withdrawn
+                    ),
                 ),
             )
             for r in rows
         ]
+
+    def fetch_withdrawn_duplicate_dois(self) -> frozenset[str]:
+        """Renvoie les DOI des doublons retirés par l'éditeur dont l'original est le DOI `primary` d'un enregistrement source (`withdrawn_original_doi`)."""
+        rows = self._conn.execute(
+            text(f"""
+                SELECT source_id, source_extras FROM source_records
+                WHERE source = '{Source.CROSSREF.value}'
+                  AND source_extras -> '{SourceExtra.UPDATE_TO}'
+                      @> '[{{"type": "{CROSSREF_WITHDRAWAL_UPDATE}"}}]'
+            """)
+        ).all()
+        originals = {
+            r.source_id: original
+            for r in rows
+            if (original := withdrawn_original_doi(r.source_extras, r.source_id))
+        }
+        if not originals:
+            return frozenset()
+        recorded = set(
+            self._conn.execute(
+                text(f"""
+                    SELECT id_value FROM source_record_identifiers
+                    WHERE id_type = '{SourceIdentifierType.DOI.value}'
+                      AND role = '{SourceIdentifierRole.PRIMARY.value}'
+                      AND id_value = ANY(:dois)
+                """),
+                {"dois": sorted(set(originals.values()))},
+            ).scalars()
+        )
+        return frozenset(doi for doi, original in originals.items() if original in recorded)
 
     def persist_matchability(self, updates: list[MatchabilityUpdate]) -> int:
         """Écrit en lot `is_matchable`, et marque les enregistrements sources pour la réconciliation. Renvoie le nombre de lignes."""

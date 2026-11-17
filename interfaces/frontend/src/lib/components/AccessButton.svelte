@@ -1,10 +1,15 @@
 <script lang="ts">
-	// Lien d'accès au texte intégral d'une publication, libellé selon son type de document : bouton plein, ou, en format de liste, cadenas open access et lien. Sans lien, un bloc du même format signale l'embargo, ou la fermeture hors liste.
+	// Lien d'accès au texte intégral d'une publication, libellé selon son type de document : bouton plein, ou, en format de liste, cadenas open access et lien. Sans lien, un bloc du même format signale l'embargo, ou la fermeture hors liste. Une publication rétractée a, à la place, un lien rouge « Rétracté » vers le DOI de la rétractation.
+	import TriangleExclamationPoint from '@lucide/svelte/icons/triangle-exclamation-point';
+	import { doiUrl } from '#lib/utils.js';
+
 	let {
 		accessUrl,
 		oaStatus,
 		docType = null,
 		compact = false,
+		retracted = false,
+		retractionDoi = null,
 	}: {
 		accessUrl: string | null | undefined;
 		oaStatus: string | null | undefined;
@@ -12,6 +17,10 @@
 		docType?: string | null;
 		/** Format de liste et de tableau : libellés courts ; l'accès fermé n'est pas signalé. */
 		compact?: boolean;
+		/** Publication rétractée : le lien mène à `retractionDoi`. */
+		retracted?: boolean;
+		/** DOI à consulter pour la rétractation : celui de l'avis, à défaut celui de la publication. */
+		retractionDoi?: string | null;
 	} = $props();
 
 	// Libellés du lien par type de document, au format bouton et au format de liste.
@@ -22,7 +31,23 @@
 	const label = $derived((docType && LABELS[docType]) || DEFAULT_LABEL);
 </script>
 
-{#if accessUrl && compact}
+{#if retracted}
+	<svelte:element
+		this={retractionDoi ? 'a' : 'span'}
+		class={compact ? 'access-link retracted' : 'access-btn retracted'}
+		href={retractionDoi ? doiUrl(retractionDoi) : undefined}
+		target={retractionDoi ? '_blank' : undefined}
+		rel={retractionDoi ? 'noopener' : undefined}
+	>
+		<TriangleExclamationPoint class="retracted-icon" strokeWidth={2.2} aria-hidden="true" />
+		Rétracté
+		{#if retractionDoi}
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="M7 17L17 7M17 7H8M17 7v9" />
+			</svg>
+		{/if}
+	</svelte:element>
+{:else if accessUrl && compact}
 	<a class="access-link" href={accessUrl} target="_blank" rel="noopener">
 		<svg class="oa-logo" viewBox="0 0 40 60" aria-hidden="true">
 			<path d="M10 31V16a10 10 0 0 1 20 0v4" fill="none" stroke="currentColor" stroke-width="6" />
@@ -128,6 +153,25 @@
 		color: var(--text-secondary);
 		font-weight: 600;
 		cursor: default;
+	}
+	/* Publication rétractée : le lien mène à la rétractation, en rouge. */
+	.access-btn.retracted {
+		background: var(--danger);
+	}
+	a.access-btn.retracted:hover {
+		background: color-mix(in srgb, var(--danger), black 20%);
+	}
+	.access-link.retracted,
+	.access-link.retracted:hover {
+		color: var(--danger);
+	}
+	.access-btn :global(.retracted-icon) {
+		width: 16px;
+		height: 16px;
+	}
+	.access-link :global(.retracted-icon) {
+		width: 13px;
+		height: 13px;
 	}
 	.access-embargo {
 		background: var(--success-light);

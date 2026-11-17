@@ -87,9 +87,9 @@ export function useUrlFilters(config: UrlFiltersConfig) {
 				case 'string_array':
 					if (Array.isArray(val) && val.length) p.set(def.urlKey, val.join(','));
 					break;
+				// Une valeur vide s'écrit quand la valeur par défaut ne l'est pas (`key=`) : « au total » face à « par année ».
 				case 'single':
-					if (val != null && val !== '' && val !== (def.defaultValue ?? ''))
-						p.set(def.urlKey, String(val));
+					if (val != null && val !== (def.defaultValue ?? '')) p.set(def.urlKey, String(val));
 					break;
 				case 'source_states': {
 					if (val && typeof val === 'object') {

@@ -19,7 +19,7 @@ Le pipeline les rafraîchit. Aucune n'est écrite directement.
 
 ## Tables dérivées
 
-- **`perimeter_structures`** : appartenance au périmètre, matérialisée par clôture récursive de `structure_parents`. Rematérialisée avant la première phase du pipeline et à chaque modification depuis l'administration qui touche une tutelle ou un périmètre.
+- **`perimeter_structures`** : appartenance au périmètre, matérialisée par clôture récursive de `structure_parents`. Rematérialisée en tête de la première phase du run qui la lit, et à chaque modification depuis l'administration qui touche une tutelle ou un périmètre.
 - **`publications_detail`** : une ligne par publication (`abstract`, `keywords`, `biblio`), recalculé depuis les `source_records` rattachées.
 
 ## Colonnes dérivées

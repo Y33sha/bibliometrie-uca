@@ -12,6 +12,7 @@
   import { contributionRoleLabels } from "#lib/labels.js";
   import { isAdmin } from "#lib/session.svelte.js";
   import { structsTooltip } from "#lib/structureLabels.js";
+  import { doiUrl } from "#lib/utils.js";
   import { authorRows, comparisonRows, orderRecords, otherRoles } from "./sourceComparison";
 
   type PublicationSources = components["schemas"]["PublicationSourcesResponse"];
@@ -106,7 +107,7 @@
                 {#if cell.text === null}
                   <span class="absent">—</span>
                 {:else if cell.link?.kind === "doi"}
-                  <a href="https://doi.org/{cell.link.doi}" target="_blank" rel="noopener">{cell.text}</a>
+                  <a href={doiUrl(cell.link.doi)} target="_blank" rel="noopener">{cell.text}</a>
                 {:else if cell.link}
                   <a href={resolve(cell.link.kind === "serials" ? `journals/${cell.link.id}` : `publishers/${cell.link.id}`)} target="_blank" rel="noopener">{cell.text}</a>
                 {:else if cell.title}

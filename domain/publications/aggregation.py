@@ -13,7 +13,7 @@ from domain.publications.publication import Publication
 from domain.publishers.attribution import publication_publisher
 from domain.source_records.keys import anchor_of, deposit_anchors, doi_anchors
 from domain.source_records.source_record import SourceRecord
-from domain.sources.registry import Source
+from domain.sources.registry import AGGREGATOR_SOURCES, Source
 from domain.types import JsonValue
 
 
@@ -176,17 +176,24 @@ def _merge_by_key(
 
 
 def _arbitrate_doc_type_with_article_subtype(sources: list[SourceRecord]) -> str:
-    """Arbitre le type de document : le premier non nul dans l'ordre des `sources`. Le premier sous-type d'article, toutes sources confondues, l'emporte sur `article`, donné par Crossref pour tous les sous-types. Un `data_paper` déclaré par HAL seul compte pour `article`."""
-    doc_types = [_corroborated_doc_type(s, sources) for s in sources]
-    article_subtype_present = next((t for t in doc_types if t in ARTICLE_SUBTYPES), None)
+    """Arbitre le type de document : le premier non nul dans l'ordre des `sources`.
 
-    for doc_type in doc_types:
-        if not doc_type:
-            continue
-        if doc_type == DocType.ARTICLE and article_subtype_present:
-            return article_subtype_present
-        return doc_type
-    return DocType.OTHER
+    - `other` vaut absence de type : il cède au premier type précis d'une source non agrégatrice (`AGGREGATOR_SOURCES`). Le type d'un agrégateur ne l'emporte pas sur `other` : OpenAlex donne `article` par défaut.
+    - Le premier sous-type d'article, toutes sources confondues, l'emporte sur `article`, donné par Crossref pour tous les sous-types.
+    - Un `data_paper` déclaré par HAL seul compte pour `article`.
+    """
+    typed = [(s, t) for s in sources if (t := _corroborated_doc_type(s, sources))]
+    if not typed:
+        return DocType.OTHER
+    doc_type = typed[0][1]
+    if doc_type == DocType.OTHER:
+        doc_type = next(
+            (t for s, t in typed if t != DocType.OTHER and s.source not in AGGREGATOR_SOURCES),
+            DocType.OTHER,
+        )
+    if doc_type == DocType.ARTICLE:
+        return next((t for _, t in typed if t in ARTICLE_SUBTYPES), doc_type)
+    return doc_type
 
 
 def _corroborated_doc_type(source: SourceRecord, sources: list[SourceRecord]) -> str | None:

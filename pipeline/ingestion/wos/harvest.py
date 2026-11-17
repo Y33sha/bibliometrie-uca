@@ -18,6 +18,7 @@ from pipeline.ingestion.wos.api import WosClient, get_records, get_records_found
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
+from pipeline.runtime.observability.signals import signal_harvest_incomplete
 
 # Pause longue toutes les `_BREATHER_EVERY` pages.
 _BREATHER_EVERY = 10
@@ -39,7 +40,7 @@ def harvest_year(
 ) -> None:
     """Moissonne les records d'une année, page après page.
 
-    Une page vide est retentée après une pause. Une première requête sans réponse, ou trois pages vides de suite, lèvent une `RuntimeError` : l'année est en échec. Les écritures sont comptées dans `metrics`.
+    Une page vide est retentée après une pause. Une première requête sans réponse, ou trois pages vides de suite, lèvent une `RuntimeError` : l'année est en échec. Le plafond de l'API sur `firstRecord` arrête l'année, avec un signal `harvest_incomplete` s'il reste des records. Les écritures sont comptées dans `metrics`.
     """
     data = client.fetch_page(year, 1, affiliations)
     if not data:
@@ -75,6 +76,10 @@ def harvest_year(
                 "Limite API atteinte (%s records). Réduire la requête si des résultats manquent.",
                 _WOS_FIRST_RECORD_LIMIT,
             )
+            if first_record <= total_count:
+                signal_harvest_incomplete(
+                    metrics, "wos", str(year), received=first_record - 1, announced=total_count
+                )
             break
         if first_record <= total_count:
             if page_num % _BREATHER_EVERY == 0:

@@ -921,3 +921,45 @@ def test_le_lien_d_acces_suit_la_meilleure_copie_et_le_statut(sa_sync_conn):
         gold: "https://doi.org/10.1/gold",
         embargoed: None,
     }
+
+
+class TestRetracted:
+    """Filtre et facette des publications rétractées ; la liste donne le DOI de la rétractation."""
+
+    def _seed(self, conn):
+        lab = _lab(conn)
+        retracted = insert_publication(conn, "Retracted", doi="10.1/a", in_perimeter=True)
+        kept = insert_publication(conn, "Kept", in_perimeter=True)
+        conn.execute(
+            text("UPDATE publications SET is_retracted = true WHERE id = :id"), {"id": retracted}
+        )
+        for publication in (retracted, kept):
+            _attach(conn, publication, lab)
+        return lab, retracted, kept
+
+    def _listed(self, conn, lab, retracted):
+        res = publications_queries(conn).list_publications(
+            filters=PublicationFilters(lab_ids=[lab], retracted=retracted),
+            page=1,
+            per_page=50,
+            sort="year_desc",
+        )
+        return {p.id: (p.is_retracted, p.retraction_doi) for p in res.publications}
+
+    def test_filter(self, sa_sync_conn):
+        lab, retracted, kept = self._seed(sa_sync_conn)
+
+        assert self._listed(sa_sync_conn, lab, ["yes"]) == {retracted: (True, "10.1/a")}
+        assert self._listed(sa_sync_conn, lab, ["no"]) == {kept: (False, None)}
+        assert self._listed(sa_sync_conn, lab, ["yes", "no"]).keys() == {retracted, kept}
+
+    def test_facet_counts_and_labels(self, sa_sync_conn):
+        lab, _, _ = self._seed(sa_sync_conn)
+
+        builder = _PublicationFacetsBuilder(
+            sa_sync_conn,
+            PublicationFilters(lab_ids=[lab], retracted=["yes"]),
+            FilterContext([], None),
+        )
+        facet = [(o.value, o.label, o.count) for o in builder._facet_retracted()]
+        assert facet == [("yes", "Rétractées", 1), ("no", "Non rétractées", 1)]

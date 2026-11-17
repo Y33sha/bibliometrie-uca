@@ -293,6 +293,32 @@ class TestBridges:
         assert _groups(plan) == {10: (1, 4, 5, 6), 20: (2, 7)}
         assert plan.dissolved == (DissolvedPublication(30, 10), DissolvedPublication(40, 10))
 
+    def test_a_bridge_joins_the_anchor_of_its_manual_merge(self):
+        """Cas réel : le dépôt HAL des recommandations ABC 3, sans DOI, a le titre, le type et l'année de la version de The Breast et de celle d'Annals of Oncology. La fusion manuelle avec Annals of Oncology l'emporte."""
+        block = ("meta", "article|abc 3|2017")
+        merge = ("manual_merge", "1")
+        plan = plan_reconciliation(
+            [
+                _m(
+                    1,
+                    10,
+                    doi="10.1/breast",
+                    tokens=[("doi", "10.1/breast"), block],
+                    doc_type="article",
+                ),
+                _m(
+                    2,
+                    20,
+                    doi="10.1/annals",
+                    tokens=[("doi", "10.1/annals"), block, merge],
+                    doc_type="article",
+                ),
+                _m(3, 30, tokens=[block, merge], doc_type="article"),
+            ]
+        )
+
+        assert _groups(plan) == {10: (1,), 20: (2, 3)}
+
     def test_a_subcomponent_linked_to_one_anchor_joins_it(self):
         """Seul l'enregistrement source 6 cite le DOI arXiv à côté d'une ancre : le preprint rejoint l'article."""
         members = [m for m in _preprint_component(doc_type="preprint") if m.source_record_id != 7]

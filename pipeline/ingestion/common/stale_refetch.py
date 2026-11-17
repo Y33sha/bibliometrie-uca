@@ -27,7 +27,8 @@ type FetchOne = Callable[[httpx2.AsyncClient, str], Awaitable[FetchOutcome]]
 """Cherche un document de la source par son identifiant natif."""
 
 
-_STALE_ROWS_SQL_TEMPLATE = """
+_STALE_ROWS_SQL = text(
+    f"""
     SELECT s.source_id
     FROM staging s
     LEFT JOIN source_records sr
@@ -35,14 +36,19 @@ _STALE_ROWS_SQL_TEMPLATE = """
     WHERE s.source = CAST(:source AS source_type)
       AND s.disappeared_at IS NULL
       AND s.last_seen_at < now() - make_interval(days => :days)
-      {year_clause}
+      AND (
+          sr.publication_year IS NULL
+          OR sr.publication_year = ANY(:years)
+          OR sr.doc_type = '{DocType.ONGOING_THESIS}'
+      )
     ORDER BY s.id
-"""
-"""Filtre sur l'année (`{year_clause}`) : `publication_year` vient de `source_records`. Un document sans enregistrement source reste sélectionné."""
+    """
+)
+"""`publication_year` vient de `source_records`. Un document sans enregistrement source reste sélectionné. Une thèse en cours est sans année de soutenance : elle est cherchée quelle que soit la fenêtre."""
 
 
 def get_stale_source_ids(
-    conn: Connection, source: str, years: list[int] | None = None, *, after_days: int
+    conn: Connection, source: str, years: list[int], *, after_days: int
 ) -> list[str]:
     """Renvoie les identifiants natifs des documents de la source non revus par le moissonnage depuis `after_days` jours, hors documents disparus.
 
@@ -50,17 +56,8 @@ def get_stale_source_ids(
     """
     if source not in Source:
         raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(Source)}")
-    params: dict[str, object] = {"source": source, "days": after_days}
-    year_clause = ""
-    if years is not None:
-        # Une thèse en cours est sans année de soutenance : elle est cherchée quelle que soit la fenêtre.
-        year_clause = (
-            "AND (sr.publication_year IS NULL OR sr.publication_year = ANY(:years)"
-            f" OR sr.doc_type = '{DocType.ONGOING_THESIS}')"
-        )
-        params["years"] = list(years)
-    sql = text(_STALE_ROWS_SQL_TEMPLATE.format(year_clause=year_clause))
-    return list(conn.execute(sql, params).scalars())
+    params = {"source": source, "days": after_days, "years": list(years)}
+    return list(conn.execute(_STALE_ROWS_SQL, params).scalars())
 
 
 async def refresh(
@@ -70,7 +67,7 @@ async def refresh(
     log: logging.Logger,
     *,
     after_days: int,
-    years: list[int] | None = None,
+    years: list[int],
 ) -> PhaseMetrics:
     """Cherche de nouveau par identifiant natif les documents de la source non revus par le moissonnage depuis `after_days` jours.
 

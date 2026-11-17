@@ -5156,6 +5156,13 @@ export interface components {
             doc_type: string;
             /** Oa Status */
             oa_status: string;
+            /** Is Retracted */
+            is_retracted: boolean;
+            /**
+             * Retraction Doi
+             * @description DOI à consulter pour la rétractation (`retraction_doi`).
+             */
+            retraction_doi: string | null;
             /**
              * License
              * @description Licence de la version éditeur.
@@ -5272,6 +5279,13 @@ export interface components {
              * @description Lien d'accès (`domain.publications.access.access_url`).
              */
             access_url: string | null;
+            /** Is Retracted */
+            is_retracted: boolean;
+            /**
+             * Retraction Doi
+             * @description DOI à consulter pour la rétractation (`retraction_doi`).
+             */
+            retraction_doi: string | null;
             /**
              * License
              * @description Licence de la version éditeur.
@@ -5417,6 +5431,8 @@ export interface components {
             };
             /** Apc */
             apc: components["schemas"]["FacetOption"][];
+            /** Retracted */
+            retracted: components["schemas"]["FacetOption"][];
             /**
              * Citation Tops
              * @description Une publication du top 1 % compte aussi dans le top 10 %.
@@ -6252,6 +6268,11 @@ export interface components {
             forms: components["schemas"]["NameFormOut"][];
             /** Theses Count */
             theses_count: number;
+            /**
+             * Members Count
+             * @description Personnes retenues à période de présence actuelle dans la structure.
+             */
+            members_count: number;
         };
         /** StructureInfo */
         StructureInfo: {
@@ -6874,6 +6895,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -6929,6 +6951,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -7006,6 +7029,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -7101,6 +7125,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -7158,6 +7183,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -7215,6 +7241,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;
@@ -7528,6 +7555,7 @@ export interface operations {
                 excluded_doc_type?: string;
                 has_apc?: string;
                 citation_top?: string;
+                retracted?: string;
                 country?: string;
                 language?: string;
                 partner_ror?: string;

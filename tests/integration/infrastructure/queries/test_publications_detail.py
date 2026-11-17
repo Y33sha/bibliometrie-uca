@@ -16,7 +16,7 @@ from tests.integration.helpers.alignment import (
 )
 from tests.integration.helpers.contributions import contribution_id_of, insert_contribution
 from tests.integration.helpers.persons import insert_person
-from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.publications import insert_publication, insert_publication_relation
 from tests.integration.helpers.read_models import publications_queries
 from tests.integration.helpers.serials import insert_doi_prefix, insert_monograph, insert_publisher
 from tests.integration.helpers.sources import (
@@ -244,6 +244,41 @@ class TestAccessAndReferences:
         detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
         assert sorted(s.source for s in detail.referenced_by) == ["openalex", "wos"]
+
+
+class TestRetraction:
+    def _retracted(self, conn, doi) -> int:
+        publication = insert_publication(conn, doi=doi)
+        conn.execute(
+            text("UPDATE publications SET is_retracted = true WHERE id = :id"), {"id": publication}
+        )
+        return publication
+
+    def _core(self, conn, publication):
+        detail = publications_queries(conn).get_publication_detail(publication)
+        assert detail is not None
+        return detail.publication
+
+    def test_doi_de_l_avis_de_retractation(self, sa_sync_conn):
+        publication = self._retracted(sa_sync_conn, "10.1/a")
+        insert_publication_relation(
+            sa_sync_conn,
+            publication,
+            relation_type="has_retraction",
+            source="crossref",
+            target_doi="10.1/avis",
+        )
+        core = self._core(sa_sync_conn, publication)
+        assert (core.is_retracted, core.retraction_doi) == (True, "10.1/avis")
+
+    def test_sans_avis_le_doi_de_la_publication(self, sa_sync_conn):
+        """Rétractation sur place : la page de l'éditeur, au DOI de la publication, affiche la rétractation."""
+        core = self._core(sa_sync_conn, self._retracted(sa_sync_conn, "10.1/a"))
+        assert (core.is_retracted, core.retraction_doi) == (True, "10.1/a")
+
+    def test_publication_non_retractee(self, sa_sync_conn):
+        core = self._core(sa_sync_conn, insert_publication(sa_sync_conn, doi="10.1/a"))
+        assert (core.is_retracted, core.retraction_doi) == (False, None)
 
 
 class TestGetPublicationExternalIdentifiers:

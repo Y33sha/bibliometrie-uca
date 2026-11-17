@@ -683,6 +683,21 @@ def test_l_ajout_est_stable():
     assert compute_updates([notice, written], {_NOTICE_DOI: _ARTICLE_DOI}) == []
 
 
+def test_un_article_d_un_autre_titre_perd_le_doi_sans_ajout():
+    """Cas réel : le dépôt HAL d'un article porte le DOI du corrigendum d'un autre article."""
+    notice, _ = _notice_group()
+    unrelated = _row(
+        2,
+        "article",
+        _NOTICE_DOI,
+        title="impact of antenatal corticosteroids on head circumference of full term newborns",
+        shared_doi=_NOTICE_DOI,
+        source="hal",
+    )
+    (update,) = compute_updates([notice, unrelated], {_NOTICE_DOI: _ARTICLE_DOI})
+    assert update.identifiers == (_doi(_NOTICE_DOI, DoiClusterCase.AVIS_VS_ARTICLE.value),)
+
+
 def test_sans_oeuvre_declaree_le_doi_est_seulement_retire():
     notice, article = _notice_group()
     (update,) = compute_updates([notice, article])

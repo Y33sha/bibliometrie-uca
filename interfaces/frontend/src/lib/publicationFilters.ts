@@ -93,6 +93,14 @@ export function publicationFilters(context: PublicationListContext): ListFilter[
 			showColumns: ['serial'],
 		},
 		{
+			key: 'retracted',
+			control: 'checkbox',
+			label: 'Rétractation',
+			param: 'retracted',
+			group: 'venue',
+			facet: { type: 'labeled', apiKey: 'retracted' },
+		},
+		{
 			key: 'author',
 			control: 'entity',
 			label: filterLabels.author,

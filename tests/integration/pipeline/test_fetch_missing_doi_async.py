@@ -73,7 +73,7 @@ async def _run(adapter, dois: list[str], *, recorded: list | None = None, **kw) 
         patch.object(
             doi_search,
             "get_missing_dois",
-            lambda conn, target, *, retry_after_days, years=None: dois,
+            lambda conn, target, *, retry_after_days, years: dois,
         ),
         patch.object(doi_search, "record_failed_lookup", _record),
         patch.object(StagingStore, "stage", _stage),
@@ -84,6 +84,7 @@ async def _run(adapter, dois: list[str], *, recorded: list | None = None, **kw) 
             DoiSearch(adapter.fetch_async),
             logging.getLogger("test"),
             retry_after_days=30,
+            years=[2024],
             **kw,
         )
 

@@ -49,9 +49,9 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 ## Décisions
 
 - Les libellés des types, les familles et leur ordre sont définis dans le domaine. L'API les sert au frontend.
-- Une famille « Conférences » réunit `recorded_talk` (« Conférence filmée »), `conference` (« Communication ») et `poster`. Elle suit la famille Publications dans l'ordre d'affichage.
+- Une famille « Conférences » réunit `conference` (« Communication »), `conference_abstract` et `poster`. Elle suit la famille Publications dans l'ordre d'affichage.
 - `conference_paper` reste dans la famille Publications.
-- HAL `VIDEO` et DataCite `Audiovisual` donnent `recorded_talk`. Les règles de correction par le titre (interview, fichiers complémentaires) s'appliquent à ce type.
+- HAL `VIDEO` et DataCite `Audiovisual` donnent `video` (« Vidéo »), dans la famille « Annexes & divers » : ces sources ne distinguent pas une conférence filmée d'un film ou d'une vidéo de corpus. Les règles de correction par le titre (interview, fichiers complémentaires) s'appliquent à ce type.
 - HAL `SON` et DataCite `Sound` donnent `media`.
 - Un type `practice_thesis` distingue les thèses d'exercice des mémoires. Il est exclu des publications, comme `memoir`.
 - Un type `journal_issue` désigne le numéro de revue, dirigé ou non. Il est exclu des publications. Un article qui a le DOI de son numéro le perd.
@@ -84,23 +84,29 @@ Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur
 - [x] Errata WoS : titre WoS sans la référence de l'article (« (vol 21, pg 283, 2020) ») comparé au titre des publications, année de l'article lue dans la référence. Base locale : 169 errata reliés, dont 37 sans relation auparavant. 28 errata sans relation corrigent un article absent de la base. 074342de7
 - [x] Avis de rétractation : toutes les publications de type `retraction` sont reliées par les mises à jour Crossref. Elsevier déclare ses avis de rétractation comme des errata : une correction dont l'avis est de type `retraction` devient une rétractation. Base locale : 12 corrections remplacées par 8 rétractations. 7c178e803
 - [x] « Rétracté » calculé par la phase `relations` : relation de rétractation, rétractation sur place déclarée à Crossref, retrait, OpenAlex. Un avis, repéré par ses relations, est exclu. Un retrait Elsevier (`withdrawal`) est déclaré par le doublon retiré, vers l'article déjà publié : il marque le doublon, sans relation. Base locale : 9 publications rétractées. 0a89ad728
-- [ ] Doublons retirés par l'éditeur (Elsevier `withdrawal`) supprimés : 258617, 15131.
-- [ ] DOI tronqué déclaré par Retraction Watch (`10.1016/j.crphar.2022`, avis 9317).
+- [x] Doublons retirés par l'éditeur (Elsevier `withdrawal`) supprimés : un enregistrement source au DOI d'un doublon retiré, dont l'original est en base, est écarté de la réconciliation (`is_matchable`). Le doublon n'est pas rétracté ; un avis écarté reste sans relation. Base locale : 2 doublons (258617, un corrigendum retiré).
 - [x] Errata et avis typés par enregistrement source : mise à jour Crossref vers une autre œuvre, titres d'errata et d'avis, référence en fin de titre WoS. Un article rétracté sur place typé `retraction` (OpenAlex, 2236) redevient `article`. Mesure du 2026-11-16 : 151 errata et avis sur 346 avaient un enregistrement source d'un autre type ; 391 enregistrements sources retypés. e4f88f785
 - [x] `erratum` et `retraction` dans `OUT_OF_SCOPE_DOC_TYPES`. Oneshot `requeue_notice_publications` : 355 publications, 1 434 enregistrements sources à réconcilier. 6959cb793
 - [x] Tâche `notices` de la phase `relations` : la relation part de la publication concernée, vers le DOI de l'avis. Signaux : déclarations Crossref de la publication et de l'avis, référence en fin de titre WoS, titre « Erratum: ». Chaque tâche reconstruit sa partie de `publication_relations`, définie par des types de relation. 6959cb793
 - [x] « Rétracté » lu sur `has_retraction`, sans exclusion des avis. 6959cb793
-- [ ] Mesures après le run : publications d'errata et d'avis, relations de correction et de rétractation, publications rétractées.
-- [ ] Facette « Rétracté ». Mise en forme de la page d'un article rétracté.
+- [x] Réconciliation : un enregistrement source d'un type exclu n'entre dans aucune partition. Un erratum groupé avec l'article par une clé partagée faisait supprimer la publication de l'article. 9fabea3e9
+- [x] Copie d'un avis Crossref (même DOI, même titre, ou WoS) typée comme l'avis. Un document d'un autre type perd le DOI de l'avis (`AVIS_VS_ARTICLE`) et reçoit le DOI de l'œuvre corrigée, déclaré par l'avis, si son titre est proche. Colonne `source_record_identifiers.added_by`. Oneshot `requeue_notice_orphans` pour les articles détachés. 3664b493a, 7b6cddfaa, 94d99f4eb
+- [x] Mesures du 2026-11-17 : aucune publication d'erratum ou d'avis ; 518 relations vers un avis (439 Crossref, 79 par titre) ; 8 publications rétractées. Les articles détachés ont retrouvé leur publication, sauf deux dépôts HAL à DOI d'avis sans œuvre corrigée déclarée, doublons d'erreurs de HAL : fusionnés à la main (148617 ; 291196, après la priorité de la fusion manuelle sur les clés automatiques dans un pont de la réconciliation).
+- [x] Lien d'accès d'une publication rétractée : « Rétracté » en rouge, vers le DOI de l'avis de rétractation, à défaut celui de la publication ; page et listes.
+- [x] Facette « Rétractation » des publications, avec les filtres de la revue et de l'éditeur.
 
 ### Phase 3 — Arbitrage
 
-- [ ] `other` d'une source prioritaire face au type précis d'une autre source, compte tenu du type `article` qu'OpenAlex attribue par défaut. Cas : 87 working papers typés `other` par DataCite et `preprint` par HAL, dont 72 à DOI OSF (`10.17605`) (14691, 255632). 58 chapitres à DOI construit sur un ISBN, typés `book_chapter` par HAL ou une autre source (167674).
+- [x] `other` d'une source prioritaire face au type précis d'une autre source : `other` cède au premier type précis d'une source non agrégatrice ; le type d'OpenAlex ou de scanR ne l'emporte pas (pages OSF typées preprint, `article` par défaut). Simulation : 183 publications sur 3 031 `other` changent de type, dont 35 preprints que le `other` de scanR emportait (10.1002/essoar). Restent `other` les 180 où seul un agrégateur donne un type.
+
+- [x] DataCite `Collection` → `dataset` : collections Figshare de fichiers supplémentaires, tables HEPData, PANGAEA, ICOS (775 enregistrements sources). `Model` reste `other` : modèles et produits de modèles mêlés. Script `apply_doc_type_mapping` pour appliquer la table au stock, qui rattrape aussi DataCite `Audiovisual` (127) et `Sound` (1).
+- [x] `recorded_talk` (« Conférence filmée ») renommé `video` (« Vidéo ») : sur 164 publications, la moitié environ sont des conférences filmées, les autres des films, des vidéos de corpus Nakala, des bandes-annonces ; aucun congrès déclaré ne les distingue.
 
 ### Phase 4 — Cas particuliers
 
 - [x] Adresses d'en-tête HTTP `Link` recopiées par OpenAlex comme localisations, écartées : profils ORCID, pages de navigation d'entrepôts. 1 694 enregistrements sources en base locale. a82e4423f
 - [x] Règle `DOI_ISBN_CHAPTER_TO_BOOK_CHAPTER` : un enregistrement source `other` à DOI de chapitre (ISBN, `.ch`, un à trois chiffres) devient `book_chapter`. Base locale : 81 publications, chapitres de Wiley. 4af130011
+- [x] Pièces d'un jeu de données : la règle `DATACITE_PACKAGE_PIECE` les fond dans la publication du parent quand DataCite déclare `IsPartOf` (2 175 pièces). Nakala ne déclare pas la collection, sans DOI enregistré, qui réunit parfois une série de conférences : ses pièces restent des publications distinctes (257102).
 
 ### Phase 5 — Résumés de conférence
 
@@ -114,11 +120,4 @@ Mesures du 2026-11-03, publications du périmètre : 1 895 communications rattac
 
 ### Phase 6 — Documentation
 
-- [ ] Mise à jour de la documentation.
-
-## Questions ouvertes
-
-- Pièces d'un corpus Nakala (257102) : publications distinctes, ou éléments d'un jeu de données.
-- Films, bandes-annonces et MOOC en `recorded_talk` par la correspondance de HAL `VIDEO` et DataCite `Audiovisual`.
-- « Meeting report » publié en revue, typé `article` par toutes les sources (176417, 180148, 16340) : quel signal pour le typer `conference_abstract` ?
-- Article corrigé ou rétracté absent de la base, cible d'un erratum ou d'un avis du périmètre : moissonnage par DOI (`fetch_missing`) ?
+- [x] Mise à jour de la documentation.

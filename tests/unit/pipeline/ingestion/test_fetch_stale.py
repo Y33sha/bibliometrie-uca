@@ -16,9 +16,10 @@ from unittest.mock import MagicMock
 import pytest
 
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
-from pipeline.ingestion.common import lookup, stale_refetch
+from pipeline.ingestion.common import fetch_stale, lookup, stale_refetch
 from pipeline.ingestion.common.staging import StagingStore
 from pipeline.ingestion.common.stale_refetch import refresh
+from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 @dataclass
@@ -56,7 +57,14 @@ def lancer(monkeypatch):
             return outcomes[source_id]
 
         metrics = asyncio.run(
-            refresh(MagicMock(), "openalex", _fetch_one, logging.getLogger("test"), after_days=90)
+            refresh(
+                MagicMock(),
+                "openalex",
+                _fetch_one,
+                logging.getLogger("test"),
+                after_days=90,
+                years=[2024],
+            )
         )
         return metrics, base
 
@@ -126,3 +134,13 @@ def test_progress_counter_counts_documents_found_at_the_source(monkeypatch, lanc
 
     assert options.get("count_kept") is True
     assert (spy.avances, spy.kept) == (4, 2)
+
+
+def test_la_table_de_la_phase_compte_les_documents_renvoyes_sous_un_autre_identifiant():
+    """Un work fusionné écrit le work renvoyé, nouveau dans `staging`."""
+    metrics = fetch_stale.assemble(
+        {"openalex": PhaseMetrics(seen=1, new=1, extras={"disappeared": 1})}
+    )
+
+    (row,) = metrics.details["table"]["rows"]
+    assert (row["key"], row["new"], row["disappeared"]) == ("openalex", 1, 1)

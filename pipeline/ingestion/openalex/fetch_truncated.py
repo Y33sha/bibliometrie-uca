@@ -26,8 +26,6 @@ from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-"""Plafond OpenAlex 10 req/s."""
-
 _SELECT_TRUNCATED_SQL = text(
     """
     SELECT source_id
@@ -93,7 +91,7 @@ _CHILDREN = (
         section="Listes d'auteurs tronquées",
         silent_when_empty=True,
         # La tâche tourne dans tous les modes, si le run interroge OpenAlex.
-        when=lambda ctx: "openalex" in ctx.options.queried_sources,
+        when=lambda ctx: "openalex" in ctx.options.sources,
     ),
 )
 

@@ -41,6 +41,10 @@ class TestMapDocType:
     def test_datacite_physicalobject_vers_physical_object(self):
         assert map_doc_type("PhysicalObject", source="datacite") == "physical_object"
 
+    def test_datacite_collection_vers_dataset(self):
+        """Collections Figshare de fichiers supplémentaires, tables HEPData, collections PANGAEA et ICOS."""
+        assert map_doc_type("Collection", source="datacite") == "dataset"
+
     def test_datacite_texte_libre_technique_vers_report(self):
         assert map_doc_type("Technical note", source="datacite") == "report"
         assert map_doc_type("Technical Report", source="datacite") == "report"
@@ -48,9 +52,9 @@ class TestMapDocType:
     def test_datacite_presentation_vers_conference(self):
         assert map_doc_type("Presentation", source="datacite") == "conference"
 
-    def test_videos_vers_recorded_talk(self):
-        assert map_doc_type("VIDEO", source="hal") == "recorded_talk"
-        assert map_doc_type("Audiovisual", source="datacite") == "recorded_talk"
+    def test_videos_vers_video(self):
+        assert map_doc_type("VIDEO", source="hal") == "video"
+        assert map_doc_type("Audiovisual", source="datacite") == "video"
 
     def test_enregistrements_audio_vers_media(self):
         assert map_doc_type("SON", source="hal") == "media"

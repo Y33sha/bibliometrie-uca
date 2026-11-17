@@ -9,7 +9,7 @@ Chaque document est cherché par son identifiant natif :
 
 Le délai étale la charge : chaque passe reprend seulement les documents qui viennent de le franchir.
 
-La recherche se borne aux années moissonnées par le run. Une thèse en cours est cherchée quelle que soit la fenêtre. La phase est sautée dans un mode dont la policy l'exclut (`daily`). WoS est opt-in (`--include-wos`).
+La recherche se borne aux années moissonnées par le run. Une thèse en cours est cherchée quelle que soit la fenêtre.
 """
 
 from __future__ import annotations
@@ -28,13 +28,13 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import assemble_by_source
 
 
-def _years(ctx: PhaseContext) -> list[int] | None:
-    """Renvoie les années de la fenêtre du run (`window_years`), ou `None` pour tout l'historique."""
+def _years(ctx: PhaseContext) -> list[int]:
+    """Renvoie les années de la fenêtre du run (`window_years`)."""
     with ctx.open_tx() as conn:
         return window_years(conn, ctx.options.years)
 
 
-def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) -> PhaseMetrics:
+def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int]) -> PhaseMetrics:
     """Cherche de nouveau les documents anciens d'une source, sur sa propre connexion."""
     fetch_one = adapter(Source(target)).fetch_by_native_id
     with ctx.open_tx() as conn:
@@ -54,7 +54,7 @@ _CHILDREN = tuple(
         parallel_group="sources",
         run=lambda ctx, source=source: _run_fetch_stale(ctx, source, _years(ctx)),
         label=source_label(source),
-        when=lambda ctx, source=source: source in ctx.options.queried_sources,
+        when=lambda ctx, source=source: source in ctx.options.sources,
     )
     for source in Source
 )
@@ -65,6 +65,8 @@ def _summary(metrics: PhaseMetrics) -> dict[str, float | None]:
     return {
         "interrogated": metrics.total,
         "refreshed": metrics.updated,
+        # Document renvoyé sous un autre identifiant natif que celui cherché.
+        "new": metrics.new,
         "unchanged": metrics.unchanged,
         "disappeared": metrics.extras.get("disappeared", 0),
         "duration_s": metrics.duration_s,

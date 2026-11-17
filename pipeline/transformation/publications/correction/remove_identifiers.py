@@ -34,6 +34,7 @@ from domain.source_records.metadata_correction.shared_doi import (
     resolve_cluster_doi_corrections,
 )
 from domain.source_records.notices import corrected_work_doi
+from domain.sources.registry import Source
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.correction.correction_batches import persist_in_batches
@@ -124,7 +125,7 @@ def compute_updates(
 ) -> list[DoiCorrectionUpdate]:
     """Calcule les mises à jour des enregistrements sources des groupes de même DOI. Les retraits d'un enregistrement source membre de plusieurs groupes se cumulent. La règle de retrait est définie dans `resolve_cluster_doi_corrections`.
 
-    Un document qui perd le DOI d'un avis (`AVIS_VS_ARTICLE`) reçoit le DOI de l'œuvre corrigée, déclaré par l'avis : il rejoint ainsi la publication de cette œuvre.
+    Un document qui perd le DOI d'un avis (`AVIS_VS_ARTICLE`) reçoit le DOI de l'œuvre corrigée, déclaré par l'avis, si son titre est proche de celui de l'avis (`distant_titles`). Il rejoint ainsi la publication de cette œuvre.
 
     Args:
         corrected_works: DOI de l'œuvre corrigée, par DOI d'avis Crossref (`corrected_work_doi`).
@@ -145,11 +146,17 @@ def compute_updates(
             has_target=any(m.has_target for m in members),
         )
         by_id = {m.id: m for m in members}
+        notice_titles = [m.title_normalized for m in members if m.source == Source.CROSSREF]
         for decision in decisions:
             removed_dois[decision.id][shared_doi] = decision.case.value
             work = corrected_works.get(shared_doi)
-            if decision.case is DoiClusterCase.AVIS_VS_ARTICLE and work is not None:
-                added_dois[decision.id][work] = _role_of(by_id[decision.id], shared_doi)
+            member = by_id[decision.id]
+            if (
+                decision.case is DoiClusterCase.AVIS_VS_ARTICLE
+                and work is not None
+                and any(not distant_titles(member.title_normalized, t) for t in notice_titles)
+            ):
+                added_dois[decision.id][work] = _role_of(member, shared_doi)
         for removal in confirmation_id_removals(group, decisions):
             confirmation_removals[removal.id].append(removal)
         records.update((m.id, m) for m in members)

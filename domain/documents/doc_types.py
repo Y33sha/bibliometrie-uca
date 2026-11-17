@@ -12,7 +12,7 @@ class DocType(StrEnum):
     CONFERENCE_PAPER = "conference_paper"
     CONFERENCE = "conference"
     CONFERENCE_ABSTRACT = "conference_abstract"
-    RECORDED_TALK = "recorded_talk"
+    VIDEO = "video"
     BOOK = "book"
     BOOK_CHAPTER = "book_chapter"
     THESIS = "thesis"
@@ -70,7 +70,7 @@ DOC_TYPE_LABELS: dict[DocType, DocTypeLabel] = {
     DocType.CONFERENCE_PAPER: DocTypeLabel("Conference paper", "Conference papers"),
     DocType.CONFERENCE: DocTypeLabel("Communication", "Communications"),
     DocType.CONFERENCE_ABSTRACT: DocTypeLabel("Résumé de conférence", "Résumés de conférence"),
-    DocType.RECORDED_TALK: DocTypeLabel("Conférence filmée", "Conférences filmées"),
+    DocType.VIDEO: DocTypeLabel("Vidéo", "Vidéos"),
     DocType.BOOK: DocTypeLabel("Ouvrage", "Ouvrages"),
     DocType.BOOK_CHAPTER: DocTypeLabel("Chapitre", "Chapitres"),
     DocType.THESIS: DocTypeLabel("Thèse", "Thèses"),
@@ -124,7 +124,6 @@ DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
         (
             DocType.CONFERENCE,
             DocType.CONFERENCE_ABSTRACT,
-            DocType.RECORDED_TALK,
             DocType.POSTER,
         ),
     ),
@@ -148,6 +147,7 @@ DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
         "Annexes & divers",
         (
             DocType.OTHER,
+            DocType.VIDEO,
             DocType.MEDIA,
             DocType.REPORT,
             DocType.ERRATUM,

@@ -21,7 +21,7 @@ from types import FrameType
 from typing import NoReturn, cast
 
 from domain.pipeline_runs import PhaseStatus
-from domain.sources.registry import Source
+from domain.sources.registry import DEFAULT_SOURCES, Source
 from infrastructure.observability.log import (
     RUN_END_MARKER,
     RUN_MARKER,
@@ -32,7 +32,7 @@ from infrastructure.observability.log import (
     set_log_phase,
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder, start_run
-from pipeline.graph import Block, Phase, Task, reads_from
+from pipeline.graph import Phase, Task, reads_from
 from pipeline.ingestion.api_params import request_budget
 from pipeline.ingestion.credentials import source_credentials_missing
 from pipeline.phases import PERIMETER_STRUCTURES, PHASES
@@ -117,11 +117,6 @@ class _RunFlag:
 
 _RUN_FLAGS = (
     _RunFlag(
-        "--include-wos",
-        "Inclure WoS dans le moissonnage et la phase fetch_missing (source exclue par défaut : "
-        "en fin de vie, crédit API limité).",
-    ),
-    _RunFlag(
         "--raw-store",
         "Archive les réponses brutes des sources sur disque, sous `BIBLIO_RAW_STORE_DIR`. Rejouer "
         "une normalisation puise alors dans cette archive au lieu de réinterroger les sources.",
@@ -195,8 +190,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--sources",
         type=_source_list,
-        default=frozenset(Source),
-        help=f"Sources, séparées par des virgules (défaut : {','.join(Source)})",
+        default=DEFAULT_SOURCES,
+        help="Sources, séparées par des virgules (défaut : "
+        f"{','.join(s for s in Source if s in DEFAULT_SOURCES)}). Une source hors défaut "
+        f"({', '.join(s for s in Source if s not in DEFAULT_SOURCES)}) est interrogée "
+        "seulement si elle est nommée : son crédit d'API est limité.",
     )
     parser.add_argument(
         "--years",
@@ -303,9 +301,6 @@ def _run_one_phase(
             )
 
         duration = time.time() - t0_phase
-        if phase.block is Block.HARVESTING:
-            log.info("")
-            log.info("Total : %s", metrics.as_summary())
         recorder.record(
             phase=name,
             started_at=phase_started_at,
@@ -364,9 +359,7 @@ def _stop_on_failure(
 def _execute_phases(options: RunOptions, phases_to_run: list[Phase]) -> None:
     """Déroule la séquence des phases avec observabilité par run, puis le récapitulatif de fin."""
     # Enregistre le run et chacune de ses phases : identifiant de séquence, entrées, sorties, statut.
-    recorder = start_run(
-        mode=options.mode, sources=[s for s in Source if s in options.queried_sources]
-    )
+    recorder = start_run(mode=options.mode, sources=[s for s in Source if s in options.sources])
     if recorder.run_id is not None:
         log.info("%s%d", RUN_MARKER, recorder.run_id)
 

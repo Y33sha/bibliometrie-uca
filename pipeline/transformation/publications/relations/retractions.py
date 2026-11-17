@@ -4,8 +4,9 @@ Une publication est rétractée sur l'un de ces signaux :
 
 - elle a un avis de rétractation (`has_retraction`) ;
 - Crossref déclare une rétractation sur place : mise à jour `retraction` ou `withdrawal` vers le DOI de l'enregistrement source lui-même ;
-- Crossref déclare un retrait (`withdrawal`) dans `update_to` : l'enregistrement source déclarant est le doublon retiré ;
 - OpenAlex la marque rétractée.
+
+Un retrait (`withdrawal`) vers un autre DOI désigne un doublon éditorial de l'article original : le doublon reste hors de la réconciliation (`is_matchable`), l'original n'est pas rétracté.
 """
 
 from __future__ import annotations
@@ -24,14 +25,11 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 _RETRACTED_SQL = f"""
     WITH crossref_update AS (
-        SELECT sr.publication_id, sr.source_id, u.key, u.value->>'type' AS type, u.value->>'doi' AS doi
+        SELECT sr.publication_id, sr.source_id, u.value->>'type' AS type, u.value->>'doi' AS doi
         FROM source_records sr
-        CROSS JOIN LATERAL (
-            SELECT '{SourceExtra.UPDATE_TO}' AS key, value
-            FROM jsonb_array_elements(coalesce(sr.source_extras->'{SourceExtra.UPDATE_TO}', '[]'))
-            UNION ALL
-            SELECT '{SourceExtra.UPDATED_BY}', value
-            FROM jsonb_array_elements(coalesce(sr.source_extras->'{SourceExtra.UPDATED_BY}', '[]'))
+        CROSS JOIN LATERAL jsonb_array_elements(
+            coalesce(sr.source_extras->'{SourceExtra.UPDATE_TO}', '[]')
+            || coalesce(sr.source_extras->'{SourceExtra.UPDATED_BY}', '[]')
         ) u
         WHERE sr.source = '{Source.CROSSREF.value}' AND sr.publication_id IS NOT NULL
     ),
@@ -40,8 +38,7 @@ _RETRACTED_SQL = f"""
         WHERE relation_type = '{RelationType.HAS_RETRACTION.value}'
         UNION
         SELECT publication_id FROM crossref_update
-        WHERE (type IN ('{CROSSREF_RETRACTION_UPDATE}', '{CROSSREF_WITHDRAWAL_UPDATE}') AND doi = source_id)
-           OR (type = '{CROSSREF_WITHDRAWAL_UPDATE}' AND key = '{SourceExtra.UPDATE_TO}')
+        WHERE type IN ('{CROSSREF_RETRACTION_UPDATE}', '{CROSSREF_WITHDRAWAL_UPDATE}') AND doi = source_id
         UNION
         SELECT publication_id FROM source_records
         WHERE source = '{Source.OPENALEX.value}' AND is_retracted AND publication_id IS NOT NULL

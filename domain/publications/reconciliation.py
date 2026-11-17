@@ -152,7 +152,16 @@ def _bridge_anchor(
     by_anchor: Mapping[Anchor, list[ReconcileMember]],
     anchors_by_token: Mapping[tuple[str, str], set[Anchor]],
 ) -> Anchor | None:
-    """Renvoie l'ancre rejointe par une sous-composante sans ancre : l'unique ancre reliée à elle par une clé, à défaut l'unique ancre reliée qui partage un type de document avec elle. `None` sans ancre unique."""
+    """Renvoie l'ancre rejointe par une sous-composante sans ancre : l'unique ancre reliée à elle par une fusion manuelle, à défaut l'unique ancre reliée à elle par une clé, à défaut l'unique ancre reliée qui partage un type de document avec elle. `None` sans ancre unique."""
+    merged = {
+        a
+        for m in bridge
+        for t in m.tokens
+        if t[0] == MANUAL_MERGE_KEY
+        for a in anchors_by_token.get(t, ())
+    }
+    if len(merged) == 1:
+        return next(iter(merged))
     linked = {a for m in bridge for t in m.tokens for a in anchors_by_token.get(t, ())}
     if len(linked) == 1:
         return next(iter(linked))

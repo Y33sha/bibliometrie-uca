@@ -1,6 +1,6 @@
 """Moissonnage d'une source par l'identifiant des personnes RH, identifiant confirmé ou authentifié : socle commun des tâches `harvest_by_person`.
 
-Chaque source est interrogée par lots de personnes, page après page, sur la plage d'années du moissonnage. Les lots réunissent les personnes qui copublient (`person_batches`). Une requête réunit tous les identifiants des personnes du lot, dans les types acceptés par la source (`PERSON_SEARCH_IDENTIFIERS`). Les lots partent en parallèle, dans la limite de requêtes simultanées de la source (`MAX_CONCURRENT`). Un document ramené par plusieurs lots est écrit une fois par run. Une erreur sur un lot émet un signal `harvest_error`, et le moissonnage passe au suivant.
+Chaque source est interrogée par lots de personnes, page après page, sur la plage d'années du moissonnage. Les lots réunissent les personnes qui copublient (`person_batches`). Une requête réunit tous les identifiants des personnes du lot, dans les types acceptés par la source (`SourceProfile.person_identifiers`). Les lots partent en parallèle, dans la limite de requêtes simultanées de la source (`MAX_CONCURRENT`). Un document ramené par plusieurs lots est écrit une fois par run. Une erreur sur un lot émet un signal `harvest_error`, et le moissonnage passe au suivant.
 """
 
 from __future__ import annotations

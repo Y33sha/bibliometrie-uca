@@ -20,7 +20,6 @@
 	import { toast, toastError } from '#lib/dialogs.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
-	import { halCollectionUrl } from '#lib/utils.js';
 	import IdentifierLink from '#lib/components/IdentifierLink.svelte';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import IconButton from '#lib/components/IconButton.svelte';
@@ -161,12 +160,11 @@
 				<SortChevron direction={sortDirection(list.sort,'tutelles')} />
 			</th>
 			<th>ROR</th>
-			<th>Collection HAL</th>
 		</tr>
 	</thead>
 	<tbody>
 		{#if list.listing.items.length === 0}
-			<TableStatusRow loading={list.listing.loading} error={list.listing.error} colspan={5 + (showTypeColumn ? 1 : 0) + (isAdmin() ? 1 : 0)} emptyText="Aucune structure ne correspond aux filtres." />
+			<TableStatusRow loading={list.listing.loading} error={list.listing.error} colspan={4 + (showTypeColumn ? 1 : 0) + (isAdmin() ? 1 : 0)} emptyText="Aucune structure ne correspond aux filtres." />
 		{/if}
 		{#each list.listing.items as s (s.id)}
 			<tr class:active-row={s.id === drawer.id}>
@@ -184,22 +182,9 @@
 				<td>
 					<a href={resolve(`structures/${s.id}`)} class="entity-link">{s.name}</a>
 				</td>
-				<td class="tutelles-col">
-					<div class="tutelles">
-						{#each s.tutelles || [] as t (t.id)}
-							<span class="tag">{structureLabel(t)}</span>
-						{/each}
-					</div>
-				</td>
+				<td class="tutelles-col muted">{(s.tutelles || []).map(structureLabel).join(', ')}</td>
 				<td>
 					{#if s.ror_id}<IdentifierLink id_type="ror" id_value={s.ror_id} />{/if}
-				</td>
-				<td>
-					{#if s.hal_collection}
-						<a href={halCollectionUrl(s.hal_collection)} target="_blank" rel="noopener" class="tag id-badge">
-							{s.hal_collection}
-						</a>
-					{/if}
 				</td>
 			</tr>
 		{/each}
@@ -240,13 +225,6 @@
 		font-weight: 600;
 	}
 	.tutelles-col {
-		width: 1%;
 		min-width: 150px;
-		white-space: nowrap;
-	}
-	.tutelles {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px;
 	}
 </style>

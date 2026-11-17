@@ -15,6 +15,7 @@ Relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software
 - [x] Une année en échec dans `SourceHarvester._harvest_by_year` émet un signal et compte une erreur. La phase passe en avertissement. Test de non-régression. Même traitement pour un lot en échec du moissonnage par personne, et pour les deux échecs d'année journalisés sans exception par WoS.
 - [x] Les documents d'une page annulée par le rollback sortent des métriques : `stage_records` compte un lot après son commit.
 - [x] Un moissonnage OpenAlex arrêté avant le nombre de works annoncé journalise le point d'arrêt de la pagination (page vide ou sans curseur suivant, curseur demandé). Au-delà de 1 % d'écart, il émet un signal `harvest_incomplete`. Des runs passés ont perdu jusqu'à neuf dixièmes d'une année sans signal.
+- [x] Les plafonds d'API émettent le même signal : 100 000 records par requête WoS, 2 000 résultats par graphie de déposant OPS.
 
 ### Phase 2 — Exécuteur des tâches
 
@@ -34,6 +35,7 @@ Relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software
 
 - [x] `main()` configure le logger racine et le flux console. L'import de `pipeline/run.py` reste sans effet de bord. Même chose pour le logger de `pipeline/runtime/execution.py`.
 - [x] Le rendu de la bannière passe de `pipeline/run.py` à `pipeline/runtime/observability/log_format.py`, avec le cadre des phases dont il partage la largeur.
+- [x] `--include-wos` disparaît. `--sources` règle seule les sources du run : par défaut toutes hors sources sur option (`DEFAULT_SOURCES`), une source sur option entre dans le run quand elle est nommée. `--sources wos` sans `--include-wos` interrogeait zéro source, sans signal.
 
 ### Phase 5 — Docstrings
 
@@ -42,9 +44,6 @@ Relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software
 
 ### Phase 6 — Documentation
 
-- [ ] `docs/architecture/06-pipeline.md` : déclaration d'une phase par `PHASE` dans son module, `phases.py` réduit à l'ordre.
-- [ ] `docs/donnees/06-structures.md` et `docs/donnees/09-donnees-derivees.md` : `perimeter_structures` recalculée en tête de la première phase du run qui la lit, au lieu d'« avant la première phase ».
-
-## Questions ouvertes
-
-- `--sources` et `--include-wos` règlent la même décision. `--sources wos` sans `--include-wos` moissonne zéro source, sans signal. L'option nomme une source, le mécanisme est générique (`SourceProfile.opt_in`). Proposition : `--sources` exclut par défaut les sources sur option et les inclut quand elles sont nommées. `--include-wos` disparaît.
+- [x] `docs/architecture/06-pipeline.md` : déclaration d'une phase par `PHASE` dans son module, `phases.py` réduit à l'ordre.
+- [x] `docs/donnees/06-structures.md` et `docs/donnees/09-donnees-derivees.md` : `perimeter_structures` recalculée en tête de la première phase du run qui la lit, au lieu d'« avant la première phase ».
+- [x] `docs/exploitation/03-pipeline.md` et `docs/sources/04-wos.md` : WoS interrogée quand `--sources` la nomme, sans `--include-wos`.

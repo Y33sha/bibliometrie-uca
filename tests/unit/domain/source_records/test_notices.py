@@ -4,6 +4,7 @@ from domain.source_records.notices import (
     CorrectedArticle,
     corrected_work_doi,
     notice_doc_type,
+    withdrawn_original_doi,
     wos_corrected_article,
 )
 
@@ -32,6 +33,28 @@ class TestCorrectedWorkDoi:
         extras = {"update_to": [{"doi": "10.1/a", "type": "new_version", "source": "publisher"}]}
         assert corrected_work_doi(extras, "10.1/notice") is None
         assert corrected_work_doi(None, "10.1/notice") is None
+
+
+class TestWithdrawnOriginalDoi:
+    def test_duplicate_declares_the_original(self):
+        """Cas réel : la version française retirée déclare un retrait vers l'article de Joint Bone Spine."""
+        extras = {
+            "update_to": [
+                {"doi": "10.1016/j.jbspin.2022.105478", "type": "withdrawal", "source": "publisher"}
+            ]
+        }
+        assert (
+            withdrawn_original_doi(extras, "10.1016/j.rhum.2022.12.007")
+            == "10.1016/j.jbspin.2022.105478"
+        )
+
+    def test_withdrawal_in_place_or_other_updates(self):
+        """Un retrait vers son propre DOI, ou une rétractation, ne désigne aucun original."""
+        in_place = {"update_to": [{"doi": "10.1/a", "type": "withdrawal", "source": "publisher"}]}
+        assert withdrawn_original_doi(in_place, "10.1/a") is None
+        retraction = {"update_to": [{"doi": "10.1/b", "type": "retraction", "source": "publisher"}]}
+        assert withdrawn_original_doi(retraction, "10.1/a") is None
+        assert withdrawn_original_doi(None, "10.1/a") is None
 
 
 class TestNoticeDocType:

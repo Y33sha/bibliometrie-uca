@@ -142,7 +142,7 @@
 	</div>
 
 	<!-- Tabs -->
-	<TabNav {tabs} />
+	<TabNav {tabs} keep={['serial']} />
 
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
@@ -150,7 +150,6 @@
 			<PublicationsDashboard
 				context={{ kind: 'serial', id: serialId }}
 				apiKey="serial-dashboard"
-				countries={false}
 				oaBreakdown="oa_voie"
 			>
 				{#snippet subjects()}
@@ -192,7 +191,7 @@
 	<!-- Tab: Monographies -->
 	{#if activeTab === 'monographs'}
 		<div class="tab-content">
-			<MonographsListView apiKey={`journal-${serialId}-monographs`} externalFilters={{ serialId }} />
+			<MonographsListView apiKey={`journal-${serialId}-monographs`} externalFilters={{ serialId }} urlSync basePath={`/journals/${serialId}`} />
 		</div>
 	{/if}
 

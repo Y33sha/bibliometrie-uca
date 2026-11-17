@@ -64,6 +64,16 @@ class TestListMultiValueFilters:
 
 
 class TestLaboratoryDisplay:
+    def test_selected_laboratory_without_member_keeps_its_label(self, sa_sync_conn):
+        lab = insert_structure(sa_sync_conn, "LAB-EMPTY", acronym="LABEMPTY")
+
+        facets = PersonsQueries(sa_sync_conn).persons_facets(
+            filters=PersonFilters(laboratories=[lab])
+        )
+
+        option = next(o for o in facets.laboratories if o.value == str(lab))
+        assert (option.label, option.count) == ("LABEMPTY", 0)
+
     def test_current_laboratories(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB-DISP", acronym="LABDISP")
         person = _create_person(sa_sync_conn, "Displayy")

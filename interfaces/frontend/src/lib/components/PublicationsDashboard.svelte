@@ -1,18 +1,19 @@
 <script lang="ts">
+	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import BookOpen from '@lucide/svelte/icons/book-open';
 	import Globe from '@lucide/svelte/icons/globe';
 	import GraduationCap from '@lucide/svelte/icons/graduation-cap';
 	import LockOpen from '@lucide/svelte/icons/lock-open';
 	import Star from '@lucide/svelte/icons/star';
 	import type { Snippet } from 'svelte';
+	import { tooltip } from '#lib/actions/tooltip.svelte.js';
+	import { tabHref, type TabLink } from '#lib/tabs.js';
 	import { api } from '#lib/api/index.js';
 	import type { components } from '#lib/api/schema.js';
 	import KeyFigures, { type KeyFigure } from '#lib/components/KeyFigures.svelte';
 	import BarChart from '#lib/components/charts/BarChart.svelte';
 	import StackedBarChart from '#lib/components/charts/StackedBarChart.svelte';
 	import YearScatterChart from '#lib/components/charts/YearScatterChart.svelte';
-	import { cssColor } from '#lib/components/charts/cssVar.js';
-	import { countryName } from '#lib/countryNames.js';
 	import { defaultYears } from '#lib/defaultYears.js';
 	import { publicationsDocTypes } from '#lib/docTypes.svelte.js';
 	import { orderedPivotValues, pivotValueColor, pivotValueDescription, pivotValueLabel } from '#lib/pivotValues.js';
@@ -27,13 +28,13 @@
 	type Row = PivotResponse['rows'][number];
 
 	// Dashboard des publications d'une entité, calculé par le moteur de la page Statistiques. Le corpus est celui de l'onglet Publications, restreint à la famille « Publications » et aux années récentes. La répartition par types de documents compte toutes les familles, sur les mêmes années.
+	// Un graphique que la vue Statistiques sait reproduire mène à elle, dans l'onglet Publications de la fiche, avec les filtres du graphique posés.
 	let {
 		context,
 		apiKey,
 		thesesFigure = true,
 		citationFigure = true,
 		citationScatter = false,
-		countries = true,
 		oaBreakdown = 'oa_access',
 		figures = [],
 		subjects,
@@ -47,8 +48,6 @@
 		citationFigure?: boolean;
 		/** Affiche le nuage des citations ou du FWCI de chaque publication, par année. */
 		citationScatter?: boolean;
-		/** Affiche les pays partenaires. */
-		countries?: boolean;
 		/** Découpage des publications par année : niveau d'accès, ou modèle open access. */
 		oaBreakdown?: 'oa_access' | 'oa_voie';
 		/** Chiffres clés propres à la page, après ceux du dashboard. */
@@ -142,9 +141,23 @@
 	const withCitationClass = $derived(sum(citationClasses));
 
 	const keyFigures = $derived<KeyFigure[]>([
-		{ value: formatNumber(total), label: plural(total, 'publication'), icon: BookOpen },
+		{
+			value: formatNumber(total),
+			label: plural(total, 'publication'),
+			icon: BookOpen,
+			link: publicationsTab({}, publicationsDocTypes()),
+			hoverColor: 'var(--key-figure-publications)',
+		},
 		...(total > 0
-			? [{ value: percent(openAccess, total), label: 'en open access', tone: 'open' as const, icon: LockOpen }]
+			? [
+					{
+						value: percent(openAccess, total),
+						label: 'en open access',
+						icon: LockOpen,
+						link: statsTab('oa_access', 'year', publicationsDocTypes(), 'part'),
+						hoverColor: 'var(--key-figure-open-access)',
+					},
+				]
 			: []),
 		...(withCitationClass > 0
 			? [
@@ -152,7 +165,8 @@
 						value: percent(topCited, withCitationClass),
 						label: 'dans le top 10 % des plus citées',
 						icon: Star,
-						tooltip: `D'après OpenAlex, sur les ${formatNumber(withCitationClass)} publications pourvues de l'indicateur (${percent(withCitationClass, total)} du corpus)`,
+						link: statsTab('citation_class', 'year', publicationsDocTypes(), 'part'),
+						hoverColor: 'var(--key-figure-citations)',
 					},
 				]
 			: []),
@@ -162,6 +176,8 @@
 						value: percent(collab.international_count, collab.total_count),
 						label: 'en collaboration internationale',
 						icon: Globe,
+						link: statsTab('collaboration', 'year', publicationsDocTypes(), 'part'),
+						hoverColor: 'var(--key-figure-collaboration)',
 					},
 				]
 			: []),
@@ -198,9 +214,25 @@
 			})),
 	);
 
+	/** Onglet Publications de la fiche, sur les années du dashboard et les types `docTypes` (tous à défaut) : `settings` choisit la vue et les réglages du graphique. */
+	function publicationsTab(settings: Record<string, string>, docTypes: string[] | null): TabLink {
+		const params: Record<string, string> = { ...settings };
+		if (docTypes) params.doc_type = docTypes.join(',');
+		if (years.length) params.year = years.join(',');
+		return { tab: 'publications', params };
+	}
+
+	/** Vue Statistiques de l'onglet Publications : un indicateur, une comparaison (vide pour « au total »), en valeur absolue ou en pourcentage. */
+	function statsTab(indicator: string, groupBy: string, docTypes: string[] | null, mode: 'absolu' | 'part' = 'absolu'): TabLink {
+		return publicationsTab({ view: 'stats', indicator, group_by: groupBy, mode }, docTypes);
+	}
+
 	const typeValues = $derived(orderedPivotValues('doc_type_grouped', types));
-	const topCountries = $derived(countries ? (collab?.rows ?? []).slice(0, 5) : []);
 </script>
+
+{#snippet statsLink(link: TabLink)}
+	<a class="stats-link" href={tabHref(link)} aria-label="Explorer dans la vue Statistiques" use:tooltip={'Ouvrir dans la vue Statistiques, filtrable'}>Explorer <ArrowRight size={13} /></a>
+{/snippet}
 
 {#if !loaded}
 	<div class="loading">Chargement…</div>
@@ -208,12 +240,12 @@
 	<KeyFigures items={keyFigures} {period} />
 	<div class="dash-grid">
 		<div class="dash-card">
-			<h2>Publications par année</h2>
+			<h2 class="with-link">Publications par année{@render statsLink(statsTab(oaBreakdown, 'year', publicationsDocTypes()))}</h2>
 			<StackedBarChart labels={yearLabels} series={accessSeries} />
 		</div>
 		{@render subjects?.()}
 		<div class="dash-card">
-			<h2>Types de documents</h2>
+			<h2 class="with-link">Types de documents{@render statsLink(statsTab('doc_type_grouped', '', null))}</h2>
 			<BarChart
 				labels={typeValues.map((v) => pivotValueLabel('doc_type_grouped', v))}
 				values={typeValues.map((v) => sum(types.filter((r) => r.doc_type_grouped === v)))}
@@ -238,22 +270,35 @@
 				/>
 			</div>
 		{/if}
-		{#if topCountries.length}
-			<div class="dash-card">
-				<h2>Pays partenaires</h2>
-				<BarChart
-					labels={topCountries.map((c) => countryName(c.code) ?? c.code.toUpperCase())}
-					values={topCountries.map((c) => c.value)}
-					color={cssColor('doctype-article')}
-					datasetLabel="Publications"
-					horizontal
-				/>
-			</div>
-		{/if}
 	</div>
 {/if}
 
 <style>
+	/* Titre d'un graphique reproductible : le lien « Explorer » vers la vue Statistiques se range au bout du filet, discret, en casse et graisse de texte courant. */
+	.with-link {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+	.stats-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 3px;
+		padding: 2px 6px;
+		margin: -2px -6px -2px 0;
+		border-radius: var(--radius);
+		font-size: var(--fs-sm);
+		font-weight: 500;
+		letter-spacing: 0;
+		text-transform: none;
+		text-decoration: none;
+		color: var(--text-faint);
+	}
+	.stats-link:hover {
+		background: var(--hover);
+		color: var(--accent);
+	}
 	.scatter-head {
 		display: flex;
 		align-items: baseline;

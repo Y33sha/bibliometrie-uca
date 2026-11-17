@@ -13,8 +13,23 @@ import {
 	formatPercent,
 	formatPublicationDate,
 	deriveStructDetectionStatus,
+	doiUrl,
 	paramsToQuery
 } from './utils';
+
+// ── doiUrl ─────────────────────────────────────────────────────
+
+describe('doiUrl', () => {
+	it('garde les barres obliques et encode le reste de chaque segment', () => {
+		expect(doiUrl('10.1002/(SICI)1097-4571(199806)49:8<693::AID-ASI4>3.0.CO;2-#')).toBe(
+			'https://doi.org/10.1002/(SICI)1097-4571(199806)49%3A8%3C693%3A%3AAID-ASI4%3E3.0.CO%3B2-%23'
+		);
+	});
+
+	it('laisse intact un DOI courant', () => {
+		expect(doiUrl('10.1016/j.ecolecon.2026.109287')).toBe('https://doi.org/10.1016/j.ecolecon.2026.109287');
+	});
+});
 
 // ── paramsToQuery ──────────────────────────────────────────────
 

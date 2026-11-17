@@ -10,7 +10,7 @@ class ModePolicy:
     """Politique d'un mode d'exécution."""
 
     harvest_sources: frozenset[str]
-    """Sources moissonnées par le mode. Une source sur option s'ajoute seulement avec `--include-wos`."""
+    """Sources moissonnées par le mode, parmi les sources du run."""
     incremental: bool
     """Le moissonnage retient les documents modifiés depuis le dernier moissonnage quotidien réussi."""
     vacuum_full: bool

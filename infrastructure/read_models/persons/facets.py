@@ -94,6 +94,20 @@ class PersonFacetQueries:
             binds,
         ).all()
         lab_facets = [FacetOption(value=str(r.id), label=r.label, count=r.n) for r in lab_rows]
+        # Un laboratoire sélectionné sans personne décomptée figure à zéro : il garde son libellé et reste décochable.
+        listed = {r.id for r in lab_rows}
+        unlisted = [lab for lab in filters.laboratories if lab not in listed]
+        if unlisted:
+            unlisted_rows = self._conn.execute(
+                text("""
+                    SELECT id, coalesce(acronym, name) AS label FROM structures
+                    WHERE id = ANY(:ids) ORDER BY label
+                """),
+                {"ids": unlisted},
+            ).all()
+            lab_facets += [
+                FacetOption(value=str(r.id), label=r.label, count=0) for r in unlisted_rows
+            ]
 
         # ORCID / IDHAL / IDREF partagent la population (skip='ids') : un seul passage.
         where_sql, binds = assemble_where(base_clauses(skip="ids"))

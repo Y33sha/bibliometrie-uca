@@ -63,6 +63,25 @@ describe('useUrlFilters', () => {
 			expect(gotoSpy).toHaveBeenCalledWith('/bibliometrie/p?sort=title', GOTO_OPTS);
 		});
 
+		it('inclut un single value vide quand sa valeur par défaut ne l’est pas, et le restaure', () => {
+			const f = useUrlFilters({
+				basePath: '/p',
+				filters: { groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' } },
+			});
+			f.syncUrl(() => ({ groupBy: '' }));
+			expect(gotoSpy).toHaveBeenCalledWith('/bibliometrie/p?group_by=', GOTO_OPTS);
+			expect(f.restoreFromUrl(new URLSearchParams('group_by='))).toEqual({ groupBy: '' });
+		});
+
+		it('omet un single value vide sans valeur par défaut', () => {
+			const f = useUrlFilters({
+				basePath: '/p',
+				filters: { q: { type: 'single', urlKey: 'q' } },
+			});
+			f.syncUrl(() => ({ q: '' }));
+			expect(gotoSpy).toHaveBeenCalledWith('/bibliometrie/p', GOTO_OPTS);
+		});
+
 		it('sérialise les source_states en yes/no joints par virgule', () => {
 			const f = useUrlFilters({
 				basePath: '/p',

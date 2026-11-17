@@ -1,6 +1,6 @@
 """Import de l'orchestrateur du pipeline : code des sources chargé, journaux laissés intacts.
 
-Les adaptateurs des sources importent le code de leur source au moment où une phase s'en sert. Le code d'une source écartée (`wos` sans `--include-wos`) reste non chargé : un défaut de ce code laisse le run se dérouler.
+Les adaptateurs des sources importent le code de leur source au moment où une phase s'en sert. Le code d'une source écartée (`wos`, hors des sources par défaut) reste non chargé : un défaut de ce code laisse le run se dérouler.
 
 Les tests passent par un sous-processus : `sys.modules` du processus de test contient les modules importés par les autres tests.
 """

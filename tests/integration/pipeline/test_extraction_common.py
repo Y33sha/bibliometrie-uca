@@ -27,8 +27,11 @@ _publication = partial(
     insert_publication, normalize_title=False, publication_year=2020, doc_type=None
 )
 
-# Enregistrement source de titre « T ».
-_source_record = partial(insert_source_record, title="T")
+# Enregistrement source de titre « T », de 2020.
+_source_record = partial(insert_source_record, title="T", publication_year=2020)
+
+_WINDOW = [2020]
+"""Fenêtre d'années du run."""
 
 
 class TestComputeHash:
@@ -155,14 +158,14 @@ def _add_inperim_source_record(conn, source, sid, *, doi=None, identifiers=None)
 class TestGetMissingDois:
     def test_rejects_unknown_source(self):
         with pytest.raises(ValueError, match="Source inconnue"):
-            get_missing_dois(None, "unknown", retry_after_days=30)
+            get_missing_dois(None, "unknown", retry_after_days=30, years=_WINDOW)
 
     def test_exclut_un_doi_que_la_cible_porte_deja(self, sa_sync_conn):
         """Interroger la cible sur ce DOI renverrait un document déjà présent."""
         _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/partage")
         _add_inperim_source_record(sa_sync_conn, "hal", "hal-1", doi="10.1234/partage")
 
-        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW) == []
 
     def test_exclut_un_doi_secondaire_de_la_cible(self, sa_sync_conn):
         """La cible renvoie le même document pour son DOI principal comme pour ses DOI secondaires."""
@@ -175,7 +178,7 @@ class TestGetMissingDois:
             identifiers={"doi": ["10.1234/preprint"]},
         )
 
-        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW) == []
 
     def test_exclut_un_doi_retire_d_un_enregistrement_de_la_cible(self, sa_sync_conn):
         """Un DOI retiré par la correction reste présent dans la cible : la recherche renverrait le même document à chaque run."""
@@ -197,7 +200,7 @@ class TestGetMissingDois:
             ],
         )
 
-        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW) == []
 
     def test_excludes_out_of_perimeter_source_records(self, sa_sync_conn):
         """Le DOI d'une publication hors périmètre est exclu des DOI à chercher."""
@@ -205,7 +208,7 @@ class TestGetMissingDois:
         _source_record(
             sa_sync_conn, publication_id, source="openalex", source_id="W1", doi="10.1234/out"
         )
-        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW) == []
 
     def test_crossref_target_filters_non_crossref_prefixes(self, sa_sync_conn):
         """Pour Crossref, seuls les DOI de préfixe attribué à Crossref sont retenus. Un DOI de préfixe sans agence connue attend la phase `dois`."""
@@ -216,7 +219,7 @@ class TestGetMissingDois:
         _add_inperim_source_record(sa_sync_conn, "hal", "h2", doi="10.1038/nature.1")
         _add_inperim_source_record(sa_sync_conn, "hal", "h3", doi="10.99999/x.1")  # préfixe inconnu
 
-        result = get_missing_dois(sa_sync_conn, "crossref", retry_after_days=30)
+        result = get_missing_dois(sa_sync_conn, "crossref", retry_after_days=30, years=_WINDOW)
 
         # Seul le DOI de préfixe Crossref est retenu.
         assert "10.5281/zenodo.1" not in result
@@ -231,7 +234,7 @@ class TestGetMissingDois:
             "W1",
             identifiers={"doi": ["10.1234/primary", "10.9999/preprint"]},
         )
-        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
+        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW)
         assert "10.1234/primary" in result
         assert "10.9999/preprint" in result
 
@@ -244,7 +247,7 @@ class TestGetMissingDois:
             doi="10.3389/feart.2020.00279/abstract",
             identifiers={"doi": ["10.3389/feart.2020.00279"]},
         )
-        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == [
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW) == [
             "10.3389/feart.2020.00279"
         ]
 
@@ -264,7 +267,7 @@ class TestGetMissingDois:
                 )
             ],
         )
-        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW) == []
 
     def test_includes_the_unversioned_form_of_a_versioned_doi(self, sa_sync_conn):
         """La forme sans version, sans source, est cherchée même dans la source qui a la version."""
@@ -275,12 +278,13 @@ class TestGetMissingDois:
             "10.6084/m9.figshare.1.v1",
             identifiers={"doi": ["10.6084/m9.figshare.1.v1"]},
         )
-        result = get_missing_dois(sa_sync_conn, "datacite", retry_after_days=30)
+        result = get_missing_dois(sa_sync_conn, "datacite", retry_after_days=30, years=_WINDOW)
         assert result == ["10.6084/m9.figshare.1"]
 
     def test_includes_relation_targets(self, sa_sync_conn):
         """Le DOI cible d'une relation depuis une publication du périmètre est retenu."""
         _publication(sa_sync_conn, "Parent", row_id=1, in_perimeter=True)
+        _source_record(sa_sync_conn, 1, source="crossref", source_id="10.1234/parent")
         insert_publication_relation(
             sa_sync_conn,
             1,
@@ -288,7 +292,7 @@ class TestGetMissingDois:
             source="crossref",
             target_doi="10.9999/related",
         )
-        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
+        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW)
         assert "10.9999/related" in result
 
     def test_relation_targets_excluded_when_parent_out_of_perimeter(self, sa_sync_conn):
@@ -301,14 +305,14 @@ class TestGetMissingDois:
             source="crossref",
             target_doi="10.9999/related",
         )
-        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW) == []
 
     def test_hal_target_no_prefix_filter(self, sa_sync_conn):
         """Pour HAL, les DOI sont retenus quelle que soit leur agence d'enregistrement."""
         insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")
         _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.5281/zenodo.1")
 
-        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
+        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW)
 
         assert result == ["10.5281/zenodo.1"]
 
@@ -319,7 +323,7 @@ class TestGetMissingDois:
         insert_failed_lookup(
             sa_sync_conn, id_type="doi", id_value="10.1234/a", not_found_days_ago=10
         )
-        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
+        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW)
         assert result == ["10.1234/b"]
 
     def test_retries_dois_with_expired_backoff(self, sa_sync_conn):
@@ -328,7 +332,7 @@ class TestGetMissingDois:
         insert_failed_lookup(
             sa_sync_conn, id_type="doi", id_value="10.1234/a", not_found_days_ago=60
         )
-        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
+        result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW)
         assert result == ["10.1234/a"]
 
     def test_exclut_les_doi_inconnus_de_doi_org(self, sa_sync_conn):
@@ -342,7 +346,7 @@ class TestGetMissingDois:
                 " VALUES ('10.1234/a', FALSE, now()), ('10.1234/c', TRUE, now())"
             )
         )
-        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == [
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW) == [
             "10.1234/b",
             "10.1234/c",
         ]
@@ -353,15 +357,19 @@ class TestGetMissingDois:
         insert_failed_lookup(
             sa_sync_conn, id_type="doi", id_value="10.1234/a", not_found_days_ago=10
         )
-        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
-        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=7) == ["10.1234/a"]
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW) == []
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=7, years=_WINDOW) == [
+            "10.1234/a"
+        ]
 
     def test_backoff_is_per_target_source(self, sa_sync_conn):
         """L'échec d'un DOI dans HAL laisse ce DOI parmi les DOI à chercher dans OpenAlex."""
         _add_inperim_source_record(sa_sync_conn, "scanr", "S1", doi="10.1234/a")
         insert_failed_lookup(sa_sync_conn, id_type="doi", id_value="10.1234/a")
-        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
-        assert get_missing_dois(sa_sync_conn, "openalex", retry_after_days=30) == ["10.1234/a"]
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=_WINDOW) == []
+        assert get_missing_dois(sa_sync_conn, "openalex", retry_after_days=30, years=_WINDOW) == [
+            "10.1234/a"
+        ]
 
     def test_fenetre_d_annees_par_les_enregistrements_sources_de_la_publication(self, sa_sync_conn):
         """Un DOI est retenu quand l'un des enregistrements sources de sa publication a son année dans la fenêtre : OpenAlex date la publication de 2021, ScanR de 2022."""
@@ -395,7 +403,7 @@ class TestGetStaleSourceIds:
         insert_staging(
             sa_sync_conn, "openalex", source_id="W3", doi="10.1/recent", seen_days_ago=10
         )
-        rows = get_stale_source_ids(sa_sync_conn, "openalex", after_days=90)
+        rows = get_stale_source_ids(sa_sync_conn, "openalex", _WINDOW, after_days=90)
         assert sorted(rows) == ["W1", "W2"]
 
     def test_excludes_disappeared(self, sa_sync_conn):
@@ -407,12 +415,12 @@ class TestGetStaleSourceIds:
             seen_days_ago=100,
             disappeared=True,
         )
-        assert get_stale_source_ids(sa_sync_conn, "openalex", after_days=90) == []
+        assert get_stale_source_ids(sa_sync_conn, "openalex", _WINDOW, after_days=90) == []
 
     def test_scoped_to_source(self, sa_sync_conn):
         insert_staging(sa_sync_conn, "openalex", source_id="W1", doi="10.1/a", seen_days_ago=100)
         insert_staging(sa_sync_conn, "scanr", source_id="S1", doi="10.1/b", seen_days_ago=100)
-        assert get_stale_source_ids(sa_sync_conn, "openalex", after_days=90) == ["W1"]
+        assert get_stale_source_ids(sa_sync_conn, "openalex", _WINDOW, after_days=90) == ["W1"]
 
     def test_year_filter_scopes_to_window_and_keeps_null(self, sa_sync_conn):
         # W1 est hors de la fenêtre, W2 dedans. W3, sans enregistrement source, n'a pas d'année : il est gardé.
@@ -444,15 +452,10 @@ class TestGetStaleSourceIds:
         rows = get_stale_source_ids(sa_sync_conn, "theses", [2023, 2024], after_days=90)
         assert rows == ["s367812"]
 
-    def test_no_year_filter_returns_all(self, sa_sync_conn):
-        insert_staging(sa_sync_conn, "openalex", source_id="W1", seen_days_ago=100)
-        _source_record(sa_sync_conn, source="openalex", source_id="W1", publication_year=2010)
-        assert get_stale_source_ids(sa_sync_conn, "openalex", after_days=90) == ["W1"]
-
     def test_the_threshold_comes_from_the_argument(self, sa_sync_conn):
         insert_staging(sa_sync_conn, "openalex", source_id="W1", seen_days_ago=40)
-        assert get_stale_source_ids(sa_sync_conn, "openalex", after_days=90) == []
-        rows = get_stale_source_ids(sa_sync_conn, "openalex", after_days=30)
+        assert get_stale_source_ids(sa_sync_conn, "openalex", _WINDOW, after_days=90) == []
+        rows = get_stale_source_ids(sa_sync_conn, "openalex", _WINDOW, after_days=30)
         assert rows == ["W1"]
 
 

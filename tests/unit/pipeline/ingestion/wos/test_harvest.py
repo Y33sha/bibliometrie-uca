@@ -94,11 +94,15 @@ def test_une_page_vide_isolee_est_retentee(ecritures):
 
 
 def test_plafond_de_l_api_interrompt(ecritures):
-    """L'API refuse un `firstRecord` au-delà de cent mille : la boucle s'arrête là."""
+    """L'API refuse un `firstRecord` au-delà de cent mille : la boucle s'arrête là, avec un signal pour les records restants."""
     records = _records(*(f"W{i}" for i in range(100_001)))
     client = _client([_reponse(records, total=200_000)])
-    assert _extraire(client).new == 100_001
+    metrics = _extraire(client)
+    assert metrics.new == 100_001
     assert client.fetch_page.call_count == 1
+    assert [s["message"] for s in metrics.signals] == [
+        "WoS 2024 : 100001 documents reçus sur 200000 annoncés"
+    ]
 
 
 def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):

@@ -13,6 +13,7 @@ import argparse
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from string import Formatter
 
 from playwright.sync_api import APIRequestContext, Page, sync_playwright
 
@@ -25,11 +26,11 @@ SAMPLES = {
     "structure": ("structures", "structures", "acronym", "LMV", "id"),
     # Les pages d'adresses montrent l'établissement : les adresses d'un laboratoire contiennent souvent des courriels personnels.
     "institution": ("structures", "structures", "code", "uca", "id"),
-    "serial": ("serials", "serials", "title", "Journal of High Energy Physics", "id"),
+    "serial": ("serials", "serials", "issns", "1029-8479", "id"),
     "publisher": ("publishers", "publishers", "name", "Elsevier", "id"),
     "subject": ("subjects", "items", "label", "Volcanologie", "label_normalized"),
 }
-"""Entités montrées en exemple : (route de recherche, clé de la liste, champ comparé, valeur cherchée, champ de l'identifiant)."""
+"""Entités montrées en exemple : (route de recherche, clé de la liste, champ comparé, valeur cherchée, champ de l'identifiant). Un champ comparé de type liste doit contenir la valeur cherchée."""
 
 
 @dataclass(frozen=True)
@@ -69,18 +70,33 @@ SHOTS = [
 ]
 
 
-def sample_ids(api: APIRequestContext, base_url: str) -> dict[str, int | str]:
-    """Renvoie l'identifiant de chaque entité de `SAMPLES`, trouvé par la recherche de l'API."""
+def sample_ids(api: APIRequestContext, base_url: str, keys: set[str]) -> dict[str, int | str]:
+    """Renvoie l'identifiant de chaque entité de `SAMPLES` nommée dans `keys`, trouvé par la recherche de l'API."""
     ids: dict[str, int | str] = {}
-    for key, (endpoint, items, field, value, id_field) in SAMPLES.items():
+    for key in keys:
+        endpoint, items, field, value, id_field = SAMPLES[key]
         response = api.get(f"{base_url}/api/{endpoint}", params={"search": value, "per_page": 20})
         if not response.ok:
             raise SystemExit(f"Recherche refusée ({response.status}) : {endpoint}")
-        matches = [item for item in response.json()[items] if item.get(field) == value]
+        matches = [
+            item for item in response.json()[items] if matches_sample(item.get(field), value)
+        ]
         if not matches:
             raise SystemExit(f"Exemple introuvable : {key} {field}={value!r}")
         ids[key] = matches[0][id_field]
     return ids
+
+
+def matches_sample(field_value: object, value: str) -> bool:
+    """Vrai si `field_value` vaut `value` ou, pour une liste, la contient."""
+    if isinstance(field_value, list):
+        return value in field_value
+    return field_value == value
+
+
+def sample_keys(shots: list[Shot]) -> set[str]:
+    """Renvoie les clés de `SAMPLES` utilisées par les chemins de `shots`."""
+    return {name for shot in shots for _, name, _, _ in Formatter().parse(shot.path) if name}
 
 
 def login(page: Page, base_url: str) -> bool:
@@ -113,6 +129,9 @@ def main() -> None:
     parser.add_argument("--only", nargs="*", help="Noms des captures à refaire, toutes par défaut.")
     args = parser.parse_args()
     base_url = args.base_url.rstrip("/")
+    unknown = set(args.only or []) - {s.name for s in SHOTS}
+    if unknown:
+        parser.error(f"captures inconnues : {', '.join(sorted(unknown))}")
     shots = [s for s in SHOTS if not args.only or s.name in args.only]
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -120,7 +139,7 @@ def main() -> None:
         browser = p.chromium.launch()
         context = browser.new_context(viewport=VIEWPORT, locale="fr-FR")
         page = context.new_page()
-        ids = sample_ids(context.request, base_url)
+        ids = sample_ids(context.request, base_url, sample_keys(shots))
         for shot in [s for s in shots if not s.admin]:
             print(capture(page, base_url, shot, ids))
         admin_shots = [s for s in shots if s.admin]

@@ -14,7 +14,7 @@ export interface PanelStorage {
 
 const OPEN_KEY = 'filter-panel-open';
 
-/** Largeur d'écran à partir de laquelle le panneau s'ouvre par défaut. En dessous, il recouvre la page. Les feuilles de style de `FilterLayout` et `FilterPanel` reprennent ce seuil. */
+/** Largeur d'écran à partir de laquelle le panneau s'ouvre par défaut. En dessous, il recouvre la page. Les feuilles de style de `FilterLayout`, `FilterPanel`, `FilterPanelToggle` et de la mise en page générale reprennent ce seuil. */
 export const WIDE_SCREEN_QUERY = '(min-width: 1100px)';
 
 function browserStorage(): PanelStorage | null {

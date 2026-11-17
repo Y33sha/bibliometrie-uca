@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy import Connection
 
-from domain.sources.registry import PROFILES, Source
+from domain.sources.registry import DEFAULT_SOURCES
 from pipeline.runtime.config import YearRange
 from pipeline.runtime.modes import MODES, ModePolicy
 
@@ -34,11 +34,10 @@ class RunOptions:
     """
 
     mode: str = "full"
-    sources: frozenset[str] = frozenset(Source)
-    """Sources du run, toutes par défaut."""
+    sources: frozenset[str] = DEFAULT_SOURCES
+    """Sources interrogées par le run (`--sources`), par défaut toutes hors sources sur option."""
     years: YearRange | None = None
     """Années du run (`--years`). `None` : de la première année configurée à l'année courante."""
-    include_wos: bool = False
     rebuild_publications: bool = False
     rebuild_author_grouping: bool = False
     rebuild_persons: bool = False
@@ -50,13 +49,6 @@ class RunOptions:
     def policy(self) -> ModePolicy:
         """Politique du mode du run (`MODES`)."""
         return MODES[self.mode]
-
-    @property
-    def queried_sources(self) -> frozenset[str]:
-        """Sources interrogées par le run : les sources demandées, une source sur option (`SourceProfile.opt_in`) seulement avec `--include-wos`."""
-        if self.include_wos:
-            return self.sources
-        return frozenset(s for s in self.sources if not PROFILES[Source(s)].opt_in)
 
 
 @dataclass(frozen=True, slots=True)

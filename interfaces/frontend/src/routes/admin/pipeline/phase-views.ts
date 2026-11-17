@@ -95,6 +95,19 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       {
         source: "table",
         firstColumnLabel: "Canal",
+        rowLabels: {
+          hal_by_id: "HAL par hal-id",
+          hal_by_nnt: "HAL par NNT",
+          "doi.hal": "HAL par DOI",
+          scanr_by_hal_id: "ScanR par hal-id",
+          "doi.scanr": "ScanR par DOI",
+          theses_by_nnt: "theses.fr par NNT",
+          ops_by_number: "OPS par numéro de brevet",
+          "doi.openalex": "OpenAlex par DOI",
+          "doi.wos": "WoS par DOI",
+          "doi.crossref": "Crossref par DOI",
+          "doi.datacite": "DataCite par DOI",
+        },
         columns: [
           { key: "interrogated", label: "Interrogés" },
           { key: "new", label: "Nouveaux" },
@@ -113,6 +126,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
         columns: [
           { key: "interrogated", label: "Interrogés" },
           { key: "refreshed", label: "Rafraîchis" },
+          { key: "new", label: "Nouveaux" },
           { key: "disappeared", label: "Disparus" },
           { key: "duration_s", label: "Durée", duration: true },
         ],

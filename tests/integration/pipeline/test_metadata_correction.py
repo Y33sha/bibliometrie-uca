@@ -777,6 +777,34 @@ def test_la_version_datacite_reste_en_jeu_tant_que_sa_cible_est_sans_enregistrem
     assert target_recorded()
 
 
+def test_le_doublon_retire_est_reconnu_quand_l_original_est_en_base(sa_sync_conn):
+    """Cas réel : la version française retirée (10.1016/j.rhum.2022.12.007) déclare un retrait vers l'article de Joint Bone Spine. Son DOI est celui d'un doublon seulement quand l'original est le DOI `primary` d'un enregistrement source."""
+    conn = sa_sync_conn
+    duplicate = _typed_source_record(
+        conn,
+        source="crossref",
+        source_id="10.1/doublon",
+        doi="10.1/doublon",
+        doc_type="article",
+        source_extras={
+            "update_to": [{"doi": "10.1/original", "type": "withdrawal", "source": "publisher"}]
+        },
+        identifiers=[
+            SourceIdentifier(SourceIdentifierType.DOI, "10.1/doublon", SourceIdentifierRole.PRIMARY)
+        ],
+    )
+    aggregator = _typed_source_record(conn, source_id="W1", doi="10.1/doublon", doc_type="article")
+
+    def withdrawn() -> dict[int, frozenset[str]]:
+        rows = SourceRecordCorrectionStore(conn).fetch_matchability_rows()
+        return {r.id: r.facts.withdrawn_duplicate_dois for r in rows}
+
+    assert withdrawn()[duplicate] == frozenset()
+    _seed_work(conn, source_id="10.1/original", doi="10.1/original")
+    facts = withdrawn()
+    assert facts[duplicate] == facts[aggregator] == frozenset({"10.1/doublon"})
+
+
 def test_un_changement_de_cible_marque_les_enregistrements_sources_du_doi(sa_sync_conn):
     conn = sa_sync_conn
     _seed_work(conn, source_id="concept", doi="10.5281/zenodo.9")

@@ -1,6 +1,6 @@
 """Phase `harvest_by_person` : moissonnage des sources par les identifiants des personnes à fiche RH, vers `staging`.
 
-Une tâche par source, en parallèle, sur les années du run (`--years`). La phase est sautée dans un mode dont la policy l'exclut (`daily`). `--sources` restreint les sources.
+Une tâche par source, en parallèle, sur les années du run (`--years`).
 
 Le profil de chaque source liste les types d'identifiant de personne acceptés (`domain/sources/registry.py`).
 """
@@ -56,7 +56,7 @@ _CHILDREN = tuple(
         run=_search(source),
         label=source_label(source),
         threshold=5,
-        when=lambda ctx, source=source: source in ctx.options.queried_sources,
+        when=lambda ctx, source=source: source in ctx.options.sources,
     )
     for source in PERSON_SEARCHED_SOURCES
 )

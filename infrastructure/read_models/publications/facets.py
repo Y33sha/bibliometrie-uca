@@ -263,6 +263,24 @@ class _PublicationFacetsBuilder:
             FacetOption(value="no", label="Sans APC", count=r.apc_no),
         ]
 
+    def _facet_retracted(self) -> list[FacetOption]:
+        """Renvoie la facette des publications rétractées : oui ou non."""
+        where, binds = self._clauses_skipping("retracted")
+        r = self.conn.execute(
+            text(f"""
+                SELECT
+                    COUNT(*) FILTER (WHERE p.is_retracted) AS yes,
+                    COUNT(*) FILTER (WHERE NOT p.is_retracted) AS no
+                FROM publications p
+                WHERE {where}
+            """),
+            binds,
+        ).one()
+        return [
+            FacetOption(value="yes", label="Rétractées", count=r.yes),
+            FacetOption(value="no", label="Non rétractées", count=r.no),
+        ]
+
     def _facet_citation_tops(self) -> list[FacetOption]:
         """Renvoie la facette des seuils de citation. Une publication du top 1 % compte aussi dans le top 10 %."""
         where_sql, binds = self._clauses_skipping("citation_top")
@@ -393,6 +411,7 @@ class PublicationFacetQueries:
             "author_positions": "_facet_author_positions",
             "source_counts": "_facet_source_counts",
             "apc": "_facet_apc",
+            "retracted": "_facet_retracted",
             "citation_tops": "_facet_citation_tops",
             "countries": "_facet_countries",
             "languages": "_facet_languages",
@@ -420,6 +439,7 @@ class PublicationFacetQueries:
             author_positions=results["author_positions"],
             source_counts=results["source_counts"],
             apc=results["apc"],
+            retracted=results["retracted"],
             citation_tops=results["citation_tops"],
             countries=results["countries"],
             languages=results["languages"],

@@ -82,6 +82,8 @@ class MatchabilityFacts(NamedTuple):
     """Identifiants de l'enregistrement source, avec leur statut."""
     primary_doi_target_recorded: bool = False
     """Le DOI `primary` a une cible dans `doi_targets`, et cette cible est le DOI `primary` d'un autre enregistrement source."""
+    withdrawn_duplicate_dois: frozenset[str] = frozenset()
+    """DOI de l'enregistrement source retirés par l'éditeur comme doublons d'un article original, DOI `primary` d'un autre enregistrement source (`withdrawn_original_doi`)."""
 
 
 def is_matchable(facts: MatchabilityFacts) -> bool:
@@ -89,6 +91,7 @@ def is_matchable(facts: MatchabilityFacts) -> bool:
 
     - tous ses DOI propres (`own_dois`), quel que soit leur statut, ont un préfixe de `_EXCLUDED_DOI_PREFIXES` ;
     - il vient de DataCite et la cible de son DOI `primary` est le DOI `primary` d'un autre enregistrement source : il est une forme secondaire d'une œuvre représentée par cet enregistrement source ;
+    - l'un de ses DOI actifs de rôle autre que `related` est celui d'un doublon retiré par l'éditeur, dont l'original est en base (`withdrawn_duplicate_dois`) : l'original représente l'œuvre ;
     - son titre normalisé est dans `_PARATEXT_TITLES` ;
     - il vient d'une source de `AGGREGATOR_SOURCES` et il n'a aucun DOI actif de rôle autre que `related`, aucune URL de copie et aucune clé de confirmation active.
 
@@ -98,6 +101,13 @@ def is_matchable(facts: MatchabilityFacts) -> bool:
     if own and all(doi.split("/", 1)[0] in _EXCLUDED_DOI_PREFIXES for doi in own):
         return False
     if facts.source == Source.DATACITE and facts.primary_doi_target_recorded:
+        return False
+    if any(
+        i.id_type is SourceIdentifierType.DOI
+        and i.role is not SourceIdentifierRole.RELATED
+        and i.value in facts.withdrawn_duplicate_dois
+        for i in active(reconsidered(facts.identifiers))
+    ):
         return False
     if facts.title_normalized in _PARATEXT_TITLES:
         return False

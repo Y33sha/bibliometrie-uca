@@ -21,7 +21,7 @@ function storeAdmin(): void {
 	try {
 		localStorage.setItem(ADMIN_STORAGE_KEY, isAdmin() ? '1' : '0');
 	} catch {
-		// Stockage inaccessible : la barre de navigation prend l'aspect admin à la lecture de la session.
+		// Stockage inaccessible : le logo d'administration apparaît à la lecture de la session.
 	}
 }
 
@@ -53,7 +53,7 @@ export function isAdmin(): boolean {
 	return session.roles.includes('admin');
 }
 
-/** La barre de navigation prend l'aspect admin : rôle de la session, ou de la dernière session lue tant que la session courante n'est pas lue. */
+/** La barre de navigation affiche le logo d'administration : rôle de la session, ou de la dernière session lue tant que la session courante n'est pas lue. */
 export function adminLook(): boolean {
 	return session.loaded ? isAdmin() : storedAdmin;
 }

@@ -114,6 +114,8 @@ class StructureDetailResponse(Model):
     children: list[RelatedStructureOut]
     forms: list[NameFormOut]
     theses_count: int
+    members_count: int
+    """Personnes retenues à période de présence actuelle dans la structure."""
 
 
 class StructureAddressOut(Model):

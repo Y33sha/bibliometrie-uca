@@ -20,8 +20,12 @@ const PENDING_PARAMS: Record<string, string> = {
 	pending_identifiers: 'has_pending_identifiers',
 };
 
-/** Filtres de l'annuaire. `labId` : laboratoire de la page (onglet Personnes d'un laboratoire), présélectionné dans le filtre Laboratoires. */
-export function personFilters(labId?: number): ListFilter[] {
+/**
+ * Filtres de l'annuaire. `labId` : laboratoire de la page (onglet Personnes d'un laboratoire), présélectionné dans le filtre Laboratoires.
+ * `labHasMembers` : le laboratoire de la page compte des personnes à période de présence actuelle. Sinon, ni Base RH ni Laboratoires n'ont de présélection, qui viderait la liste.
+ */
+export function personFilters(labId?: number, labHasMembers = true): ListFilter[] {
+	const preselect = labId == null || labHasMembers;
 	return [
 		{
 			key: 'rh',
@@ -30,7 +34,7 @@ export function personFilters(labId?: number): ListFilter[] {
 			param: 'has_rh',
 			group: 'affiliation',
 			facet: { type: 'boolean', apiKey: 'rh', yesLabel: 'Oui', noLabel: 'Non' },
-			defaultSelection: () => ['yes'],
+			...(preselect ? { defaultSelection: () => ['yes'] } : {}),
 			// Une seule valeur filtre ; les deux cochées retiennent tout le monde.
 			serialize: (selected) => (selected.length === 1 ? selected[0] : null),
 		},
@@ -50,7 +54,7 @@ export function personFilters(labId?: number): ListFilter[] {
 			group: 'affiliation',
 			facet: { type: 'labeled', apiKey: 'laboratories' },
 			searchable: true,
-			...(labId == null ? {} : { defaultSelection: () => [String(labId)] }),
+			...(labId != null && labHasMembers ? { defaultSelection: () => [String(labId)] } : {}),
 		},
 		{
 			key: 'identifiers',

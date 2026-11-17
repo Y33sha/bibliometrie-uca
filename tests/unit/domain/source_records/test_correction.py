@@ -318,10 +318,10 @@ class TestTitleSupplementaryContentRule:
         corrected = doc_type_correction(view)
         assert corrected is not None and corrected.value == "dataset"
 
-    def test_supporting_movies_on_recorded_talk_corrects_to_dataset(self):
+    def test_supporting_movies_on_video_corrects_to_dataset(self):
         # DataCite `Audiovisual` : vidéos jointes à un article.
         view = _view(
-            doc_type="recorded_talk",
+            doc_type="video",
             title="Supporting Movies from: Seismo-acoustic observations of crashing ocean waves",
         )
         corrected = doc_type_correction(view)
@@ -329,7 +329,7 @@ class TestTitleSupplementaryContentRule:
 
     def test_supplementary_videos_corrects_to_dataset(self):
         view = _view(
-            doc_type="recorded_talk",
+            doc_type="video",
             title="Supplementary videos for 'Driven shear flow in biological magneto-active fluids'",
         )
         corrected = doc_type_correction(view)
@@ -746,8 +746,8 @@ class TestTitleMediaPrefixRule:
         corrected = doc_type_correction(view)
         assert corrected is not None and corrected.value == "media"
 
-    def test_interview_prefix_on_recorded_talk_corrects_to_media(self):
-        view = _view(doc_type="recorded_talk", title="Interview Jean Pierre CHANET INRAE")
+    def test_interview_prefix_on_video_corrects_to_media(self):
+        view = _view(doc_type="video", title="Interview Jean Pierre CHANET INRAE")
         corrected = doc_type_correction(view)
         assert corrected is not None and corrected.value == "media"
 
@@ -859,6 +859,8 @@ class TestTitleErratumPrefixRule:
             "WITHDRAWN: Corrigendum to ‘Identification of low fluoride areas’",
             "Publisher Erratum: Open charm production and asymmetry in pNe collisions",
             "Author Erratum: Search for new phenomena",
+            "Correction to exploration of biological markers of feed efficiency in young bulls",
+            "Corrections to Received Date Information",
         ],
     )
     def test_erratum_titles(self, title):
@@ -876,6 +878,15 @@ class TestTitleErratumPrefixRule:
     )
     def test_article_titles(self, title):
         assert doc_type_correction(_view(doc_type="article", title=title)) is None
+
+    def test_hal_correction_typed_book_review(self):
+        """Cas réel : HAL type `book_review` le dépôt d'une correction."""
+        view = _view(
+            doc_type="book_review",
+            title="Correction to: Mapping of dressed and processed poultry products in Bangladesh",
+        )
+        corrected = doc_type_correction(view)
+        assert corrected is not None and corrected.value == "erratum"
 
     def test_chapter_correction(self):
         """Springer type `book_chapter` la correction d'un chapitre."""

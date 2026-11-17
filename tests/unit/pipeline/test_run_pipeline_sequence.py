@@ -93,6 +93,11 @@ class TestSelectPhasesToRun:
 
         assert sortie.value.code == 2
 
+    def test_sans_sources_nommees_wos_est_ecartee(self):
+        """Une source sur option entre dans le run seulement quand il la nomme."""
+        assert "wos" not in run_pipeline._build_arg_parser().parse_args([]).sources
+        assert run_pipeline._build_arg_parser().parse_args(["--sources", "wos"]).sources == {"wos"}
+
     def test_liste_de_sources_normalisee(self):
         args = run_pipeline._build_arg_parser().parse_args(["--sources", " hal , wos "])
 
@@ -284,7 +289,7 @@ class TestRunOnePhase:
 
     def test_options_du_run_transmises_a_la_phase(self):
         recus: dict = {}
-        options = RunOptions(mode="daily", years=(2024, 2024), include_wos=True)
+        options = RunOptions(mode="daily", years=(2024, 2024), sources=frozenset({"hal", "wos"}))
 
         self._executer(
             lambda ctx: recus.update(options=ctx.options) or PhaseMetrics(), options=options
@@ -371,16 +376,14 @@ class TestExecutePhases:
 
         assert appels == []
 
-    def test_wos_ecartee_des_sources_consignees(self, run_prepare):
-        """WoS est interrogée seulement sur demande : son crédit d'appels est limité."""
+    def test_wos_ecartee_des_sources_par_defaut(self, run_prepare):
+        """WoS est interrogée seulement par un run qui la nomme : son crédit d'appels est limité."""
+        run_pipeline._execute_phases(RunOptions(), [])
+
+        assert "wos" not in run_prepare.demarrage["sources"]
+
+    def test_wos_consignee_quand_elle_est_nommee(self, run_prepare):
         run_pipeline._execute_phases(RunOptions(sources=frozenset({"hal", "wos"})), [])
-
-        assert run_prepare.demarrage["sources"] == ["hal"]
-
-    def test_wos_consignee_quand_elle_est_demandee(self, run_prepare):
-        options = RunOptions(sources=frozenset({"hal", "wos"}), include_wos=True)
-
-        run_pipeline._execute_phases(options, [])
 
         assert run_prepare.demarrage["sources"] == ["hal", "wos"]
 
@@ -459,8 +462,7 @@ class TestMain:
                 "2020",
                 "2022",
                 "--sources",
-                "hal,openalex",
-                "--include-wos",
+                "hal,wos",
                 "--raw-store",
             ],
         )
@@ -470,8 +472,7 @@ class TestMain:
         (options,) = recues
         assert options.mode == "daily"
         assert options.years == (2020, 2022)
-        assert options.sources == {"hal", "openalex"}
-        assert options.include_wos is True
+        assert options.sources == {"hal", "wos"}
         assert options.raw_store is True
 
 

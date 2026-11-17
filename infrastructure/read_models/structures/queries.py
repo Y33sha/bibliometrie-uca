@@ -8,7 +8,12 @@ from sqlalchemy import Connection, Row, text
 from domain.structures.ror import ROR_TYPE_LABELS_FR, RorType
 from infrastructure.read_models._common import FacetOption
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
-from infrastructure.read_models.filters import OWN_RORS_SQL
+from infrastructure.read_models.filters import (
+    OWN_RORS_SQL,
+    assemble_where,
+    person_exclusion_clause,
+    person_laboratory_clause,
+)
 from infrastructure.read_models.structures.models import (
     NameFormOut,
     RelatedStructureOut,
@@ -396,6 +401,14 @@ class StructuresQueries:
             {"id": structure_id},
         ).one()
 
+        # Mêmes filtres que la sélection par défaut de l'onglet Personnes : personnes retenues, à période de présence actuelle dans la structure.
+        members_where, members_binds = assemble_where(
+            [person_exclusion_clause([None]), person_laboratory_clause([structure_id])]
+        )
+        members_count = self._conn.execute(
+            text(f"SELECT COUNT(*) FROM persons p WHERE {members_where}"), members_binds
+        ).scalar_one()
+
         return StructureDetailResponse(
             structure=StructureOut(
                 id=struct_row.id,
@@ -412,6 +425,7 @@ class StructuresQueries:
             children=[_related_from_row(r) for r in child_rows],
             forms=[_name_form_from_row(r) for r in form_rows],
             theses_count=theses_row.n,
+            members_count=members_count,
         )
 
     def get_structure_addresses(

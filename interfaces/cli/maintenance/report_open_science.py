@@ -57,7 +57,7 @@ DOC_TYPE_LABELS = {
     DocType.CONFERENCE_PAPER: "Texte publié dans des actes",
     DocType.CONFERENCE: "Communication sans texte publié",
     DocType.CONFERENCE_ABSTRACT: "Résumé de conférence",
-    DocType.RECORDED_TALK: "Conférence filmée",
+    DocType.VIDEO: "Vidéo",
     DocType.POSTER: "Poster",
     DocType.EDITORIAL: "Éditorial",
     DocType.LETTER: "Lettre",

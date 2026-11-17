@@ -266,7 +266,10 @@ class SubjectsQueries:
         )
 
     def _vocabulary_subjects(self, label_normalized: str) -> list[VocabularySubjectOut]:
-        """Renvoie les sujets de vocabulaire du libellé normalisé, avec leurs ancêtres et leurs enfants."""
+        """Renvoie les sujets de vocabulaire du libellé normalisé, avec leurs ancêtres et leurs enfants.
+
+        Ancêtres et enfants sont des sujets, identifiés par leur libellé normalisé : un vocabulaire qui emboîte deux nœuds de même libellé (domaine et champ « Social Sciences » d'OpenAlex) les confond. Chaque ancêtre figure donc une seule fois, et le sujet lui-même ne figure ni parmi ses ancêtres ni parmi ses enfants.
+        """
         rows = self._conn.execute(
             text("""
                 SELECT id, vocabulary::text AS vocabulary, code, level, usage_count
@@ -279,11 +282,16 @@ class SubjectsQueries:
         ids = [r.id for r in rows]
         ancestors: defaultdict[int, list[SubjectLabelRef]] = defaultdict(list)
         for a in self._conn.execute(_ANCESTORS_SQL, {"ids": ids}):
-            ancestors[a.subject_id].append(
-                SubjectLabelRef(label_normalized=a.label_normalized, label=a.label)
-            )
+            chain = ancestors[a.subject_id]
+            if a.label_normalized == label_normalized or any(
+                known.label_normalized == a.label_normalized for known in chain
+            ):
+                continue
+            chain.append(SubjectLabelRef(label_normalized=a.label_normalized, label=a.label))
         children: defaultdict[int, list[SubjectChildOut]] = defaultdict(list)
         for c in self._conn.execute(_CHILDREN_SQL, {"ids": ids}):
+            if c.label_normalized == label_normalized:
+                continue
             children[c.parent_id].append(
                 SubjectChildOut(
                     label_normalized=c.label_normalized, label=c.label, usage_count=c.usage_count

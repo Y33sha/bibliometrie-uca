@@ -2,6 +2,7 @@
 
 import csv
 import io
+from datetime import date
 from functools import partial
 
 from sqlalchemy import text
@@ -14,7 +15,7 @@ from tests.integration.helpers.addresses import (
     insert_address_structure,
 )
 from tests.integration.helpers.contributions import insert_contribution
-from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.persons import insert_hr_period, insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.structures import (
     add_contribution_structure,
@@ -172,6 +173,25 @@ class TestGetLaboratory:
         assert isinstance(res.parents, list)
         assert isinstance(res.children, list)
         assert isinstance(res.theses_count, int)
+
+    def test_members_count_counts_retained_current_members(self, sa_sync_conn):
+        lab = insert_structure(sa_sync_conn, "LAB-MEMBERS")
+        present = insert_person(sa_sync_conn, "Presenty")
+        insert_hr_period(sa_sync_conn, present, unit_label="LAB", structure_id=lab)
+        gone = insert_person(sa_sync_conn, "Goney")
+        insert_hr_period(
+            sa_sync_conn, gone, unit_label="LAB", structure_id=lab, end_date=date(2020, 1, 1)
+        )
+        excluded = insert_person(sa_sync_conn, "Excludy")
+        insert_hr_period(sa_sync_conn, excluded, unit_label="LAB", structure_id=lab)
+        sa_sync_conn.execute(
+            text("UPDATE persons SET exclusion = 'out_of_perimeter' WHERE id = :p"), {"p": excluded}
+        )
+
+        res = StructuresQueries(sa_sync_conn).get_structure_detail(lab)
+
+        assert res is not None
+        assert res.members_count == 1
 
 
 class TestGetLaboratoryAddresses:

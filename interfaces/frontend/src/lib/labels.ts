@@ -214,7 +214,7 @@ export const contributionRoleLabels: Record<string, string> = {
 /** Nom de chaque section du site, par chemin : lien de la navigation, en-tête de page et fil d'Ariane. */
 export const sectionLabels = {
 	publications: 'Publications',
-	structures: 'Labos',
+	structures: 'Structures',
 	persons: 'Chercheurs',
 	theses: 'Thèses',
 	publishers: 'Éditeurs',

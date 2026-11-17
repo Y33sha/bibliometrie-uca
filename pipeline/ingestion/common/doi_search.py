@@ -34,7 +34,7 @@ class DoiSearch:
 
 
 def get_missing_dois(
-    conn: Connection, target: str, *, retry_after_days: int, years: list[int] | None = None
+    conn: Connection, target: str, *, retry_after_days: int, years: list[int]
 ) -> list[str]:
     """Renvoie les DOI à chercher dans la cible : DOI des publications du périmètre absents de la cible, nettoyés et sans doublon.
 
@@ -58,16 +58,6 @@ def get_missing_dois(
     prefix_filter = " AND dp.ra = :target_ra" if target_ra else ""
     pending = pending_failed_lookup_sql(source_sql=":target", id_type="doi", value_sql="c.doi")
     unknown_to_doi_org = "EXISTS (SELECT 1 FROM dois x WHERE x.doi = c.doi AND NOT x.registered)"
-    year_filter = (
-        """
-          AND EXISTS (
-                  SELECT 1 FROM source_records sr_year
-                  WHERE sr_year.publication_id = c.publication_id
-                    AND sr_year.publication_year = ANY(:years)
-              )"""
-        if years is not None
-        else ""
-    )
     # `IS DISTINCT FROM` : un DOI de relation ou une forme sans version, sans source, est candidat pour toutes les cibles.
     # `NOT EXISTS` : avec `NOT IN`, un NULL dans la sous-requête viderait la sélection.
     query = f"""
@@ -92,12 +82,19 @@ def get_missing_dois(
               ){prefix_filter}
           AND NOT EXISTS (SELECT 1 FROM deja_connus k WHERE k.doi = c.doi)
           AND NOT {pending}
-          AND NOT {unknown_to_doi_org}{year_filter}
+          AND NOT {unknown_to_doi_org}
+          AND EXISTS (
+                  SELECT 1 FROM source_records sr_year
+                  WHERE sr_year.publication_id = c.publication_id
+                    AND sr_year.publication_year = ANY(:years)
+              )
         ORDER BY c.doi
     """
-    params: dict[str, object] = {"target": target, "retry_after_days": retry_after_days}
-    if years is not None:
-        params["years"] = years
+    params: dict[str, object] = {
+        "target": target,
+        "retry_after_days": retry_after_days,
+        "years": years,
+    }
     if target_ra:
         params["target_ra"] = target_ra
     rows: ScalarResult[str] = conn.execute(text(query), params).scalars()
@@ -112,8 +109,8 @@ async def fetch_missing_doi(
     log: logging.Logger,
     *,
     retry_after_days: int,
+    years: list[int],
     limit: int | None = None,
-    years: list[int] | None = None,
     scope: str | None = None,
 ) -> PhaseMetrics:
     """Cherche dans la source les DOI absents de son `staging`, et écrit dans `staging` les documents trouvés.

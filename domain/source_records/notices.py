@@ -28,16 +28,31 @@ _NOTICE_UPDATES = CROSSREF_CORRECTION_UPDATES | {CROSSREF_RETRACTION_UPDATE}
 """Types de mise à jour d'un erratum ou d'un avis de rétractation."""
 
 
-def corrected_work_doi(source_extras: Mapping[str, JsonValue] | None, own_doi: str) -> str | None:
-    """Renvoie le DOI de l'œuvre corrigée ou rétractée, déclaré par un avis Crossref dans `update-to`. `None` sans déclaration, ou pour plusieurs œuvres déclarées."""
+def _single_updated_doi(
+    source_extras: Mapping[str, JsonValue] | None, own_doi: str, update_types: Iterable[str]
+) -> str | None:
+    """Renvoie le DOI visé par les mises à jour Crossref de ces types déclarées dans `update-to`, hors `own_doi`. `None` sans déclaration, ou pour plusieurs DOI visés."""
+    types = frozenset(update_types)
     declared = {
         doi
         for entry in as_sequence((source_extras or {}).get(SourceExtra.UPDATE_TO))
-        if (as_str(as_mapping(entry).get("type")) or "") in _NOTICE_UPDATES
+        if (as_str(as_mapping(entry).get("type")) or "") in types
         and (doi := as_str(as_mapping(entry).get("doi")))
         and doi != own_doi
     }
     return next(iter(declared)) if len(declared) == 1 else None
+
+
+def corrected_work_doi(source_extras: Mapping[str, JsonValue] | None, own_doi: str) -> str | None:
+    """Renvoie le DOI de l'œuvre corrigée ou rétractée, déclaré par un avis Crossref dans `update-to`. `None` sans déclaration, ou pour plusieurs œuvres déclarées."""
+    return _single_updated_doi(source_extras, own_doi, _NOTICE_UPDATES)
+
+
+def withdrawn_original_doi(
+    source_extras: Mapping[str, JsonValue] | None, own_doi: str
+) -> str | None:
+    """Renvoie le DOI de l'article original, déclaré par l'enregistrement source Crossref d'un doublon retiré : retrait (`withdrawal`) dans `update-to`, vers un autre DOI. `None` sans déclaration, ou pour plusieurs DOI déclarés."""
+    return _single_updated_doi(source_extras, own_doi, {CROSSREF_WITHDRAWAL_UPDATE})
 
 
 def notice_doc_type(update_types: Iterable[str]) -> DocType | None:

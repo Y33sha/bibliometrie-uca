@@ -60,10 +60,8 @@
 	--focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent-mid) 20%, transparent); /* halo d'un champ qui a le focus, bordé de --accent-mid */
 
 	/* Barre de navigation */
-	--nav-public: oklch(0.475 0.067 var(--brand-hue));
-	--nav-public-menu: oklch(0.429 0.061 var(--brand-hue)); /* sous-menus déroulants */
-	--nav-admin: var(--accent-light);                      /* session admin : barre claire, texte en --accent */
-	--nav-admin-menu: #ffffff;
+	--nav-bg: oklch(0.475 0.067 var(--brand-hue));
+	--nav-menu-bg: oklch(0.429 0.061 var(--brand-hue)); /* sous-menus déroulants */
 
 	/* États */
 	--success: #25734a;        /* contraste de 4,5:1 au moins en texte sur --success-light */
@@ -92,6 +90,14 @@
 	--bronze: #9f5526;
 	--green: #36a558;
 	--open-access-logo: #f68212; /* cadenas ouvert du logo open access */
+
+	/* Chiffres clés d'un dashboard : couleur de l'icône d'un chiffre cliquable, au survol. */
+	--key-figure-publications: #f68212;
+	--key-figure-open-access: var(--open);
+	--key-figure-citations: var(--gold);
+	--key-figure-collaboration: var(--doctype-article);
+	--key-figure-theses: var(--doctype-theses);
+	--key-figure-persons: #894d97;
 
 	/* Graphiques : couleurs des séries sans couleur propre, dans l'ordre d'attribution (`chartColor()`). */
 	--chart-1: #4e79a7;
@@ -164,6 +170,7 @@
 	--header-height: 46px; /* hauteur du menu supérieur fixe */
 	--list-toolbar-slide: 0.2s; /* durée du glissement de la barre d'outils d'une liste */
 	--page-gutter: 24px; /* marge latérale du contenu de la page */
+	--filter-panel-width: 290px; /* largeur du panneau des filtres d'une liste, sur grand écran */
 	--radius: 8px;
 	--radius-pill: 999px;
 }

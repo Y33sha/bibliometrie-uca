@@ -20,7 +20,7 @@ Le pipeline est le traitement par lots qui moissonne les sources et en déduit l
 
 ## Phases et tâches
 
-Le module de chaque phase déclare ses tâches (`TASKS`) : lectures, écritures, API, fonction et affichage. `phases.py` groupe les tâches en phases. Une phase peut avoir une condition de mode, une précondition et un assemblage de ses métriques. `run_phase` exécute les tâches d'une phase dans leur ordre, sur le contexte du run. Les tests vérifient qu'aucune tâche ne lit une donnée écrite après elle.
+Le module de chaque phase déclare la phase (`PHASE`) et ses tâches : lectures, écritures, API, fonction et affichage. Une phase peut avoir une condition de mode, une précondition et un assemblage de ses métriques. `phases.py` donne l'ordre des phases. `run_phase` exécute les tâches d'une phase dans leur ordre, sur le contexte du run. Les tests vérifient qu'aucune tâche ne lit une donnée écrite après elle.
 
 Un verrou PostgreSQL limite chaque base à une exécution du pipeline à la fois. Les phases commitent par lots ([transactions](04-infrastructure.md#transactions)).
 
