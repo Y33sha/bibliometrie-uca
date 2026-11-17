@@ -859,6 +859,8 @@ class TestTitleErratumPrefixRule:
             "WITHDRAWN: Corrigendum to ‘Identification of low fluoride areas’",
             "Publisher Erratum: Open charm production and asymmetry in pNe collisions",
             "Author Erratum: Search for new phenomena",
+            "Correction to exploration of biological markers of feed efficiency in young bulls",
+            "Corrections to Received Date Information",
         ],
     )
     def test_erratum_titles(self, title):
@@ -876,6 +878,15 @@ class TestTitleErratumPrefixRule:
     )
     def test_article_titles(self, title):
         assert doc_type_correction(_view(doc_type="article", title=title)) is None
+
+    def test_hal_correction_typed_book_review(self):
+        """Cas réel : HAL type `book_review` le dépôt d'une correction."""
+        view = _view(
+            doc_type="book_review",
+            title="Correction to: Mapping of dressed and processed poultry products in Bangladesh",
+        )
+        corrected = doc_type_correction(view)
+        assert corrected is not None and corrected.value == "erratum"
 
     def test_chapter_correction(self):
         """Springer type `book_chapter` la correction d'un chapitre."""

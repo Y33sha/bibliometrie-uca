@@ -153,7 +153,7 @@ _ERRATUM_TITLE_PREFIXES = (
 
 _ERRATUM_TITLE_PATTERN = re.compile(
     r"^\s*(?:withdrawn\s*:\s*)?(?:"
-    r"(?:(?:author|publisher)\s+)?(?:corrections?|erratum|errata|corrigendum|addendum)\s*(?:(?:to|for|of)\s*)?[:“\"‘'«]"
+    r"(?:(?:author|publisher)\s+)?(?:corrections?|erratum|errata|corrigendum|addendum)\s*(?:to\b|(?:(?:for|of)\s*)?[:“\"‘'«])"
     r"|corrections?\s+for\s+[^,:]+\bet\s+al\b"
     r"|publisher['’]s\s+note\s*:"
     r"|corrections?\s*$"
@@ -161,7 +161,7 @@ _ERRATUM_TITLE_PATTERN = re.compile(
     r")",
     re.IGNORECASE,
 )
-"""Titre brut d'un erratum, avec ou sans « WITHDRAWN: » devant : « Correction: … », « Publisher Erratum: … », « Correction(s) to “… », « Correction for X et al. », « Publisher's note: … », « Correction » seul, « Department of Error » (The Lancet). Un deux-points ou un guillemet suit le mot : « Correction of hallux valgus » est un article."""
+"""Titre brut d'un erratum, avec ou sans « WITHDRAWN: » devant : « Correction: … », « Publisher Erratum: … », « Correction(s) to … », « Correction for X et al. », « Publisher's note: … », « Correction » seul, « Department of Error » (The Lancet). Hors « to », un deux-points ou un guillemet suit le mot : « Correction of hallux valgus » est un article."""
 
 _RETRACTION_TITLE_PREFIXES = ("retraction notice", "retraction note")
 """Débuts de titre normalisé d'un avis de rétractation. « Retraction of consent in clinical trials » est un article."""
@@ -264,10 +264,11 @@ _NOTICE_CANDIDATE_TYPES = frozenset(
         DocType.DATA_PAPER,
         DocType.LETTER,
         DocType.BOOK_CHAPTER,
+        DocType.BOOK_REVIEW,
         DocType.OTHER,
     }
 )
-"""Types qu'une règle d'erratum ou d'avis de rétractation peut corriger."""
+"""Types qu'une règle d'erratum ou d'avis de rétractation peut corriger. HAL type parfois `book_review` le dépôt d'une correction."""
 
 
 _RULES: dict[MetadataCorrectionRule, _Rule] = {
