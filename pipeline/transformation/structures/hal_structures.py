@@ -16,7 +16,7 @@ from infrastructure.db.queues import Queue, enqueue
 from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
 from pipeline.ingestion.hal.api import HAL_STRUCTURES_BATCH
 from pipeline.ingestion.hal.structures import HalStructure, parse_hal_structure
-from pipeline.runtime.observability.log_format import LAST_BRANCH, open_section
+from pipeline.runtime.observability.log_format import BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
 
@@ -299,10 +299,9 @@ def run_refresh_hal_structures(
 ) -> PhaseMetrics:
     """Charge les structures à lire, puis reconstruit les relations, y compris quand HAL devient inaccessible."""
     metrics = PhaseMetrics()
-    open_section(logger, "Référentiel des structures HAL")
     ids = store.ids_to_fetch(refresh_stale=refresh_stale)
     if not ids:
-        logger.info("%sAucune structure à charger", LAST_BRANCH)
+        metrics.report = "Aucune structure à charger"
         return metrics
 
     def save_batch(
@@ -312,7 +311,7 @@ def run_refresh_hal_structures(
         conn.commit()
 
     try:
-        with track_progress(len(ids), f"{LAST_BRANCH}HAL", logger) as progress:
+        with track_progress(len(ids), f"{BRANCH}HAL", logger) as progress:
             load = fetch_hal_structures(
                 ids, source=source, store=store, save_batch=save_batch, progress=progress
             )
@@ -331,11 +330,8 @@ def run_refresh_hal_structures(
         "loaded": load.structures,
         "not_found": len(load.not_found),
     }
-    logger.info(
-        "%s%d structures cherchées : %d trouvées, %d introuvables",
-        LAST_BRANCH,
-        load.requested,
-        load.requested - len(load.not_found),
-        len(load.not_found),
+    metrics.report = (
+        f"{load.requested} structures cherchées : {load.requested - len(load.not_found)} trouvées,"
+        f" {len(load.not_found)} introuvables"
     )
     return metrics

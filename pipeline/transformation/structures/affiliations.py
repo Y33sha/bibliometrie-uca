@@ -28,7 +28,7 @@ from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.ror import ZenodoRorDumpSource
 from pipeline.ingestion.hal.api import HalStructuresClient
 from pipeline.runtime.context import PhaseContext
-from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity
+from pipeline.runtime.observability.log_format import BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.transformation.countries import countries
@@ -57,6 +57,11 @@ def _resolve_addresses(ctx: PhaseContext) -> PhaseMetrics:
         stats = run_resolution(conn, perimeter_ids, ctx.logger)
     metrics = PhaseMetrics()
     metrics.add(seen=stats.processed)
+    if stats.processed:
+        metrics.report = (
+            f"structures du périmètre identifiées dans {quantity(stats.in_perimeter, 'adresse')}"
+            f" ({100 * stats.in_perimeter / stats.processed:.1f}%)"
+        )
     metrics.details["summary"] = {
         "adresses": stats.processed,
         "in_perimeter": stats.in_perimeter,
@@ -66,15 +71,18 @@ def _resolve_addresses(ctx: PhaseContext) -> PhaseMetrics:
 
 def _resolve_thesis_partners(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        resolve_thesis_partners(conn, ctx.logger)
-    return PhaseMetrics()
+        resolved, partners = resolve_thesis_partners(conn)
+    return PhaseMetrics(report=f"{resolved} laboratoires partenaires rattachés sur {partners}")
 
 
 def _populate(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         perimeter_ids = set(get_persons_structure_ids_list(conn))
         counts = populate(conn, ctx.logger, perimeter_ids)
-    metrics = PhaseMetrics()
+    entered = quantity(counts.added, "contribution source entrée", "contributions sources entrées")
+    metrics = PhaseMetrics(
+        report=f"{entered} dans le périmètre, {counts.removed} {inflect(counts.removed, 'sortie')}"
+    )
     metrics.details["summary"] = {
         "source_contributions_entered": counts.added,
         "source_contributions_left": counts.removed,
@@ -86,14 +94,10 @@ def populate(
     conn: Connection, logger: logging.Logger, perimeter_ids: set[int]
 ) -> InPerimeterSyncCounts:
     """Pose sur les contributions sources les indices de leur entrée dans le périmètre. Renvoie le nombre d'entrées et de sorties du périmètre. L'appelant commite."""
-    with waiting(f"{LAST_BRANCH}rattachement en cours", logger) as line:
+    with waiting(f"{BRANCH}rattachement en cours", logger) as line:
         refresh_source_contribution_structures(conn)
         counts = sync_perimeter_evidence(conn, perimeter_ids=list(perimeter_ids))
-        entered = quantity(
-            counts.added, "contribution source entrée", "contributions sources entrées"
-        )
-        left = f"{counts.removed} {inflect(counts.removed, 'sortie')}"
-        line.conclude(f"{LAST_BRANCH}{entered} dans le périmètre, {left}")
+        line.erase()
     return counts
 
 
@@ -130,6 +134,7 @@ _REFRESH_ROR = Task(
     previous_run=("ror_dump_imports",),
     network="zenodo",
     run=_refresh_ror,
+    section="Référentiel ROR",
 )
 
 
@@ -146,6 +151,7 @@ _REFRESH_HAL_STRUCTURES = Task(
     previous_run=("hal_structures", "hal_structure_aliases"),
     network="hal",
     run=_refresh_hal_structures,
+    section="Référentiel des structures HAL",
 )
 
 
@@ -163,6 +169,7 @@ _CLASSIFY_ADDRESSES = Task(
     previous_run=("addresses.origin",),
     run=in_transaction(classify_addresses),
     section="Origine des adresses",
+    silent_when_empty=True,
 )
 
 
@@ -173,6 +180,7 @@ _DETECT_CONCATENATED_ADDRESSES = Task(
     previous_run=("addresses.is_concatenated",),
     run=in_transaction(detect_concatenated_addresses),
     section="Adresses concaténées",
+    silent_when_empty=True,
 )
 
 
@@ -189,6 +197,7 @@ _RESOLVE_ADDRESSES = Task(
     previous_run=("addresses",),
     run=_resolve_addresses,
     section="Identification des structures dans les adresses institutionnelles",
+    silent_when_empty=True,
 )
 
 
@@ -203,6 +212,7 @@ _RESOLVE_THESIS_PARTNERS = Task(
     writes=("idref_structures",),
     previous_run=("idref_structures",),
     run=_resolve_thesis_partners,
+    section="Identification des laboratoires partenaires de thèse",
 )
 
 

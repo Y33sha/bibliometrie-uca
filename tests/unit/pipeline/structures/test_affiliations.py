@@ -27,7 +27,7 @@ def perimetre(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
     lus = {"extraction": [1, 2, 3, 4, 5], "persons": PERIMETRE}
     monkeypatch.setattr(perimeter, "get_extraction_structure_ids", lambda conn: lus["extraction"])
     monkeypatch.setattr(phase, "get_persons_structure_ids_list", lambda conn: lus["persons"])
-    monkeypatch.setattr(phase, "resolve_thesis_partners", lambda _conn, _logger: 0)
+    monkeypatch.setattr(phase, "resolve_thesis_partners", lambda _conn: (0, 0))
     return lus
 
 
@@ -119,7 +119,7 @@ def test_rafraichit_le_referentiel_ror_et_reprend_ses_metriques(contexte):
             "run_resolution",
             return_value=ResolutionStats(processed=0, in_perimeter=0, affiliations=0),
         ),
-        patch.object(phase, "populate"),
+        patch.object(phase, "populate", return_value=InPerimeterSyncCounts(added=0, removed=0)),
         patch.object(countries, "funnel", return_value={}),
     ):
         metrics = run_phase(_phase(ror), contexte())

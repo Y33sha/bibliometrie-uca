@@ -9,7 +9,7 @@ from sqlalchemy import Connection, text
 
 from pipeline.graph import Step, Task, in_transaction
 from pipeline.runtime.context import PhaseContext
-from pipeline.runtime.observability.log_format import LAST_BRANCH, quantity
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.countries import (
     detect_by_country_name,
@@ -58,12 +58,9 @@ def _resolve(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         changed = resolve_queued_addresses(conn)
         after = count_address_country_status(conn)
-    ctx.logger.info(
-        "%s%s",
-        LAST_BRANCH,
-        quantity(changed, "adresse mise à jour", "adresses mises à jour"),
+    metrics = PhaseMetrics(
+        updated=changed, report=quantity(changed, "adresse mise à jour", "adresses mises à jour")
     )
-    metrics = PhaseMetrics(updated=changed)
     metrics.details[_STATUS_AFTER] = after
     return metrics
 

@@ -9,7 +9,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from infrastructure.db.scalars import scalar_int
-from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect
+from pipeline.runtime.observability.log_format import BRANCH
 from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.structures.detections import (
     ADDRESS_STRUCTURES,
@@ -94,14 +94,5 @@ def process_addresses(
 
             processed += len(rows)
             progress.advance(len(rows))
-
-    if processed > 0:
-        logger.info(
-            "%sstructures du périmètre identifiées dans %s %s (%.1f%%)",
-            LAST_BRANCH,
-            in_perimeter_count,
-            inflect(in_perimeter_count, "adresse"),
-            100 * in_perimeter_count / processed,
-        )
 
     return ResolutionStats(processed, in_perimeter_count, affil_count)

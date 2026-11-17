@@ -7,7 +7,6 @@ Une valeur neutralisée ne fait ni entrer une contribution source dans le périm
 L'arbitrage est indépendant de l'ordre de traitement : le calcul repart des données à chaque exécution.
 """
 
-import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from typing import NamedTuple
@@ -23,8 +22,6 @@ from infrastructure.sql_fragments import (
     person_source_contribution,
     trusted_identifier_sql,
 )
-from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity
-from pipeline.runtime.observability.progress import waiting
 
 _MARK_MODIFIED_PUBLICATIONS = enqueue_sql(
     Queue.PUBLICATION_CONTRIBUTIONS,
@@ -250,20 +247,9 @@ def requalify_misplaced_identifiers(
     }
 
 
-def arbitrate_identifier_conflicts(conn: Connection, logger: logging.Logger) -> dict[str, int]:
+def arbitrate_identifier_conflicts(conn: Connection) -> dict[str, int]:
     """Neutralise les identifiants mal placés (`requalify_misplaced_identifiers`).
 
     Renvoie `{neutralized, marked_contributions}`. L'appelant commite.
     """
-    with waiting(LAST_BRANCH, logger) as line:
-        requalified = requalify_misplaced_identifiers(conn, compute_identifier_consensus(conn))
-        neutralized = requalified["neutralized"]
-        line.conclude(
-            f"{LAST_BRANCH}Identifiants portés sous le nom d'une autre personne : "
-            + (
-                f"{quantity(neutralized, 'identifiant')} {inflect(neutralized, 'neutralisé')}"
-                if neutralized
-                else "rien à faire"
-            )
-        )
-    return requalified
+    return requalify_misplaced_identifiers(conn, compute_identifier_consensus(conn))

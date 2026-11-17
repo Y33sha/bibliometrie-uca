@@ -7,13 +7,7 @@ from sqlalchemy import Connection, text
 
 from domain.addresses.concatenation import is_concatenated
 from infrastructure.db.scalars import scalar_int
-from pipeline.runtime.observability.log_format import (
-    BRANCH,
-    LAST_BRANCH,
-    inflect,
-    nothing_to_do,
-    quantity,
-)
+from pipeline.runtime.observability.log_format import BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
 
@@ -41,7 +35,6 @@ def detect_concatenated_addresses(
     """Pose `is_concatenated` sur les adresses non examinées, tranche par tranche. L'appelant commite."""
     total = scalar_int(conn.execute(_COUNT_UNEXAMINED))
     if not total:
-        nothing_to_do(logger)
         return PhaseMetrics()
 
     examined = concatenated = 0
@@ -57,11 +50,8 @@ def detect_concatenated_addresses(
             concatenated += sum(p["is_concatenated"] for p in payload)
             progress.advance(len(rows))
 
-    logger.info(
-        "%s%s %s, dont %s",
-        LAST_BRANCH,
-        quantity(examined, "adresse"),
-        inflect(examined, "examinée"),
-        quantity(concatenated, "concaténée"),
+    report = (
+        f"{quantity(examined, 'adresse')} {inflect(examined, 'examinée')},"
+        f" dont {quantity(concatenated, 'concaténée')}"
     )
-    return PhaseMetrics(seen=examined, updated=examined)
+    return PhaseMetrics(seen=examined, updated=examined, report=report)

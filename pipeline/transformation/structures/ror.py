@@ -23,7 +23,6 @@ from infrastructure.db.tables import (
 )
 from pipeline.http.dump_download import DumpUnavailableError
 from pipeline.ingestion.complements.ror import ZenodoRorDumpSource, dump_version
-from pipeline.runtime.observability.log_format import LAST_BRANCH, open_section
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unavailable
 
@@ -143,15 +142,14 @@ def run_refresh_ror(
     store: RorStore,
     logger: logging.Logger,
 ) -> PhaseMetrics:
-    """Importe la dernière version du dump ROR, si elle reste à importer."""
+    """Importe la dernière version du dump ROR, si elle reste à importer. La ligne de bilan donne la version."""
     metrics = PhaseMetrics()
 
     def already_imported(version: str) -> PhaseMetrics:
-        logger.info("%sVersion %s déjà importée", LAST_BRANCH, version)
+        metrics.report = f"Version {version} déjà importée"
         metrics.details["ror"] = {"version": version, "imported": False}
         return metrics
 
-    open_section(logger, "Référentiel ROR")
     last = store.last_imported_version()
     published = source.published_version()
     if last and published and dump_version(last) == published:
@@ -172,12 +170,6 @@ def run_refresh_ror(
         metrics.details["ror"] = {"imported": False, "error": str(e)}
         metrics.report = "dump ROR inaccessible, import repris au prochain run"
         return metrics
-    logger.info(
-        "%sVersion %s importée : %d organisations, %d relations",
-        LAST_BRANCH,
-        latest,
-        stats.organizations,
-        stats.relations,
-    )
+    metrics.report = f"Version {latest} importée : {stats.organizations} organisations, {stats.relations} relations"
     metrics.details["ror"] = {"version": latest, "imported": True}
     return metrics

@@ -46,13 +46,13 @@ class Task:
     section: str | None = None
     """Section de la tâche au journal, hors d'une étape de premier niveau qui en a une. `None` : la tâche écrit sous la section courante."""
     label: str | None = None
-    """Libellé de la ligne de bilan. `None` : la tâche écrit elle-même ses lignes."""
+    """Libellé de la ligne de bilan, suivi du bilan de la tâche. `None` : la ligne de bilan est `PhaseMetrics.report`, ou, à défaut, la tâche écrit elle-même ses lignes."""
     threshold: int = DEFAULT_THRESHOLD
     """Échecs consécutifs avant la coupure du circuit-breaker de la source."""
     when: Callable[[PhaseContext], bool] | None = None
     """Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée n'écrit rien."""
     silent_when_empty: bool = False
-    """La tâche n'écrit rien sans élément traité : `total` nul, sans signal."""
+    """La tâche n'écrit rien sans élément traité : `total` nul, sans erreur ni signal."""
 
 
 type TaskRun = Callable[[PhaseContext], PhaseMetrics]

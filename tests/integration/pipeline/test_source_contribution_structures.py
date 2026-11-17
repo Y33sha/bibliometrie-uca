@@ -1,7 +1,6 @@
 """Branches adresse, `ror`, `hal_structure`, thèse et brevet de la vue `source_contribution_structures`."""
 
 import json
-import logging
 
 from sqlalchemy import text
 
@@ -210,7 +209,7 @@ def test_structures_d_une_these(sa_sync_conn):
         sa_sync_conn, record, source="theses", author_position=None, roles=["jury_member"]
     )
 
-    resolve_thesis_partners(sa_sync_conn, logging.getLogger("test"))
+    resolve_thesis_partners(sa_sync_conn)
 
     assert _reached(sa_sync_conn) == {
         (doctorant, univ, "thesis_institution"),

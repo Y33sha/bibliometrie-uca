@@ -92,7 +92,7 @@ class PhaseMetrics:
     signals: list[Signal] = field(default_factory=list)
     """Motifs d'un statut dégradé, comme une source coupée."""
     report: str | None = field(default=None, compare=False)
-    """Ligne de bilan de la tâche, dans les mots de la tâche. À défaut, le bilan est `as_summary()`.
+    """Bilan de la tâche, dans ses mots. Il suit le libellé de la tâche (`Task.label`), ou forme seul la ligne de bilan d'une tâche sans libellé. À défaut, le bilan d'une tâche à libellé est `as_summary()`.
 
     Hors comparaison : deux relevés aux mêmes compteurs sont égaux, quels que soient leurs libellés.
     """

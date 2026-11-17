@@ -29,6 +29,7 @@ from pipeline.graph import Block, Phase, Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.cpu import available_cpus
 from pipeline.runtime.observability.log_format import (
+    BRANCH,
     LAST_BRANCH,
     nothing_to_do,
     open_section,
@@ -275,13 +276,14 @@ def build_contributions(
     workers = min(available_cpus(), len(publication_ids))
     with (
         ProcessPoolExecutor(max_workers=workers) if workers > 1 else nullcontext() as pool,
-        track_progress(len(publication_ids), LAST_BRANCH.rstrip(), logger) as progress,
+        track_progress(len(publication_ids), BRANCH.rstrip(), logger) as progress,
     ):
         mapper: Mapper = pool_mapper(pool, workers) if pool is not None else map
         for batch in publication_batches(dirty):
             contribution_count += realign(store, batch, methods, progress.advance, mapper)
             store.delete_processed_marks(batch)
             conn.commit()
+    logger.info("%s%s", LAST_BRANCH, quantity(contribution_count, "contribution"))
     # Marquages relevés des publications supprimées.
     store.delete_processed_marks()
     store.drop_snapshot()
@@ -297,7 +299,6 @@ def build_contributions(
         "groups": contribution_count,
         **{str(method): count for method, count in methods.items()},
     }
-    metrics.report = f"{quantity(len(publication_ids), 'publication')}, {quantity(contribution_count, 'contribution')}"
     return metrics
 
 
@@ -309,19 +310,18 @@ def _build(ctx: PhaseContext) -> PhaseMetrics:
 
 def _attributes(ctx: PhaseContext) -> PhaseMetrics:
     """Recalcule les attributs des contributions en file. Les attributs ont leur propre file : l'affiliation d'une contribution source change sans changer sa contribution."""
-    open_section(ctx.logger, "Attributs des contributions")
     t0 = time.perf_counter()
     with (
-        waiting(f"{LAST_BRANCH}en cours", ctx.logger) as line,
+        waiting(f"{BRANCH}en cours", ctx.logger) as line,
         ctx.open_tx() as conn,
     ):
         queued, updated = AuthorGroupingStore(conn).propagate_attributes()
-        line.conclude(
-            f"{LAST_BRANCH}{quantity(queued, 'contribution examinée', 'contributions examinées')},"
-            f" {quantity(updated, 'mise à jour', 'mises à jour')}"
-            f" en {time.perf_counter() - t0:.1f} s"
-        )
-    return PhaseMetrics(seen=queued, updated=updated)
+        line.erase()
+    report = (
+        f"{quantity(queued, 'contribution examinée', 'contributions examinées')},"
+        f" {quantity(updated, 'mise à jour', 'mises à jour')} en {time.perf_counter() - t0:.1f} s"
+    )
+    return PhaseMetrics(seen=queued, updated=updated, report=report)
 
 
 _CHILDREN = (
@@ -372,7 +372,6 @@ _CHILDREN = (
             "source_contributions.neutralized_identifiers",
         ),
         run=_build,
-        label="Bilan",
     ),
     Task(
         "attributes",
@@ -417,6 +416,7 @@ _CHILDREN = (
             "publications.doi",
         ),
         run=_attributes,
+        section="Attributs des contributions",
     ),
 )
 

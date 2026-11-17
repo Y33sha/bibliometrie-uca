@@ -38,10 +38,13 @@ def execute_tasks(children: Sequence[Step | Task], ctx: PhaseContext) -> dict[st
         for task in block:
             metrics = results[task.name]
             ctx.task_durations[task.name] = metrics.duration_s or 0.0
-            report = None
-            if task.label is not None and not _silent(task, metrics):
-                report = (task.label, _outcome(metrics))
-            tree.write(task, report, _maintain(task, ctx), silent=_silent(task, metrics))
+            silent = _silent(task, metrics)
+            tree.write(
+                task,
+                None if silent else _report(task, metrics),
+                _maintain(task, ctx),
+                silent=silent,
+            )
     return results
 
 
@@ -76,8 +79,8 @@ class _Tree:
     def write(
         self,
         task: Task,
-        report: tuple[str, str] | None,
-        maintenance: Sequence[tuple[str, str]],
+        report: str | None,
+        maintenance: Sequence[str],
         *,
         silent: bool,
     ) -> None:
@@ -88,14 +91,10 @@ class _Tree:
         self._quiet = self._quiet and silent
         closing = self._closing.get(task.name, True)
         lines = [*([report] if report is not None else []), *maintenance]
-        for rank, (label, outcome) in enumerate(lines):
+        for rank, line in enumerate(lines):
             last = closing and rank == len(lines) - 1
             self._logger.info(
-                "%s%s : %s",
-                LAST_BRANCH if last else BRANCH,
-                label,
-                outcome,
-                extra={"detail": section is None},
+                "%s%s", LAST_BRANCH if last else BRANCH, line, extra={"detail": section is None}
             )
         if section is not None and closing and self._quiet:
             nothing_to_do(self._logger)
@@ -151,11 +150,20 @@ def _execute_lane(tasks: list[Task], ctx: PhaseContext) -> dict[str, PhaseMetric
 
 
 def _silent(task: Task, metrics: PhaseMetrics) -> bool:
-    """Vrai si la tâche reste silencieuse : `silent_when_empty`, sans élément traité ni signal."""
-    return task.silent_when_empty and metrics.total == 0 and not metrics.signals
+    """Vrai si la tâche reste silencieuse : `silent_when_empty`, sans élément traité, erreur ni signal."""
+    return (
+        task.silent_when_empty and metrics.total == 0 and not metrics.errors and not metrics.signals
+    )
 
 
-def _maintain(task: Task, ctx: PhaseContext) -> list[tuple[str, str]]:
+def _report(task: Task, metrics: PhaseMetrics) -> str | None:
+    """Renvoie la ligne de bilan de la tâche : son libellé suivi de son bilan, ou, sans libellé, sa ligne de bilan (`PhaseMetrics.report`). `None` : la tâche écrit elle-même ses lignes."""
+    if task.label is not None:
+        return f"{task.label} : {_outcome(metrics)}"
+    return metrics.report
+
+
+def _maintain(task: Task, ctx: PhaseContext) -> list[str]:
     """Lance la maintenance de la tâche et renvoie une ligne de journal par opération. `VACUUM` devient `VACUUM FULL` dans un mode qui le demande."""
     lines = []
     for operation in task.maintenance:
@@ -163,7 +171,7 @@ def _maintain(task: Task, ctx: PhaseContext) -> list[tuple[str, str]]:
             operation = operation.replace("VACUUM", "VACUUM FULL", 1)
         t0 = time.perf_counter()
         ctx.maintain(operation)
-        lines.append((operation, f"{time.perf_counter() - t0:.1f}s"))
+        lines.append(f"{operation} : {time.perf_counter() - t0:.1f}s")
     return lines
 
 
