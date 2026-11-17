@@ -18,7 +18,17 @@ def _publication(conn, *, doi, doc_type="article", title=PARENT_TITLE, year=2024
     )
 
 
-def _notice(conn, doi, *, source="crossref", doc_type="erratum", title="t", year=2024, **extras):
+def _notice(
+    conn,
+    doi,
+    *,
+    source="crossref",
+    doc_type="erratum",
+    title="t",
+    year=2024,
+    is_matchable=True,
+    **extras,
+):
     """Insère l'enregistrement source d'un avis, sans publication."""
     insert_source_record(
         conn,
@@ -31,6 +41,7 @@ def _notice(conn, doi, *, source="crossref", doc_type="erratum", title="t", year
         doc_type=doc_type,
         publication_year=year,
         source_extras=extras or None,
+        is_matchable=is_matchable,
     )
 
 
@@ -148,4 +159,10 @@ class TestTitleMatch:
         """Sans DOI, l'avis ne peut être la cible d'une relation."""
         _publication(sa_sync_conn, doi="10.1/a")
         _notice(sa_sync_conn, None, source="hal", title=self._TITLE)
+        assert _edges(sa_sync_conn) == []
+
+    def test_avis_ecarte_de_la_reconciliation(self, sa_sync_conn):
+        """Cas réel : le doublon retiré d'un corrigendum (10.1016/j.scitotenv.2024.172613) reste sans relation."""
+        _publication(sa_sync_conn, doi="10.1/a")
+        _notice(sa_sync_conn, "10.1/e", title=self._TITLE, is_matchable=False)
         assert _edges(sa_sync_conn) == []

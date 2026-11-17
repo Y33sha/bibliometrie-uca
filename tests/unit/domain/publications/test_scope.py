@@ -97,6 +97,24 @@ class TestIsMatchable:
         record = _facts(doi="10.5281/zenodo.10", target_recorded=True)
         assert is_matchable(record)
 
+    def test_record_of_a_withdrawn_duplicate_is_excluded(self):
+        """Cas réel : les enregistrements sources Crossref, OpenAlex et scanR de la version française retirée (10.1016/j.rhum.2022.12.007), doublon d'un article en base."""
+        duplicate = "10.1016/j.rhum.2022.12.007"
+        for source in ("crossref", "openalex", "scanr"):
+            record = _facts(source, doi=duplicate)._replace(
+                withdrawn_duplicate_dois=frozenset({duplicate})
+            )
+            assert not is_matchable(record)
+
+    def test_withdrawn_duplicate_doi_removed_or_related_keeps_the_record(self):
+        duplicate = "10.1016/j.rhum.2022.12.007"
+        related = _id(SourceIdentifierType.DOI, duplicate, role=SourceIdentifierRole.RELATED)
+        for record in (
+            _facts(removed_doi=duplicate),
+            _facts(doi="10.1/x", identifiers=[related]),
+        ):
+            assert is_matchable(record._replace(withdrawn_duplicate_dois=frozenset({duplicate})))
+
     def test_paratext_title_is_excluded(self):
         for title in ("List of Contributors", "README.txt", "Table des matières"):
             assert not is_matchable(_facts(title=normalized_title(title)))

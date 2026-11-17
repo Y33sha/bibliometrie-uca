@@ -59,7 +59,7 @@ class TestMarkRetracted:
         assert _retracted(sa_sync_conn, article) == [True]
 
     def test_doublon_retire(self, sa_sync_conn):
-        """Cas réel : la version française retirée, doublon accidentel, déclare un retrait vers l'article (10.1016/j.rhum.2022.12.007)."""
+        """Cas réel : la version française retirée, doublon accidentel, déclare un retrait vers l'article (10.1016/j.rhum.2022.12.007). Ni l'un ni l'autre n'est rétracté."""
         original = insert_publication(sa_sync_conn, doc_type="article", doi="10.1/original")
         duplicate = insert_publication(sa_sync_conn, doc_type="article")
         _crossref(
@@ -75,7 +75,7 @@ class TestMarkRetracted:
             updated_by=[{"doi": "10.1/doublon", "type": "withdrawal", "source": "publisher"}],
         )
         _run(sa_sync_conn)
-        assert _retracted(sa_sync_conn, original, duplicate) == [False, True]
+        assert _retracted(sa_sync_conn, original, duplicate) == [False, False]
 
     def test_publication_sans_signal_demarquee(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn, doc_type="article")

@@ -77,9 +77,9 @@ _NOTICE_RECORDS_SQL = text(f"""
            sr.title_normalized, sr.publication_year, sr.source_extras,
            {source_record_doi_sql("sr")} AS doi
     FROM source_records sr
-    WHERE sr.doc_type::text IN {in_clause(_NOTICE_DOC_TYPES)}
+    WHERE sr.doc_type::text IN {in_clause(_NOTICE_DOC_TYPES)} AND sr.is_matchable
 """)
-"""Enregistrements sources des errata et des avis, avec leur DOI (`source_record_doi_sql`)."""
+"""Enregistrements sources des errata et des avis, avec leur DOI (`source_record_doi_sql`). Un avis écarté de la réconciliation (`is_matchable`), tel le doublon retiré d'un corrigendum, est ignoré."""
 
 _DECLARING_PUBLICATIONS_SQL = text(f"""
     SELECT sr.publication_id, sr.source_extras
@@ -311,6 +311,7 @@ TASKS = (
                     "title",
                     "title_normalized",
                     "publication_year",
+                    "is_matchable",
                 )
             ),
             "source_record_identifiers",
