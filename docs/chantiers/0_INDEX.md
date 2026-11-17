@@ -6,6 +6,7 @@
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
+- [Réduction des contributions orphelines](DATA_reduction-contributions-orphelines.md)
 
 ### Non commencé
 
