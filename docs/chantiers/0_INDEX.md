@@ -12,6 +12,7 @@
 - [Dashboard, point d'entrée de la vue Statistiques](UI_dashboard-point-d-entree.md)
 - [Financements](DATA_financements.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
+- [Refactorisation : normalisation](CODE_refacto-normalisation.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
