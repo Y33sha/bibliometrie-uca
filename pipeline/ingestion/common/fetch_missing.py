@@ -19,7 +19,7 @@ import asyncio
 from collections.abc import Callable, Coroutine, Mapping
 
 from domain.config import ConfigKey
-from domain.sources.registry import DOI_SEARCHABLE_SOURCES, PROFILES, Source
+from domain.sources.registry import PROFILES, Source
 from pipeline.graph import Block, Phase, Step, Task
 from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.doi_search import fetch_missing_doi
@@ -32,19 +32,9 @@ from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import assemble_by_source
 
-_HAL_BY_ID = "hal_by_id"
-_SCANR_BY_HAL_ID = "scanr_by_hal_id"
-_HAL_BY_NNT = "hal_by_nnt"
-_THESES_BY_NNT = "theses_by_nnt"
-_OPS_BY_NUMBER = "ops_by_number"
-
-
-def _doi_task(target: str) -> str:
-    return f"doi.{target}"
-
 
 def _summary(metrics: PhaseMetrics) -> dict[str, float | None]:
-    """Renvoie la ligne « par canal » de la table d'observabilité de la phase."""
+    """Renvoie la ligne d'un canal dans la table d'observabilité de la phase. La clé de la ligne est le nom de la tâche du canal."""
     return {
         "interrogated": metrics.total,
         "new": metrics.new,
@@ -136,9 +126,10 @@ def _channel(
     )
 
 
-_BY_DOI = {
-    target: _channel(
-        _doi_task(target),
+def _by_doi(target: Source) -> Task:
+    """Renvoie la recherche par DOI dans `target`, source interrogeable par DOI."""
+    return _channel(
+        f"doi.{target}",
         # DOI candidats de la vue `candidate_dois`, bornés à la fenêtre d'années du run par les enregistrements sources de leur publication, et agence d'enregistrement pour Crossref et DataCite.
         reads=(
             "source_record_identifiers",
@@ -149,96 +140,99 @@ _BY_DOI = {
         previous_run=("doi_prefixes", "publication_relations"),
         network=target,
         identifier="DOI",
-        run=lambda ctx, scope, target=target: _run_fetch_missing_doi(ctx, scope, target),
+        run=lambda ctx, scope: _run_fetch_missing_doi(ctx, scope, target),
     )
-    for target in DOI_SEARCHABLE_SOURCES
-}
-"""Recherche par DOI dans chaque source interrogeable par DOI."""
-
-_BY_SOURCE: dict[str, tuple[Task, ...]] = {
-    Source.HAL: (
-        _channel(
-            _HAL_BY_ID,
-            network="hal",
-            identifier="hal-id",
-            run=_by_identifier(fetch_missing_hal_by_id),
-        ),
-        _channel(
-            _HAL_BY_NNT,
-            reads=("publications.doc_type",),
-            previous_run=("publications.doc_type",),
-            network="hal",
-            identifier="NNT",
-            run=_by_identifier(fetch_missing_hal_by_nnt),
-            when=lambda ctx: ctx.options.policy.hal_theses_by_nnt,
-        ),
-        _BY_DOI[Source.HAL],
-    ),
-    Source.SCANR: (
-        _channel(
-            _SCANR_BY_HAL_ID,
-            reads=("source_records.source_id",),
-            network="scanr",
-            identifier="hal-id",
-            run=_by_identifier(fetch_missing_scanr_by_hal_id),
-        ),
-        _BY_DOI[Source.SCANR],
-    ),
-    Source.THESES: (
-        _channel(
-            _THESES_BY_NNT,
-            network="theses",
-            identifier="NNT",
-            run=_by_identifier(fetch_missing_theses_by_nnt),
-        ),
-    ),
-    Source.OPS: (
-        _channel(
-            _OPS_BY_NUMBER,
-            network="ops",
-            identifier="n° brevet",
-            run=_by_identifier(fetch_missing_ops_by_number),
-        ),
-    ),
-    **{
-        target: (channel,)
-        for target, channel in _BY_DOI.items()
-        if target not in (Source.HAL, Source.SCANR)
-    },
-}
-"""Recherches de chaque source, dans l'ordre : une recherche par DOI dans HAL suit la recherche par hal-id, qui a déjà écrit ses documents dans `staging`."""
 
 
-_SUMMARIES: dict[str, str] = {
-    Source.HAL: "hal-id, NNT et DOI trouvés dans une autre source → documents absents de HAL",
-    Source.SCANR: "hal-id et DOI trouvés dans une autre source → documents absents de ScanR",
-    Source.THESES: "NNT trouvés dans une autre source → thèses absentes de theses.fr",
-    Source.OPS: "numéros de brevet trouvés dans une autre source → familles de brevets absentes d'OPS",
-    Source.OPENALEX: "DOI trouvés dans une autre source → documents absents d'OpenAlex",
-    Source.WOS: "DOI trouvés dans une autre source → documents absents de WoS",
-    Source.CROSSREF: "DOI trouvés dans une autre source → documents absents de Crossref",
-    Source.DATACITE: "DOI trouvés dans une autre source → documents absents de DataCite",
-}
-"""Phrase d'entrées → sorties de l'étape de chaque source."""
-
-_CHILDREN = tuple(
-    Step(str(source), _SUMMARIES[source], tasks) for source, tasks in _BY_SOURCE.items()
+_CHILDREN = (
+    # La recherche par DOI dans HAL suit la recherche par hal-id, qui a déjà écrit ses documents dans `staging`.
+    Step(
+        Source.HAL,
+        "hal-id, NNT et DOI trouvés dans une autre source → documents absents de HAL",
+        (
+            _channel(
+                "hal_by_id",
+                network="hal",
+                identifier="hal-id",
+                run=_by_identifier(fetch_missing_hal_by_id),
+            ),
+            _channel(
+                "hal_by_nnt",
+                reads=("publications.doc_type",),
+                previous_run=("publications.doc_type",),
+                network="hal",
+                identifier="NNT",
+                run=_by_identifier(fetch_missing_hal_by_nnt),
+                when=lambda ctx: ctx.options.policy.hal_theses_by_nnt,
+            ),
+            _by_doi(Source.HAL),
+        ),
+    ),
+    Step(
+        Source.SCANR,
+        "hal-id et DOI trouvés dans une autre source → documents absents de ScanR",
+        (
+            _channel(
+                "scanr_by_hal_id",
+                reads=("source_records.source_id",),
+                network="scanr",
+                identifier="hal-id",
+                run=_by_identifier(fetch_missing_scanr_by_hal_id),
+            ),
+            _by_doi(Source.SCANR),
+        ),
+    ),
+    Step(
+        Source.THESES,
+        "NNT trouvés dans une autre source → thèses absentes de theses.fr",
+        (
+            _channel(
+                "theses_by_nnt",
+                network="theses",
+                identifier="NNT",
+                run=_by_identifier(fetch_missing_theses_by_nnt),
+            ),
+        ),
+    ),
+    Step(
+        Source.OPS,
+        "numéros de brevet trouvés dans une autre source → familles de brevets absentes d'OPS",
+        (
+            _channel(
+                "ops_by_number",
+                network="ops",
+                identifier="n° brevet",
+                run=_by_identifier(fetch_missing_ops_by_number),
+            ),
+        ),
+    ),
+    Step(
+        Source.OPENALEX,
+        "DOI trouvés dans une autre source → documents absents d'OpenAlex",
+        (_by_doi(Source.OPENALEX),),
+    ),
+    Step(
+        Source.WOS,
+        "DOI trouvés dans une autre source → documents absents de WoS",
+        (_by_doi(Source.WOS),),
+    ),
+    Step(
+        Source.CROSSREF,
+        "DOI trouvés dans une autre source → documents absents de Crossref",
+        (_by_doi(Source.CROSSREF),),
+    ),
+    Step(
+        Source.DATACITE,
+        "DOI trouvés dans une autre source → documents absents de DataCite",
+        (_by_doi(Source.DATACITE),),
+    ),
 )
-
-_CHANNEL_KEYS = {
-    _HAL_BY_ID: "hal-id",
-    _SCANR_BY_HAL_ID: "hal-id ScanR",
-    _HAL_BY_NNT: "NNT",
-    _THESES_BY_NNT: "NNT theses.fr",
-    _OPS_BY_NUMBER: "numéro de brevet OPS",
-    **{_doi_task(target): target for target in DOI_SEARCHABLE_SOURCES},
-}
-"""Clé de chaque canal dans la table d'observabilité de la phase."""
+"""Une étape par source, avec sa phrase d'entrées → sorties, et ses recherches dans l'ordre."""
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie la somme des métriques des canaux, avec la table des canaux interrogés."""
-    return assemble_by_source(by_task, _summary, key=_CHANNEL_KEYS.__getitem__)
+    return assemble_by_source(by_task, _summary)
 
 
 PHASE = Phase(

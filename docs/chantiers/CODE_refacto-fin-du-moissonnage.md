@@ -24,9 +24,9 @@ Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy
 
 ### Phase 3 — Canaux de `fetch_missing`
 
-- [ ] Une dataclass de canal réunit le nom de la tâche, la source, le type d'identifiant affiché au journal, la clé d'observabilité et la phrase d'étape. L'ajout d'un canal touche un seul endroit, au lieu des constantes de nom, de `_BY_SOURCE`, de `_SUMMARIES` et de `_CHANNEL_KEYS`.
+- [x] La clé d'un canal dans la table d'observabilité est le nom de sa tâche, et ses libellés vont dans `rowLabels` de la vue de la phase, côté frontend : la base garde des clés techniques. Les runs enregistrés gardent leurs clés en français, affichées telles quelles.
+- [x] Les étapes de la phase se déclarent ensemble, chacune avec sa phrase d'entrées → sorties et ses canaux. L'ajout d'un canal touche un seul endroit, au lieu des constantes de nom, de `_BY_SOURCE`, de `_SUMMARIES` et de `_CHANNEL_KEYS`. Un test vérifie que chaque source interrogeable par DOI a sa recherche sous son étape.
 
 ## Questions ouvertes
 
-- Clés d'observabilité de `fetch_missing`, stockées dans `pipeline_phase_executions` : `"hal-id"` désigne la recherche par hal-id dans HAL, `"hal"` la recherche par DOI dans HAL. Des clés symétriques (`source` et type d'identifiant) changeraient la forme des exécutions enregistrées.
 - Deux modèles de concurrence pour un même besoin, des requêtes parallèles bornées vers une source. Le moissonnage par personne emploie des threads et une file bornée (`concurrent_pages`), avec un client synchrone par source. Les recherches par identifiant emploient asyncio (`run_fetch_pool`), avec des fonctions asynchrones par source. Chaque source expose donc deux interfaces HTTP. Chantier à évaluer.
