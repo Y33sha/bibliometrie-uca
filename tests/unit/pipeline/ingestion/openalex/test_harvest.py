@@ -1,6 +1,6 @@
 """Moissonnage OpenAlex (`pipeline.ingestion.openalex.harvest`).
 
-Paramètres de requête : fonction pure. Pilotage : pagination par curseur jusqu'à son épuisement, marquage des works tronqués, mode incrémental, refus d'une configuration incomplète, arrêt sur circuit-breaker. Pas de réseau ni de base : un faux client sert des pages scriptées, la configuration et l'écriture dans `staging` sont remplacées.
+Paramètres de requête : fonction pure. Pilotage : pagination par curseur jusqu'à son épuisement, signal d'un arrêt avant le nombre annoncé, marquage des works tronqués, mode incrémental, refus d'une configuration incomplète, arrêt sur circuit-breaker. Pas de réseau ni de base : un faux client sert des pages scriptées, la configuration et l'écriture dans `staging` sont remplacées.
 """
 
 from __future__ import annotations
@@ -132,6 +132,32 @@ def test_work_au_plafond_d_auteurs_marque_tronque(ecritures):
     client = _client([_page([_work("W1", auteurs=100), _work("W2", auteurs=3)])])
     _extraire(client)
     assert [e.authors_truncated for e in ecritures] == [True, False]
+
+
+def test_un_arret_avant_le_nombre_annonce_emet_un_signal(ecritures, caplog):
+    """Le journal donne le point d'arrêt de la pagination ; le signal met la phase en avertissement."""
+    client = _client([_page([_work("W1"), _work("W2")], next_cursor="c2", count=10), _page([])])
+
+    with caplog.at_level(logging.WARNING):
+        metrics = _extraire(client)
+
+    assert [(s["code"], s["message"]) for s in metrics.signals] == [
+        ("harvest_incomplete", "OpenAlex 2024 : 2 documents reçus sur 10 annoncés")
+    ]
+    assert "2 works reçus sur 10 annoncés, pagination arrêtée : page vide au curseur c2" in (
+        caplog.text
+    )
+
+
+def test_un_ecart_dans_la_tolerance_est_seulement_journalise(ecritures, caplog):
+    works = [_work(f"W{i}") for i in range(199)]
+    client = _client([_page(works, count=200)])
+
+    with caplog.at_level(logging.WARNING):
+        metrics = _extraire(client)
+
+    assert metrics.signals == []
+    assert "page de 199 works sans curseur suivant, au curseur *" in caplog.text
 
 
 def test_page_sans_resultat_interrompt(ecritures):

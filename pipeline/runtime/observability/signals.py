@@ -83,6 +83,23 @@ def signal_harvest_error(
     )
 
 
+def signal_harvest_incomplete(
+    metrics: PhaseMetrics, source: str, scope: str, *, received: int, announced: int
+) -> None:
+    """Marque un moissonnage arrêté avant le nombre de documents annoncé par la source. La phase se termine en avertissement. Le journal de la source donne le point d'arrêt.
+
+    Args:
+        scope: partie moissonnée, comme une année.
+    """
+    metrics.signals.append(
+        {
+            "level": PhaseStatus.WARNING,
+            "code": "harvest_incomplete",
+            "message": f"{source_label(source)} {scope} : {received} documents reçus sur {announced} annoncés",
+        }
+    )
+
+
 def signal_dump_unrecognized(
     metrics: PhaseMetrics, message: str, *, logger: logging.Logger
 ) -> None:

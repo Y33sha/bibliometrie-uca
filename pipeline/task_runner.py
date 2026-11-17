@@ -185,14 +185,18 @@ def _execute(task: Task, ctx: PhaseContext) -> PhaseMetrics:
     return metrics
 
 
+_PARTIAL = frozenset({"harvest_error", "harvest_incomplete"})
+"""Signaux d'une tâche allée à son terme sur une partie de son travail."""
+
+
 def _outcome(metrics: PhaseMetrics) -> str:
-    """Renvoie le bilan d'une tâche : sa ligne de bilan, l'obstacle à son exécution, ou ses compteurs. Un signal d'une erreur partielle (`harvest_error`) laisse les compteurs, erreurs comprises."""
+    """Renvoie le bilan d'une tâche : sa ligne de bilan, l'obstacle à son exécution, ou ses compteurs. Un signal d'exécution partielle (`_PARTIAL`) laisse les compteurs, erreurs comprises."""
     if metrics.report is not None:
         return metrics.report
     codes = {s["code"] for s in metrics.signals}
     if "source_unconfigured" in codes:
         return "sautée, accès non configuré"
-    if codes - {"harvest_error"}:
+    if codes - _PARTIAL:
         return "interrompue"
     return metrics.as_summary()
 
