@@ -6,7 +6,6 @@
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
-- [Refactorisation : orchestrateur et moissonnage](CODE_refacto-orchestrateur-et-moissonnage.md)
 
 ### Non commencé
 
@@ -18,6 +17,7 @@
 
 ## Chantiers archivés
 
+- 2026-11-17 — [Refactorisation : orchestrateur et moissonnage](archived/2026-11-17_CODE_refacto-orchestrateur-et-moissonnage.md)
 - 2026-11-16 — [Duplications du frontend](archived/2026-11-16_UI_duplications-du-frontend.md)
 - 2026-11-16 — [Hiérarchie du pipeline](archived/2026-11-16_CODE_hierarchie-du-pipeline.md)
 - 2026-11-10 — [Brevets](archived/2026-11-10_DATA_brevets.md)

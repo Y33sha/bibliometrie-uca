@@ -44,6 +44,6 @@ Relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software
 
 ### Phase 6 — Documentation
 
-- [ ] `docs/architecture/06-pipeline.md` : déclaration d'une phase par `PHASE` dans son module, `phases.py` réduit à l'ordre.
-- [ ] `docs/donnees/06-structures.md` et `docs/donnees/09-donnees-derivees.md` : `perimeter_structures` recalculée en tête de la première phase du run qui la lit, au lieu d'« avant la première phase ».
-- [ ] `docs/exploitation/03-pipeline.md` et `docs/sources/04-wos.md` : WoS interrogée quand `--sources` la nomme, sans `--include-wos`.
+- [x] `docs/architecture/06-pipeline.md` : déclaration d'une phase par `PHASE` dans son module, `phases.py` réduit à l'ordre.
+- [x] `docs/donnees/06-structures.md` et `docs/donnees/09-donnees-derivees.md` : `perimeter_structures` recalculée en tête de la première phase du run qui la lit, au lieu d'« avant la première phase ».
+- [x] `docs/exploitation/03-pipeline.md` et `docs/sources/04-wos.md` : WoS interrogée quand `--sources` la nomme, sans `--include-wos`.
