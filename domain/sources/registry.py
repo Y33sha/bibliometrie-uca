@@ -37,7 +37,7 @@ class SourceProfile:
     registration_agency: str | None = None
     """Agence d'enregistrement représentée par la source, sous son nom dans `doi_prefixes.ra`. Seuls les DOI de cette agence sont cherchés dans la source."""
     opt_in: bool = False
-    """Interrogée sur option (`--include-wos`) : son crédit d'API est limité."""
+    """Interrogée seulement par un run qui la nomme (`--sources`) : son crédit d'API est limité."""
     incremental: bool = False
     """Moissonnée par le mode quotidien, depuis le dernier moissonnage quotidien réussi."""
     aggregator: bool = False
@@ -170,6 +170,8 @@ PERSON_SEARCHED_SOURCES: tuple[Source, ...] = tuple(
     s for s, p in PROFILES.items() if p.person_identifiers
 )
 AGGREGATOR_SOURCES: frozenset[Source] = frozenset(s for s, p in PROFILES.items() if p.aggregator)
+DEFAULT_SOURCES: frozenset[Source] = frozenset(s for s, p in PROFILES.items() if not p.opt_in)
+"""Sources d'un run qui n'en nomme aucune : toutes, hors sources sur option (`SourceProfile.opt_in`)."""
 
 DISTINCT_WORK_SOURCES: frozenset[Source] = frozenset(
     s for s, p in PROFILES.items() if p.distinct_works

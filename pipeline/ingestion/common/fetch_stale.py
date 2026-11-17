@@ -9,7 +9,7 @@ Chaque document est cherché par son identifiant natif :
 
 Le délai étale la charge : chaque passe reprend seulement les documents qui viennent de le franchir.
 
-La recherche se borne aux années moissonnées par le run. Une thèse en cours est cherchée quelle que soit la fenêtre. La phase est sautée dans un mode dont la policy l'exclut (`daily`). WoS est opt-in (`--include-wos`).
+La recherche se borne aux années moissonnées par le run. Une thèse en cours est cherchée quelle que soit la fenêtre. La phase est sautée dans un mode dont la policy l'exclut (`daily`).
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ _CHILDREN = tuple(
         parallel_group="sources",
         run=lambda ctx, source=source: _run_fetch_stale(ctx, source, _years(ctx)),
         label=source_label(source),
-        when=lambda ctx, source=source: source in ctx.options.queried_sources,
+        when=lambda ctx, source=source: source in ctx.options.sources,
     )
     for source in Source
 )

@@ -56,7 +56,7 @@ _CHILDREN = tuple(
         run=_search(source),
         label=source_label(source),
         threshold=5,
-        when=lambda ctx, source=source: source in ctx.options.queried_sources,
+        when=lambda ctx, source=source: source in ctx.options.sources,
     )
     for source in PERSON_SEARCHED_SOURCES
 )

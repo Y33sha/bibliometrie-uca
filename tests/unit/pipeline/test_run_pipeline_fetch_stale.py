@@ -1,6 +1,6 @@
 """Phase `fetch_stale` : sources rafraîchies, fenêtre d'années, circuit-breaker de chaque source.
 
-WoS est rafraîchie seulement sur demande (`--include-wos`), comme dans `harvest` et `fetch_missing`. Chaque source est rafraîchie sous son circuit-breaker, qui coupe les appels après des réponses 429 répétées.
+WoS est rafraîchie seulement par un run qui la nomme (`--sources`), comme dans `harvest` et `fetch_missing`. Chaque source est rafraîchie sous son circuit-breaker, qui coupe les appels après des réponses 429 répétées.
 """
 
 from contextlib import ExitStack
@@ -53,10 +53,10 @@ def test_fetch_stale_excludes_wos_by_default():
     assert targets  # les autres sources sont rafraîchies
 
 
-def test_fetch_stale_includes_wos_when_opted_in():
+def test_fetch_stale_includes_wos_when_named():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        _run_phase(RunOptions(include_wos=True))
+        _run_phase(RunOptions(sources=frozenset({"hal", "wos"})))
     targets = [c.args[1] for c in run_one.call_args_list]
     assert "wos" in targets
 
@@ -91,7 +91,7 @@ def test_fetch_stale_year_narrows_all_including_theses():
 def test_fetch_stale_respects_sources_filter():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
-        _run_phase(RunOptions(sources={"hal"}, include_wos=True))
+        _run_phase(RunOptions(sources=frozenset({"hal"})))
     assert [c.args[1] for c in run_one.call_args_list] == ["hal"]
 
 

@@ -10,7 +10,7 @@ Une étape par source. Les sources sont interrogées en parallèle, et chaque so
 
 Au journal, chaque recherche a sa barre, libellée par la source et le type d'identifiant cherché. Une recherche sans identifiant à chercher écrit « rien à faire ».
 
-Un identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché de nouveau après le délai `fetch_missing_retry_after_days`. Auprès du registre qui l'attribue (HAL pour un hal-id, theses.fr pour un NNT), l'échec est définitif. Un DOI inconnu de doi.org (`dois.registered`) sort de la sélection. WoS est opt-in (`--include-wos`).
+Un identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché de nouveau après le délai `fetch_missing_retry_after_days`. Auprès du registre qui l'attribue (HAL pour un hal-id, theses.fr pour un NNT), l'échec est définitif. Un DOI inconnu de doi.org (`dois.registered`) sort de la sélection.
 """
 
 from __future__ import annotations
@@ -131,7 +131,7 @@ def _channel(
         parallel_group="sources",
         run=lambda ctx: run(ctx, identifier),
         label=f"par {identifier}",
-        when=lambda ctx: network in ctx.options.queried_sources and (when is None or when(ctx)),
+        when=lambda ctx: network in ctx.options.sources and (when is None or when(ctx)),
         silent_when_empty=True,
     )
 

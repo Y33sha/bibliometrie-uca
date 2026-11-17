@@ -40,7 +40,7 @@ def _source_summary(metrics: PhaseMetrics) -> dict[str, float | None]:
 
 def _effective_sources(ctx: PhaseContext) -> frozenset[str]:
     """Renvoie les sources moissonnées par le run : celles interrogées, restreintes par le mode."""
-    return ctx.options.queried_sources & ctx.options.policy.harvest_sources
+    return ctx.options.sources & ctx.options.policy.harvest_sources
 
 
 def _since_last_daily() -> tuple[date, str]:
