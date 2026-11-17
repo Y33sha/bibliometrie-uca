@@ -379,9 +379,9 @@ _RULES: dict[MetadataCorrectionRule, _Rule] = {
     MetadataCorrectionRule.PREPRINT_RELATION_TO_PREPRINT: _Rule(
         None, lambda f: bool(f.self_declared_preprint), DocType.PREPRINT
     ),
-    # Titre `interview`/`reportage`/`podcast` + `doc_type` ∈ {article, other, recorded_talk} ⇒ `media`.
+    # Titre `interview`/`reportage`/`podcast` + `doc_type` ∈ {article, other, video} ⇒ `media`.
     MetadataCorrectionRule.TITLE_MEDIA_PREFIX_TO_MEDIA: _Rule(
-        _ARTICLE_OR_OTHER | {DocType.RECORDED_TALK},
+        _ARTICLE_OR_OTHER | {DocType.VIDEO},
         lambda f: _title_starts_with(f, _MEDIA_TITLE_PREFIXES),
         DocType.MEDIA,
     ),
@@ -389,9 +389,9 @@ _RULES: dict[MetadataCorrectionRule, _Rule] = {
     MetadataCorrectionRule.DOI_FIGSHARE_COLLECTION_TO_DATASET: _Rule(
         _ARTICLE_OR_OTHER, lambda f: _doi_contains(f, "m9.figshare.c."), DocType.DATASET
     ),
-    # Titre de fichiers complémentaires + doc_type ∈ {article, other, conference, recorded_talk} ⇒ `dataset`. DataCite et des entrepôts (Dryad, Zenodo) les décrivent à part ; Figshare en type certains `Presentation`, DataCite les vidéos `Audiovisual`.
+    # Titre de fichiers complémentaires + doc_type ∈ {article, other, conference, video} ⇒ `dataset`. DataCite et des entrepôts (Dryad, Zenodo) les décrivent à part ; Figshare en type certains `Presentation`, DataCite les vidéos `Audiovisual`.
     MetadataCorrectionRule.TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET: _Rule(
-        _ARTICLE_OR_OTHER | {DocType.CONFERENCE, DocType.RECORDED_TALK},
+        _ARTICLE_OR_OTHER | {DocType.CONFERENCE, DocType.VIDEO},
         lambda f: _title_starts_with(f, _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES),
         DocType.DATASET,
     ),

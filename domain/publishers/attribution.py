@@ -21,7 +21,7 @@ UNPUBLISHED_DOC_TYPES: frozenset[str] = frozenset(
         DocType.MEMOIR,
         DocType.POSTER,
         DocType.CONFERENCE,
-        DocType.RECORDED_TALK,
+        DocType.VIDEO,
         DocType.PATENT,
     }
 )

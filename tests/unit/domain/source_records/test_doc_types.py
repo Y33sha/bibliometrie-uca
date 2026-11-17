@@ -52,9 +52,9 @@ class TestMapDocType:
     def test_datacite_presentation_vers_conference(self):
         assert map_doc_type("Presentation", source="datacite") == "conference"
 
-    def test_videos_vers_recorded_talk(self):
-        assert map_doc_type("VIDEO", source="hal") == "recorded_talk"
-        assert map_doc_type("Audiovisual", source="datacite") == "recorded_talk"
+    def test_videos_vers_video(self):
+        assert map_doc_type("VIDEO", source="hal") == "video"
+        assert map_doc_type("Audiovisual", source="datacite") == "video"
 
     def test_enregistrements_audio_vers_media(self):
         assert map_doc_type("SON", source="hal") == "media"

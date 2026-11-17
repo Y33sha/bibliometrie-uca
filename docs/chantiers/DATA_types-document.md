@@ -49,9 +49,9 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 ## Décisions
 
 - Les libellés des types, les familles et leur ordre sont définis dans le domaine. L'API les sert au frontend.
-- Une famille « Conférences » réunit `recorded_talk` (« Conférence filmée »), `conference` (« Communication ») et `poster`. Elle suit la famille Publications dans l'ordre d'affichage.
+- Une famille « Conférences » réunit `conference` (« Communication »), `conference_abstract` et `poster`. Elle suit la famille Publications dans l'ordre d'affichage.
 - `conference_paper` reste dans la famille Publications.
-- HAL `VIDEO` et DataCite `Audiovisual` donnent `recorded_talk`. Les règles de correction par le titre (interview, fichiers complémentaires) s'appliquent à ce type.
+- HAL `VIDEO` et DataCite `Audiovisual` donnent `video` (« Vidéo »), dans la famille « Annexes & divers » : ces sources ne distinguent pas une conférence filmée d'un film ou d'une vidéo de corpus. Les règles de correction par le titre (interview, fichiers complémentaires) s'appliquent à ce type.
 - HAL `SON` et DataCite `Sound` donnent `media`.
 - Un type `practice_thesis` distingue les thèses d'exercice des mémoires. Il est exclu des publications, comme `memoir`.
 - Un type `journal_issue` désigne le numéro de revue, dirigé ou non. Il est exclu des publications. Un article qui a le DOI de son numéro le perd.
@@ -100,6 +100,7 @@ Mesures du 2026-11-03, base locale, publications du périmètre : 199 errata sur
 - [x] `other` d'une source prioritaire face au type précis d'une autre source : `other` cède au premier type précis d'une source non agrégatrice ; le type d'OpenAlex ou de scanR ne l'emporte pas (pages OSF typées preprint, `article` par défaut). Simulation : 183 publications sur 3 031 `other` changent de type, dont 35 preprints que le `other` de scanR emportait (10.1002/essoar). Restent `other` les 180 où seul un agrégateur donne un type.
 
 - [x] DataCite `Collection` → `dataset` : collections Figshare de fichiers supplémentaires, tables HEPData, PANGAEA, ICOS (775 enregistrements sources). `Model` reste `other` : modèles et produits de modèles mêlés. Script `apply_doc_type_mapping` pour appliquer la table au stock, qui rattrape aussi DataCite `Audiovisual` (127) et `Sound` (1).
+- [x] `recorded_talk` (« Conférence filmée ») renommé `video` (« Vidéo ») : sur 164 publications, la moitié environ sont des conférences filmées, les autres des films, des vidéos de corpus Nakala, des bandes-annonces ; aucun congrès déclaré ne les distingue.
 
 ### Phase 4 — Cas particuliers
 
@@ -123,6 +124,5 @@ Mesures du 2026-11-03, publications du périmètre : 1 895 communications rattac
 
 ## Questions ouvertes
 
-- Films, bandes-annonces et MOOC en `recorded_talk` par la correspondance de HAL `VIDEO` et DataCite `Audiovisual`.
 - « Meeting report » publié en revue, typé `article` par toutes les sources (176417, 180148, 16340) : quel signal pour le typer `conference_abstract` ?
 - Article corrigé ou rétracté absent de la base, cible d'un erratum ou d'un avis du périmètre : moissonnage par DOI (`fetch_missing`) ?

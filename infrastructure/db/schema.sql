@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict MeadtDJugwpZPrpG4FYqaVStQtX8FE8JzrVlrhYiXoiod9UrmSyq0b1LvFz1Sk7
+\restrict jEmokkdFeCStmLZXnmspA6Xw6YL0BEwKMOspGwnTiyEQiYDeJ7wW2CcOx0KpygZ
 
 -- Dumped from database version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
@@ -159,7 +159,7 @@ CREATE TYPE public.doc_type AS ENUM (
     'conference_paper',
     'conference',
     'conference_abstract',
-    'recorded_talk',
+    'video',
     'book',
     'book_chapter',
     'thesis',
@@ -6324,5 +6324,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MeadtDJugwpZPrpG4FYqaVStQtX8FE8JzrVlrhYiXoiod9UrmSyq0b1LvFz1Sk7
+\unrestrict jEmokkdFeCStmLZXnmspA6Xw6YL0BEwKMOspGwnTiyEQiYDeJ7wW2CcOx0KpygZ
 
