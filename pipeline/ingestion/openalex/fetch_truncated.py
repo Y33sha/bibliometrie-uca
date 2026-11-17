@@ -26,8 +26,6 @@ from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-"""Plafond OpenAlex 10 req/s."""
-
 _SELECT_TRUNCATED_SQL = text(
     """
     SELECT source_id

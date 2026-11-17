@@ -12,10 +12,10 @@ Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy
 
 ### Phase 1 — Docstrings
 
-- [ ] `pipeline/ingestion/common/person_search.py` : la docstring du module renvoie à `SourceProfile.person_identifiers` au lieu de `PERSON_SEARCH_IDENTIFIERS`, absent du code.
-- [ ] `pipeline/ingestion/openalex/fetch_truncated.py` : suppression de la chaîne orpheline « Plafond OpenAlex 10 req/s. ».
-- [ ] `pipeline/ingestion/common/fetch_stale.py` : suppression de « ou `None` pour tout l'historique » dans la docstring de `_years`. `window_years` renvoie toujours une liste. Le paramètre `years` devient obligatoire dans `get_stale_source_ids`, `refresh`, `get_missing_dois` et `fetch_missing_doi`.
-- [ ] Les docstrings des phases perdent les redites de `Phase.when`, de la CLI et du profil de source : « sautée dans un mode dont la policy l'exclut », « `--sources` restreint les sources », « WoS est opt-in ».
+- [x] `pipeline/ingestion/common/person_search.py` : la docstring du module renvoie à `SourceProfile.person_identifiers` au lieu de `PERSON_SEARCH_IDENTIFIERS`, absent du code.
+- [x] `pipeline/ingestion/openalex/fetch_truncated.py` : suppression de la chaîne orpheline « Plafond OpenAlex 10 req/s. ».
+- [x] `pipeline/ingestion/common/fetch_stale.py` : suppression de « ou `None` pour tout l'historique » dans la docstring de `_years`. `window_years` renvoie toujours une liste. Le paramètre `years` devient obligatoire dans `get_stale_source_ids`, `refresh`, `get_missing_dois` et `fetch_missing_doi`.
+- [x] Les docstrings des phases perdent les redites de `Phase.when`, de la CLI et du profil de source : « sautée dans un mode dont la policy l'exclut », « `--sources` restreint les sources », « WoS est opt-in ».
 
 ### Phase 2 — Observabilité
 

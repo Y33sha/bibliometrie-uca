@@ -56,7 +56,14 @@ def lancer(monkeypatch):
             return outcomes[source_id]
 
         metrics = asyncio.run(
-            refresh(MagicMock(), "openalex", _fetch_one, logging.getLogger("test"), after_days=90)
+            refresh(
+                MagicMock(),
+                "openalex",
+                _fetch_one,
+                logging.getLogger("test"),
+                after_days=90,
+                years=[2024],
+            )
         )
         return metrics, base
 
