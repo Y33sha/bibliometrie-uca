@@ -131,7 +131,6 @@ def _channel(
         parallel_group="sources",
         run=lambda ctx: run(ctx, identifier),
         label=f"par {identifier}",
-        progress_bar=True,
         when=lambda ctx: network in ctx.options.queried_sources and (when is None or when(ctx)),
         silent_when_empty=True,
     )

@@ -54,7 +54,6 @@ TASKS = tuple(
         parallel_group="sources",
         run=lambda ctx, source=source: _run_fetch_stale(ctx, source, _years(ctx)),
         label=source_label(source),
-        progress_bar=True,
         when=lambda ctx, source=source: source in ctx.options.queried_sources,
     )
     for source in Source

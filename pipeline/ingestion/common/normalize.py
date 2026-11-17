@@ -214,7 +214,6 @@ _BY_SOURCE = tuple(
         ),
         run=_normalize(source),
         label=source_label(source),
-        progress_bar=True,
         when=lambda ctx, source=source: source in ctx.options.sources,
     )
     for source in SOURCE_PRIORITY

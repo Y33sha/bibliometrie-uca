@@ -5,6 +5,7 @@ Une tâche déclare sa fonction d'exécution et son affichage. L'exécuteur ouvr
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Mapping, Sequence
 from functools import partial
@@ -21,30 +22,85 @@ from pipeline.runtime.parallel import run_parallel
 def execute_tasks(children: Sequence[Step | Task], ctx: PhaseContext) -> dict[str, PhaseMetrics]:
     """Exécute les tâches de `children` dans leur ordre et renvoie les métriques des tâches exécutées, par nom de tâche. Une tâche écartée par sa condition est absente du résultat.
 
-    Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble (`run_parallel`). Leurs lignes de bilan suivent, dans l'ordre des tâches. Le titre de section d'un bloc d'une seule section précède son exécution. Un bloc de plusieurs sections ouvre chacune au moment d'écrire ses lignes.
+    Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble (`run_parallel`). Leurs lignes de bilan suivent, dans l'ordre des tâches (`_Tree`).
     """
-    sections = _sections(children)
     selected = [task for task in leaves(children) if task.when is None or task.when(ctx)]
-    next_sections = {task.name: sections[following.name] for task, following in pairwise(selected)}
+    tree = _Tree(_sections(children), selected, ctx.logger)
     results: dict[str, PhaseMetrics] = {}
-    opened = None
     for block in _blocks(selected):
-        block_sections = {sections[task.name] for task in block}
-        section = sections[block[0].name]
-        if len(block_sections) == 1 and section is not None and section != opened:
-            step(ctx.logger, section)
-            opened = section
+        tree.open_block(block)
         results.update(_execute_block(block, ctx))
         for task in block:
-            ctx.task_durations[task.name] = results[task.name].duration_s or 0.0
-            section, next_section = sections[task.name], next_sections.get(task.name)
-            if section is not None and section != opened:
-                step(ctx.logger, section)
-            opened = section
-            _write_lines(task, results[task.name], section, next_section, ctx)
-            if section is not None and section != next_section:
-                _close_if_silent([t for t in selected if sections[t.name] == section], results, ctx)
+            metrics = results[task.name]
+            ctx.task_durations[task.name] = metrics.duration_s or 0.0
+            report = None
+            if task.label is not None and not _silent(task, metrics):
+                report = (task.label, _outcome(metrics))
+            tree.write(task, report, _maintain(task, ctx), silent=_silent(task, metrics))
     return results
+
+
+class _Tree:
+    """Arborescence du journal d'une phase : titres de section, branches des lignes de bilan, fermeture des sections.
+
+    Le titre de section d'un bloc d'une seule section précède son exécution : les lignes écrites par ses tâches et ses barres d'avancement viennent sous lui. Un bloc de plusieurs sections ouvre chacune au moment d'écrire ses lignes. La dernière ligne d'une section, ou de la phase, prend `LAST_BRANCH`. Une section aux tâches toutes silencieuses se ferme sur « Rien à faire » : son titre a ainsi une ligne sous lui.
+
+    Une tâche sans section écrit sous le titre courant, et ses lignes vont au seul journal : une barre d'avancement en tient lieu en terminal, ou la ligne double celles écrites par la tâche.
+    """
+
+    def __init__(
+        self, sections: Mapping[str, str | None], tasks: Sequence[Task], logger: logging.Logger
+    ) -> None:
+        self._sections = sections
+        self._logger = logger
+        self._closing = {
+            task.name: sections[following.name] != sections[task.name]
+            for task, following in pairwise(tasks)
+        }
+        """Par nom de tâche : la tâche suivante est d'une autre section. La dernière tâche ferme la phase, absente ici."""
+        self._opened: str | None = None
+        self._quiet = True
+        """Les tâches de la section ouverte sont toutes silencieuses."""
+
+    def open_block(self, block: Sequence[Task]) -> None:
+        """Ouvre la section d'un bloc avant son exécution, si toutes ses tâches en partagent une."""
+        sections = {self._sections[task.name] for task in block}
+        if len(sections) == 1:
+            self._open(sections.pop())
+
+    def write(
+        self,
+        task: Task,
+        report: tuple[str, str] | None,
+        maintenance: Sequence[tuple[str, str]],
+        *,
+        silent: bool,
+    ) -> None:
+        """Écrit sous la section de la tâche sa ligne de bilan, s'il y en a une, et une ligne par opération de maintenance. Ferme la section après sa dernière tâche."""
+        section = self._sections[task.name]
+        self._open(section)
+        self._opened = section
+        self._quiet = self._quiet and silent
+        closing = self._closing.get(task.name, True)
+        lines = [*([report] if report is not None else []), *maintenance]
+        for rank, (label, outcome) in enumerate(lines):
+            last = closing and rank == len(lines) - 1
+            self._logger.info(
+                "%s%s : %s",
+                LAST_BRANCH if last else BRANCH,
+                label,
+                outcome,
+                extra={"detail": section is None},
+            )
+        if section is not None and closing and self._quiet:
+            nothing_to_do(self._logger)
+
+    def _open(self, section: str | None) -> None:
+        """Écrit le titre de `section`, sauf section déjà ouverte ou absente."""
+        if section is not None and section != self._opened:
+            step(self._logger, section)
+            self._opened = section
+            self._quiet = True
 
 
 def _sections(children: Sequence[Step | Task]) -> dict[str, str | None]:
@@ -92,38 +148,6 @@ def _execute_lane(tasks: list[Task], ctx: PhaseContext) -> dict[str, PhaseMetric
 def _silent(task: Task, metrics: PhaseMetrics) -> bool:
     """Vrai si la tâche reste silencieuse : `silent_when_empty`, sans élément traité ni signal."""
     return task.silent_when_empty and metrics.total == 0 and not metrics.signals
-
-
-def _close_if_silent(
-    tasks: list[Task], results: Mapping[str, PhaseMetrics], ctx: PhaseContext
-) -> None:
-    """Ferme sur « Rien à faire » la section des tâches `tasks` quand toutes sont silencieuses : le titre a ainsi une ligne sous lui."""
-    if all(_silent(task, results[task.name]) for task in tasks):
-        nothing_to_do(ctx.logger)
-
-
-def _write_lines(
-    task: Task,
-    metrics: PhaseMetrics,
-    section: str | None,
-    next_section: str | None,
-    ctx: PhaseContext,
-) -> None:
-    """Écrit la ligne de bilan de la tâche, sauf tâche silencieuse, lance sa maintenance et écrit une ligne par opération."""
-    has_report = task.label is not None and not _silent(task, metrics)
-    lines = [
-        *([(task.label, _outcome(metrics))] if has_report else []),
-        *_maintain(task, ctx),
-    ]
-    for rank, (label, outcome) in enumerate(lines):
-        last = section != next_section and rank == len(lines) - 1
-        ctx.logger.info(
-            "%s%s : %s",
-            LAST_BRANCH if last else BRANCH,
-            label,
-            outcome,
-            extra={"detail": section is None or (task.progress_bar and rank == 0)},
-        )
 
 
 def _maintain(task: Task, ctx: PhaseContext) -> list[tuple[str, str]]:

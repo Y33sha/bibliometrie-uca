@@ -68,6 +68,23 @@ def test_l_executeur_ecrit_le_bilan_de_chaque_section_dans_l_ordre_des_taches(co
     ]
 
 
+def test_la_derniere_ligne_d_une_phase_sans_section_la_ferme(contexte, caplog):
+    """Les lignes d'une tâche sans section vont au seul journal. La dernière tâche exécutée ferme la phase, même suivie d'une tâche écartée."""
+    tasks = (
+        Task("hal", run=lambda _ctx: PhaseMetrics(new=1), label="HAL"),
+        Task("openalex", run=lambda _ctx: PhaseMetrics(new=2), label="OpenAlex"),
+        Task("wos", run=lambda _ctx: PhaseMetrics(), label="WoS", when=lambda _ctx: False),
+    )
+
+    with caplog.at_level(logging.INFO, logger="test"):
+        execute_tasks(tasks, contexte())
+
+    assert [(record.getMessage(), record.detail) for record in caplog.records] == [
+        ("  ├─ HAL : 1 nouveau", True),
+        ("  └─ OpenAlex : 2 nouveaux", True),
+    ]
+
+
 def test_le_bilan_d_une_tache_en_erreur_partielle_garde_ses_compteurs(contexte, caplog):
     """Un signal `harvest_error` laisse les compteurs, erreurs comprises ; une source coupée donne « interrompue »."""
 

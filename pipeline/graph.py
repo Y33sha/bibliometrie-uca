@@ -47,8 +47,6 @@ class Task:
     """Titre de la sous-étape ouverte par une tâche placée hors d'une étape. `None` : la tâche écrit sous le titre courant."""
     label: str | None = None
     """Libellé de la ligne de bilan. `None` : la tâche écrit elle-même ses lignes."""
-    progress_bar: bool = False
-    """La tâche affiche une barre d'avancement en terminal, donc sa ligne de bilan va seulement au journal."""
     threshold: int = DEFAULT_THRESHOLD
     """Échecs consécutifs avant la coupure du circuit-breaker de la source."""
     when: Callable[[PhaseContext], bool] | None = None

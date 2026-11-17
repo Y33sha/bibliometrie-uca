@@ -55,7 +55,6 @@ TASKS = tuple(
         parallel_group="sources",
         run=_search(source),
         label=source_label(source),
-        progress_bar=True,
         threshold=5,
         when=lambda ctx, source=source: source in ctx.options.queried_sources,
     )
