@@ -1,6 +1,6 @@
 # Référentiels
 
-## Labos
+## Structures
 
 `/structures`, en session d'administration
 
