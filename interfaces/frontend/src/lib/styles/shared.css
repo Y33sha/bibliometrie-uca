@@ -164,6 +164,7 @@
 	--header-height: 46px; /* hauteur du menu supérieur fixe */
 	--list-toolbar-slide: 0.2s; /* durée du glissement de la barre d'outils d'une liste */
 	--page-gutter: 24px; /* marge latérale du contenu de la page */
+	--filter-panel-width: 290px; /* largeur du panneau des filtres d'une liste, sur grand écran */
 	--radius: 8px;
 	--radius-pill: 999px;
 }

@@ -361,6 +361,14 @@
     margin: 0 auto;
     padding: 24px var(--page-gutter);
   }
+  /* Panneau des filtres ouvert sur grand écran (`FilterLayout`) : le contenu se range à sa droite, centré dans l'espace restant sur 1320 px au plus. */
+  @media (min-width: 1100px) {
+    .container:has(:global(.filter-layout.open)) {
+      max-width: none;
+      margin-left: var(--filter-panel-width);
+      padding-inline: max(var(--page-gutter), calc((100% - var(--filter-panel-width) - 1320px) / 2));
+    }
+  }
   /* Cible du lien d'évitement : le focus s'y pose sans contour, la zone n'étant pas un contrôle. */
   .container:focus {
     outline: none;
