@@ -4,7 +4,7 @@ import logging
 
 from sqlalchemy import text
 
-from pipeline.transformation.publications import notices
+from pipeline.transformation.publications.relations import notices
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_record
 

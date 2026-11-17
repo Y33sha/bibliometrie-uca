@@ -38,7 +38,7 @@ from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from infrastructure.sql_fragments import has_source_extra, in_clause
 from pipeline.graph import Task, in_transaction
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.transformation.publications.relations import (
+from pipeline.transformation.publications.relations.rebuild import (
     TITLE_MATCH_YEAR_WINDOW,
     UNIQUE_SUBSTANTIVE_CANDIDATE,
     RelationEdge,

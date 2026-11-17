@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from pipeline.graph import Task
+from pipeline.graph import Block, Phase, Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -67,7 +67,7 @@ def _purge(ctx: PhaseContext) -> PhaseMetrics:
     return PhaseMetrics(extras=dict(counts))
 
 
-TASKS = (
+_CHILDREN = (
     Task(
         "arbitrate_identifiers",
         reads=(
@@ -222,3 +222,12 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
         name_forms=by_task["populate_person_name_forms"].extras,
         purge=by_task["purge"].extras,
     )
+
+
+PHASE = Phase(
+    "persons",
+    "Rattachement des contributions aux personnes",
+    _CHILDREN,
+    Block.ENTITIES,
+    assemble=assemble,
+)

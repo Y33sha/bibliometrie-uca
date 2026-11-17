@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from pipeline.graph import Task, in_transaction
+from pipeline.graph import Block, Phase, Task, in_transaction
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.correction import (
     correct_unary,
@@ -25,7 +25,7 @@ from pipeline.transformation.publications.correction import (
     serial_by_doi,
 )
 
-TASKS = (
+_CHILDREN = (
     Task(
         "serial_by_doi",
         reads=(
@@ -204,3 +204,12 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     counts.sort(key=lambda kc: kc[1], reverse=True)
     metrics.details["table"] = {"rows": [{"key": key, "count": count} for key, count in counts]}
     return metrics
+
+
+PHASE = Phase(
+    "metadata_correction",
+    "Correction des enregistrements sources",
+    _CHILDREN,
+    Block.SOURCE_RECORDS,
+    assemble=assemble,
+)

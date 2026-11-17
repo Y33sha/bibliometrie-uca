@@ -9,8 +9,13 @@ Les tâches s'enchaînent dans cet ordre :
 Les publications d'un DOI dont la réponse change entrent dans la file de consolidation.
 """
 
+from pipeline.graph import Block, Phase
 from pipeline.transformation.dois import lookups, registration_agencies
 
-TASKS = (*registration_agencies.TASKS, *lookups.TASKS)
-
-assemble = lookups.assemble
+PHASE = Phase(
+    "dois",
+    "Référentiel des DOI",
+    (*registration_agencies.TASKS, *lookups.TASKS),
+    Block.SOURCE_RECORDS,
+    assemble=lookups.assemble,
+)

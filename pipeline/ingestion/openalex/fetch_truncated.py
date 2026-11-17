@@ -16,7 +16,7 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, text
 
 from domain.types import JsonValue, as_sequence
-from pipeline.graph import Task
+from pipeline.graph import Block, Phase, Task
 from pipeline.ingestion.common.lookup import LookupChannel, by_native_id, look_up
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.ingestion.openalex.api import fetch_work
@@ -84,7 +84,7 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
     )
 
 
-TASKS = (
+_CHILDREN = (
     Task(
         "refetch_openalex",
         reads=("staging",),
@@ -96,4 +96,12 @@ TASKS = (
         # La tâche tourne dans tous les modes, si le run interroge OpenAlex.
         when=lambda ctx: "openalex" in ctx.options.queried_sources,
     ),
+)
+
+
+PHASE = Phase(
+    "fetch_truncated",
+    "Complétion des listes d'auteurs OpenAlex tronquées",
+    _CHILDREN,
+    Block.HARVESTING,
 )

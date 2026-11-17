@@ -8,7 +8,7 @@ Le profil de chaque source liste les types d'identifiant de personne acceptés (
 from __future__ import annotations
 
 from domain.sources.registry import PERSON_SEARCHED_SOURCES, Source, source_label
-from pipeline.graph import Task, TaskRun
+from pipeline.graph import Block, Phase, Task, TaskRun
 from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.harvester import HarvestWindow, run_harvest
 from pipeline.runtime.context import PhaseContext
@@ -27,7 +27,7 @@ def _search(source: str) -> TaskRun:
     return run
 
 
-TASKS = tuple(
+_CHILDREN = tuple(
     Task(
         str(source),
         reads=(
@@ -59,4 +59,13 @@ TASKS = tuple(
         when=lambda ctx, source=source: source in ctx.options.queried_sources,
     )
     for source in PERSON_SEARCHED_SOURCES
+)
+
+
+PHASE = Phase(
+    "harvest_by_person",
+    "Moissonnage par personne",
+    _CHILDREN,
+    Block.HARVESTING,
+    when=lambda ctx: ctx.options.policy.harvest_by_person,
 )

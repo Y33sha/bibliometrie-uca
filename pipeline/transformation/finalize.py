@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, text
 
 from infrastructure.db.scalars import scalar_int
-from pipeline.graph import Step, Task, in_transaction
+from pipeline.graph import Block, Phase, Step, Task, in_transaction
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
     BRANCH,
@@ -331,7 +331,7 @@ _PUBLICATION_COUNTS = Task(
 )
 
 
-STEPS = (
+_CHILDREN = (
     _PURGE_PUBLICATIONS,
     _PUBLICATIONS_IN_PERIMETER,
     _STRUCTURES,
@@ -359,3 +359,12 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
         "publications_purged": by_task["purge_publications"].details["purged"],
     }
     return metrics
+
+
+PHASE = Phase(
+    "finalize",
+    "Données dérivées : périmètre des publications, purges, vues, compteurs",
+    _CHILDREN,
+    Block.DERIVED_DATA,
+    assemble=assemble,
+)

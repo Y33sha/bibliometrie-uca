@@ -25,7 +25,7 @@ from domain.contributions.author_grouping import (
     plan_contribution_ids,
     with_known_first_name,
 )
-from pipeline.graph import Task
+from pipeline.graph import Block, Phase, Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.cpu import available_cpus
 from pipeline.runtime.observability.log_format import (
@@ -324,7 +324,7 @@ def _attributes(ctx: PhaseContext) -> PhaseMetrics:
     return PhaseMetrics(seen=queued, updated=updated)
 
 
-TASKS = (
+_CHILDREN = (
     Task(
         "build",
         reads=(
@@ -426,3 +426,12 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     metrics = by_task["build"]
     metrics.details["attributes_updated"] = by_task["attributes"].updated
     return metrics
+
+
+PHASE = Phase(
+    "author_grouping",
+    "Alignement des auteurs d'une publication entre ses sources",
+    _CHILDREN,
+    Block.ENTITIES,
+    assemble=assemble,
+)

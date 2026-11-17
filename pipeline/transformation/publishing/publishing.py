@@ -1,4 +1,4 @@
-"""Phase `publishing` : référentiels des éditeurs, des revues et des monographies, en étapes (`STEPS`) et tâches du graphe (`pipeline.graph`).
+"""Phase `publishing` : référentiels des éditeurs, des revues et des monographies, en étapes et tâches du graphe (`pipeline.graph`).
 
 Contraintes d'ordre :
 
@@ -21,7 +21,7 @@ from functools import partial
 
 from domain.config import ConfigKey
 from infrastructure.repositories.publisher_merge import merge_publisher_into
-from pipeline.graph import Step, Task, TaskRun, in_transaction
+from pipeline.graph import Block, Phase, Step, Task, TaskRun, in_transaction
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.api_params import (
     API_BASE_URLS,
@@ -589,7 +589,7 @@ _TYPE_PROCEEDINGS_VOLUMES = Task(
 )
 
 
-STEPS = (
+_CHILDREN = (
     Step(
         "doi_prefixes",
         "préfixes DOI → éditeur titulaire de chaque préfixe, agence du préfixe inconnu de doi.org",
@@ -632,4 +632,13 @@ STEPS = (
         (_ATTACH_MONOGRAPHS, _LINK_MONOGRAPHS_TO_COLLECTIONS, _TYPE_PROCEEDINGS_VOLUMES),
         section="Monographies",
     ),
+)
+
+
+PHASE = Phase(
+    "publishing",
+    "Référentiels de l'édition",
+    _CHILDREN,
+    Block.SOURCE_RECORDS,
+    assemble=assemble,
 )

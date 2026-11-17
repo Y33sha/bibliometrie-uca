@@ -23,7 +23,7 @@ from sqlalchemy import Connection
 from infrastructure.read_models.perimeters.queries import (
     get_persons_structure_ids_list,
 )
-from pipeline.graph import Step, Task, in_transaction
+from pipeline.graph import Block, Phase, Step, Task, in_transaction
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.ror import ZenodoRorDumpSource
 from pipeline.ingestion.hal.api import HalStructuresClient
@@ -42,6 +42,7 @@ from pipeline.transformation.structures.hal_structures import (
     run_refresh_hal_structures,
 )
 from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
+from pipeline.transformation.structures.perimeter import check_extraction_perimeter
 from pipeline.transformation.structures.perimeter_evidence import (
     InPerimeterSyncCounts,
     refresh_source_contribution_structures,
@@ -256,7 +257,7 @@ _POPULATE = Task(
 )
 
 
-STEPS = (
+_CHILDREN = (
     Step(
         "structures",
         "adresses, identifiants ROR et HAL, partenaires de thèse → structures des contributions sources",
@@ -288,3 +289,13 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
         **cast("dict[str, int]", by_task["populate"].details["summary"]),
     }
     return metrics
+
+
+PHASE = Phase(
+    "affiliations",
+    "Structures, pays et périmètre des contributions sources",
+    _CHILDREN,
+    Block.SOURCE_RECORDS,
+    check=check_extraction_perimeter,
+    assemble=assemble,
+)

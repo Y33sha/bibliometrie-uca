@@ -5,7 +5,7 @@ La phase `finalize` supprime au préalable les publications sans contribution ra
 
 from __future__ import annotations
 
-from pipeline.graph import Task, in_transaction
+from pipeline.graph import Block, Phase, Task, in_transaction
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.subjects.subject_cooccurrences import (
@@ -20,7 +20,7 @@ def _ingest(ctx: PhaseContext) -> PhaseMetrics:
         return run_ingest(conn, ctx.logger, rebuild=ctx.options.rebuild_subjects)
 
 
-TASKS = (
+_CHILDREN = (
     Task(
         "ingest",
         reads=(
@@ -50,4 +50,12 @@ TASKS = (
         run=in_transaction(run_cooccurrences),
         section="Rafraîchissement des décomptes",
     ),
+)
+
+
+PHASE = Phase(
+    "subjects",
+    "Sujets des publications",
+    _CHILDREN,
+    Block.ENRICHMENTS,
 )

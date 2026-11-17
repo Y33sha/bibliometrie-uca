@@ -19,7 +19,7 @@ from collections.abc import Mapping
 
 from domain.config import ConfigKey
 from domain.sources.registry import Source, source_label
-from pipeline.graph import Task
+from pipeline.graph import Block, Phase, Task
 from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.stale_refetch import refresh
 from pipeline.runtime.config import delay, window_years
@@ -44,7 +44,7 @@ def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) ->
         )
 
 
-TASKS = tuple(
+_CHILDREN = tuple(
     Task(
         str(source),
         reads=("config", "staging", "source_records.publication_year"),
@@ -74,3 +74,13 @@ def _summary(metrics: PhaseMetrics) -> dict[str, float | None]:
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie la somme des métriques des sources, avec la table des sources interrogées."""
     return assemble_by_source(by_task, _summary)
+
+
+PHASE = Phase(
+    "fetch_stale",
+    "Recherche des documents non revus par le moissonnage",
+    _CHILDREN,
+    Block.HARVESTING,
+    when=lambda ctx: ctx.options.policy.fetch_stale,
+    assemble=assemble,
+)

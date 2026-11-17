@@ -20,7 +20,7 @@ from collections.abc import Callable, Coroutine, Mapping
 
 from domain.config import ConfigKey
 from domain.sources.registry import DOI_SEARCHABLE_SOURCES, PROFILES, Source
-from pipeline.graph import Step, Task
+from pipeline.graph import Block, Phase, Step, Task
 from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.doi_search import fetch_missing_doi
 from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id, fetch_missing_hal_by_nnt
@@ -221,7 +221,9 @@ _SUMMARIES: dict[str, str] = {
 }
 """Phrase d'entrées → sorties de l'étape de chaque source."""
 
-STEPS = tuple(Step(str(source), _SUMMARIES[source], tasks) for source, tasks in _BY_SOURCE.items())
+_CHILDREN = tuple(
+    Step(str(source), _SUMMARIES[source], tasks) for source, tasks in _BY_SOURCE.items()
+)
 
 _CHANNEL_KEYS = {
     _HAL_BY_ID: "hal-id",
@@ -237,3 +239,12 @@ _CHANNEL_KEYS = {
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie la somme des métriques des canaux, avec la table des canaux interrogés."""
     return assemble_by_source(by_task, _summary, key=_CHANNEL_KEYS.__getitem__)
+
+
+PHASE = Phase(
+    "fetch_missing",
+    "Recherche des documents trouvés dans une autre source",
+    _CHILDREN,
+    Block.HARVESTING,
+    assemble=assemble,
+)

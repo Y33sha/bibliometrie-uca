@@ -15,8 +15,8 @@ from domain.source_records.identifiers import (
     SourceIdentifierRole,
     SourceIdentifierType,
 )
-from pipeline.transformation.publications import relations
-from pipeline.transformation.publications.relations import (
+from pipeline.transformation.publications.relations import rebuild
+from pipeline.transformation.publications.relations.rebuild import (
     DoiPublication,
     RelationEdge,
 )
@@ -69,7 +69,7 @@ class TestFetchPreprintTitleMatches:
             doi="10.1/pre",
             publication_year=2024,
         )
-        matches = relations.fetch_preprint_title_matches(sa_sync_conn)
+        matches = rebuild.fetch_preprint_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id, m.parent_doi) for m in matches] == [
             (pre, parent, "10.1/pub")
         ]
@@ -85,7 +85,7 @@ class TestFetchPreprintTitleMatches:
         _publication(
             sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/pre"
         )
-        assert relations.fetch_preprint_title_matches(sa_sync_conn) == []
+        assert rebuild.fetch_preprint_title_matches(sa_sync_conn) == []
 
     def test_dataset_does_not_block(self, sa_sync_conn):
         article = _publication(
@@ -97,7 +97,7 @@ class TestFetchPreprintTitleMatches:
         pre = _publication(
             sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/pre"
         )
-        matches = relations.fetch_preprint_title_matches(sa_sync_conn)
+        matches = rebuild.fetch_preprint_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id) for m in matches] == [(pre, article)]
 
     def test_parent_before_preprint_not_matched(self, sa_sync_conn):
@@ -116,7 +116,7 @@ class TestFetchPreprintTitleMatches:
             doi="10.1/pre",
             publication_year=2024,
         )
-        assert relations.fetch_preprint_title_matches(sa_sync_conn) == []
+        assert rebuild.fetch_preprint_title_matches(sa_sync_conn) == []
 
 
 class TestRelationTargetDeletionCascades:
@@ -182,7 +182,7 @@ class TestRelationsDeMemeOeuvre:
         )
         sources = [
             s
-            for s in relations.fetch_declared_relation_sources(sa_sync_conn)
+            for s in rebuild.fetch_declared_relation_sources(sa_sync_conn)
             if s.publication_id == publication
         ]
         assert [(s.doi, s.doc_type) for s in sources] == [("10.48550/arxiv.1", "preprint")]
@@ -201,7 +201,7 @@ class TestRelationsDeMemeOeuvre:
         )
         sources = [
             s
-            for s in relations.fetch_declared_relation_sources(sa_sync_conn)
+            for s in rebuild.fetch_declared_relation_sources(sa_sync_conn)
             if s.publication_id == publication
         ]
         assert [(s.doc_type, s.source_record_doc_type) for s in sources] == [
@@ -212,12 +212,12 @@ class TestRelationsDeMemeOeuvre:
         publication = _publication(
             sa_sync_conn, doc_type="article", title_normalized="article", doi="10.1007/jhep.a1"
         )
-        assert relations.fetch_publications_by_doi(sa_sync_conn, ["10.1007/jhep.a1"]) == {
+        assert rebuild.fetch_publications_by_doi(sa_sync_conn, ["10.1007/jhep.a1"]) == {
             "10.1007/jhep.a1": DoiPublication(publication, "article")
         }
 
     def test_aucun_doi_aucune_requete(self, sa_sync_conn):
-        assert relations.fetch_publications_by_doi(sa_sync_conn, []) == {}
+        assert rebuild.fetch_publications_by_doi(sa_sync_conn, []) == {}
 
     def test_le_doi_d_une_forme_secondaire_designe_la_publication_de_sa_cible(self, sa_sync_conn):
         """Le DOI d'une version Zenodo désigne la publication de son concept."""
@@ -225,7 +225,7 @@ class TestRelationsDeMemeOeuvre:
             sa_sync_conn, doc_type="dataset", title_normalized="jeu", doi="10.5281/zenodo.100"
         )
         _add_doi_target(sa_sync_conn, "10.5281/zenodo.101", "10.5281/zenodo.100")
-        assert relations.fetch_publications_by_doi(sa_sync_conn, ["10.5281/zenodo.101"]) == {
+        assert rebuild.fetch_publications_by_doi(sa_sync_conn, ["10.5281/zenodo.101"]) == {
             "10.5281/zenodo.101": DoiPublication(concept, "dataset")
         }
 
@@ -253,7 +253,7 @@ class TestCountByRelationType:
                 target_doi=target_doi,
             )
 
-        result = relations.count_by_relation_type(sa_sync_conn)
+        result = rebuild.count_by_relation_type(sa_sync_conn)
 
         # Des types Python simples, sérialisables en JSON, comme l'exige l'enregistrement de l'exécution.
         assert all(isinstance(t, str) and isinstance(n, int) for t, n in result)
@@ -271,7 +271,7 @@ class TestRebuildRelations:
         return RelationEdge(from_id, relation_type, target_doi, "crossref")
 
     def _rebuild(self, conn, edges):
-        return relations.rebuild_relations(conn, edges, relations.REBUILT_RELATION_TYPES)
+        return rebuild.rebuild_relations(conn, edges, rebuild.REBUILT_RELATION_TYPES)
 
     def test_la_cible_d_une_relation_au_doi_d_une_forme_secondaire_est_sa_cible(self, sa_sync_conn):
         """Une relation vers le DOI d'une version Zenodo pointe la publication du concept."""
@@ -398,7 +398,7 @@ class TestFetchSharedKeyPairs:
             identifiers=secondary_identifiers({"hal_id": ["hal-skp-1", "hal-skp-2"]}),
         )
 
-        pairs = [p for p in relations.fetch_shared_key_pairs(sa_sync_conn) if p.a_id == a]
+        pairs = [p for p in rebuild.fetch_shared_key_pairs(sa_sync_conn) if p.a_id == a]
 
         assert [(p.a_id, p.a_doi, p.b_id, p.b_doi) for p in pairs] == [(a, None, b, None)]
 
@@ -417,7 +417,7 @@ class TestFetchSharedKeyPairs:
                 identifiers=secondary_identifiers({"doi": "10.48550/arxiv.2401.00001"}),
             )
 
-        pairs = [p for p in relations.fetch_shared_key_pairs(sa_sync_conn) if p.a_id == a]
+        pairs = [p for p in rebuild.fetch_shared_key_pairs(sa_sync_conn) if p.a_id == a]
 
         assert [(p.a_id, p.b_id) for p in pairs] == [(a, b)]
 
@@ -455,7 +455,7 @@ class TestPhaseRelations:
             },
         )
 
-        relations.rebuild(sa_sync_conn, logging.getLogger("test"))
+        rebuild.rebuild(sa_sync_conn, logging.getLogger("test"))
 
         rows = sa_sync_conn.execute(
             text(

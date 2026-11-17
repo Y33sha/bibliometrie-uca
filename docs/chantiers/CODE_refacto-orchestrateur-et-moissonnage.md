@@ -26,7 +26,7 @@ Relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software
 ### Phase 3 — Déclaration des phases
 
 - [x] `Phase.harvesting` disparaît au profit de `block is Block.HARVESTING`, vrai pour les mêmes phases.
-- [ ] Les modules de phase exportent leurs étapes et leurs tâches sous un seul nom (`TASKS` ou `STEPS`).
+- [x] Nommage cohérent des déclarations. Chaque module de phase exporte sa phase complète (`PHASE`), et `pipeline/phases.py` donne seulement leur ordre. La phase `relations` devient un paquet, sur le modèle de `dois` : `relations.py` déclare la phase, `rebuild.py`, `notices.py` et `retractions.py` ses tâches. « Section » désigne seul le titre de journal (`Step.section`, `Task.section`, `open_section`, `SECTION`), « tâche » l'unité d'exécution, au lieu de « sous-étape ».
 - [x] `Phase.when` et `Task.when` reçoivent le même argument. Le message d'une phase écartée vaut pour toute condition. « Sautée en mode X » suppose une condition sur le mode : la ligne devient « Sautée », le mode figurant dans la bannière du run.
 
 ### Phase 4 — Point d'entrée

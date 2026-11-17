@@ -4,7 +4,7 @@ import logging
 
 from sqlalchemy import text
 
-from pipeline.transformation.publications.retractions import mark_retracted
+from pipeline.transformation.publications.relations.retractions import mark_retracted
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
 from tests.integration.helpers.sources import insert_source_record
 

@@ -1,6 +1,6 @@
 """Tâches, étapes et phases du pipeline, et graphe de dépendances des tâches d'après leurs lectures et leurs écritures.
 
-Le module de chaque phase déclare ses étapes et ses tâches. `pipeline.phases` liste les phases dans l'ordre d'exécution. L'ordre des tâches est celui d'un parcours en profondeur des phases et de leurs étapes.
+Le module de chaque phase déclare la phase (`PHASE`), avec ses étapes et ses tâches. `pipeline.phases` liste les phases dans l'ordre d'exécution. L'ordre des tâches est celui d'un parcours en profondeur des phases et de leurs étapes.
 
 Une donnée se désigne par sa table (`"serials"`) ou par une colonne (`"serials.serial_type"`). `"serials.id"` désigne l'existence des lignes, créées et supprimées par les écrivains. Une table et l'une de ses colonnes se recouvrent.
 
