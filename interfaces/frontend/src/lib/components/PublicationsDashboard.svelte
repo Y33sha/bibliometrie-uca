@@ -1,9 +1,9 @@
 <script lang="ts">
+	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import BookOpen from '@lucide/svelte/icons/book-open';
 	import Globe from '@lucide/svelte/icons/globe';
 	import GraduationCap from '@lucide/svelte/icons/graduation-cap';
 	import LockOpen from '@lucide/svelte/icons/lock-open';
-	import Maximize2 from '@lucide/svelte/icons/maximize-2';
 	import Star from '@lucide/svelte/icons/star';
 	import type { Snippet } from 'svelte';
 	import { tooltip } from '#lib/actions/tooltip.svelte.js';
@@ -214,7 +214,7 @@
 </script>
 
 {#snippet statsLink(href: string)}
-	<a class="stats-link" {href} aria-label="Ouvrir dans la vue Statistiques" use:tooltip={'Ouvrir dans la vue Statistiques, filtrable'}><Maximize2 size={13} /></a>
+	<a class="stats-link" {href} aria-label="Explorer dans la vue Statistiques" use:tooltip={'Ouvrir dans la vue Statistiques, filtrable'}>Explorer <ArrowRight size={13} /></a>
 {/snippet}
 
 {#if !loaded}
@@ -269,7 +269,7 @@
 {/if}
 
 <style>
-	/* Titre d'un graphique reproductible : l'icône du lien vers la vue Statistiques se range au bout du filet. */
+	/* Titre d'un graphique reproductible : le lien « Explorer » vers la vue Statistiques se range au bout du filet, discret, en casse et graisse de texte courant. */
 	.with-link {
 		display: flex;
 		align-items: center;
@@ -278,9 +278,16 @@
 	}
 	.stats-link {
 		display: inline-flex;
-		padding: 3px;
-		margin: -3px 0;
+		align-items: center;
+		gap: 3px;
+		padding: 2px 6px;
+		margin: -2px -6px -2px 0;
 		border-radius: var(--radius);
+		font-size: var(--fs-sm);
+		font-weight: 500;
+		letter-spacing: 0;
+		text-transform: none;
+		text-decoration: none;
 		color: var(--text-faint);
 	}
 	.stats-link:hover {
