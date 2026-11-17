@@ -62,7 +62,7 @@
 	const GROUPS: Group[] = [
 		{
 			key: 'labs',
-			label: 'Labos',
+			label: 'Structures',
 			async search(term) {
 				labDefaults ??= await labListDefaults();
 				const params = new URLSearchParams({ search: term, per_page: String(PER_GROUP) });
