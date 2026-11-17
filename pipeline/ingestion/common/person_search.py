@@ -109,14 +109,17 @@ class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
             )
         ]
         reader = payload_reader(Source(self.SOURCE))
-        seen: set[str] = set()
+        written: set[str] = set()
+        """Documents écrits dans le run, page commitée."""
+        pending: set[str] = set()
+        """Documents de la page en cours d'écriture."""
 
         def keep(record: Mapping[str, JsonValue]) -> bool:
-            """Écarte un document sans identifiant, ou déjà écrit dans le run."""
+            """Écarte un document sans identifiant, déjà écrit dans le run, ou déjà présent dans la page."""
             identity = reader.identify(record)
-            if identity is None or identity.source_id in seen:
+            if identity is None or identity.source_id in written | pending:
                 return False
-            seen.add(identity.source_id)
+            pending.add(identity.source_id)
             return True
 
         def harvest_step(progress: Progress) -> PhaseMetrics:
@@ -132,6 +135,7 @@ class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
                         keep=keep,
                         entry_mode=StagingEntryMode.PERSON_IDENTIFIER,
                     )
+                    written.update(pending)
                 except Exception as e:
                     self.conn.rollback()
                     signal_harvest_error(
@@ -142,6 +146,8 @@ class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
                         next_step="page sautée",
                         logger=self.logger,
                     )
+                finally:
+                    pending.clear()
 
             def on_end(batch: _Batch, error: Exception | None) -> None:
                 if error is not None and not isinstance(error, SourceUnavailableError):
