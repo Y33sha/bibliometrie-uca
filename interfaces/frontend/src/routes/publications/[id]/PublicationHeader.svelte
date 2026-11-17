@@ -6,7 +6,7 @@
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
   import TitleRow from "#lib/components/TitleRow.svelte";
   import { relationTypeLabel, relationTier, relationTierRank } from "#lib/labels.js";
-  import { formatPublicationDate } from "#lib/utils.js";
+  import { doiUrl, formatPublicationDate } from "#lib/utils.js";
   import type { PubDetail, RelatedPublication } from "./types";
 
   const {
@@ -36,9 +36,10 @@
     showAllRelations ? sortedRelations : sortedRelations.slice(0, RELATION_CAP),
   );
 
-  // Lien vers l'œuvre liée : interne si elle est au corpus, sinon vers doi.org.
-  function relHref(r: RelatedPublication): string {
-    return r.publication_id ? resolve(`publications/${r.publication_id}`) : `https://doi.org/${r.doi}`;
+  // Lien vers l'œuvre liée : interne si elle est au corpus, sinon vers doi.org. Une cible hors corpus a toujours son DOI ; sans lui, le lien reste sans adresse.
+  function relHref(r: RelatedPublication): string | undefined {
+    if (r.publication_id) return resolve(`publications/${r.publication_id}`);
+    return r.doi ? doiUrl(r.doi) : undefined;
   }
 </script>
 
@@ -46,7 +47,7 @@
   <div class="publication-meta">
     {#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}
     <span class="publication-date">{formatPublicationDate(pub.publication_date, pub.publication_date_precision)}</span>
-    {#if pub.doi}<span class="publication-doi"><span class="doi-label">DOI</span> <a href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a></span>{/if}
+    {#if pub.doi}<span class="publication-doi"><span class="doi-label">DOI</span> <a href={doiUrl(pub.doi)} target="_blank" rel="noopener">{pub.doi}</a></span>{/if}
   </div>
   <div class="publication-title-row">
     <TitleRow onopen={onopenDrawer}>

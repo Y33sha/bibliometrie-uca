@@ -304,6 +304,11 @@ export function rorFullUrl(rorId: string): string {
 	return `https://ror.org/${rorId}`;
 }
 
+/** Page d'un DOI sur doi.org. Chaque segment est encodé : un DOI ancien contient parfois `#` ou `?`. */
+export function doiUrl(doi: string): string {
+	return `https://doi.org/${doi.split('/').map(encodeURIComponent).join('/')}`;
+}
+
 /** Notice d'un ISSN sur le portail ISSN. */
 export function issnPortalUrl(issn: string): string {
 	return `https://portal.issn.org/resource/ISSN/${encodeURIComponent(issn)}`;

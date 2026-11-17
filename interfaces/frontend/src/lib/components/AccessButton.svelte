@@ -1,6 +1,7 @@
 <script lang="ts">
 	// Lien d'accès au texte intégral d'une publication, libellé selon son type de document : bouton plein, ou, en format de liste, cadenas open access et lien. Sans lien, un bloc du même format signale l'embargo, ou la fermeture hors liste. Une publication rétractée a, à la place, un lien rouge « Rétracté » vers le DOI de la rétractation.
 	import TriangleExclamationPoint from '@lucide/svelte/icons/triangle-exclamation-point';
+	import { doiUrl } from '#lib/utils.js';
 
 	let {
 		accessUrl,
@@ -34,7 +35,7 @@
 	<svelte:element
 		this={retractionDoi ? 'a' : 'span'}
 		class={compact ? 'access-link retracted' : 'access-btn retracted'}
-		href={retractionDoi ? `https://doi.org/${retractionDoi}` : undefined}
+		href={retractionDoi ? doiUrl(retractionDoi) : undefined}
 		target={retractionDoi ? '_blank' : undefined}
 		rel={retractionDoi ? 'noopener' : undefined}
 	>
