@@ -160,5 +160,5 @@ Document `WOS:001759398100001` (2 auteurs, article de mathématiques discrètes)
 
 ## Particularités
 
-- **Source sous contrat, moissonnée sur demande.** Le crédit d'appels est acheté à l'année, donc WoS reste hors des exécutions ordinaires : l'option `--include-wos` l'y ajoute.
+- **Source sous contrat, moissonnée sur demande.** Le crédit d'appels est acheté à l'année, donc WoS reste hors des exécutions ordinaires : un run l'interroge quand `--sources` la nomme.
 - **Identifiants calculés par WoS.** L'ORCID (`PreferredORCID`) et l'entité auteur (`daisng_id`) viennent des algorithmes de WoS : ils restent hors de la base. Une entrée auteur sans `daisng_id` ou sans nom complet est écartée.
