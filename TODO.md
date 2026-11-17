@@ -18,6 +18,7 @@
 ## Admin
 * [ ] fusionner structures
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
+* [ ] page bilan pipeline à toiletter
 ## Publique
 * [ ] stats en compte fractionnaire vs compte entier?
 * [ ] quand on détache une publi d'un auteur: mettre à jour le décompte et la pagination
