@@ -58,9 +58,9 @@
 </script>
 
 <aside class="detail-sidebar">
-  <AccessButton {accessUrl} oaStatus={pub.oa_status} docType={pub.doc_type} />
+  <AccessButton {accessUrl} oaStatus={pub.oa_status} docType={pub.doc_type} retracted={pub.is_retracted} retractionDoi={pub.retraction_doi} />
 
-  {#if accessUrl && oaStatusKnown}
+  {#if accessUrl && oaStatusKnown && !pub.is_retracted}
     <div class="access-line">
       <span class="access-state"><span class="access-dot"></span>Accès ouvert</span>
       {#if accessLicense}<span class="access-license">· <LicenseBadge license={accessLicense} /></span>{/if}

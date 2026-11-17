@@ -5156,6 +5156,13 @@ export interface components {
             doc_type: string;
             /** Oa Status */
             oa_status: string;
+            /** Is Retracted */
+            is_retracted: boolean;
+            /**
+             * Retraction Doi
+             * @description DOI à consulter pour la rétractation (`retraction_doi`).
+             */
+            retraction_doi: string | null;
             /**
              * License
              * @description Licence de la version éditeur.
@@ -5272,6 +5279,13 @@ export interface components {
              * @description Lien d'accès (`domain.publications.access.access_url`).
              */
             access_url: string | null;
+            /** Is Retracted */
+            is_retracted: boolean;
+            /**
+             * Retraction Doi
+             * @description DOI à consulter pour la rétractation (`retraction_doi`).
+             */
+            retraction_doi: string | null;
             /**
              * License
              * @description Licence de la version éditeur.

@@ -35,6 +35,7 @@ from infrastructure.read_models.publications.models import (
 from infrastructure.read_models.sql_fragments import (
     contribution_has_source,
     contributor_display_name,
+    retraction_doi,
 )
 from infrastructure.read_models.subjects.models import SubjectOut
 from infrastructure.sql_fragments import active_issns, is_laboratory
@@ -260,7 +261,7 @@ class PublicationDetailQueries:
                        p.doi, p.doc_type::text AS doc_type,
                        p.oa_status::text AS oa_status,
                        p.license::text AS license, p.deposit_license::text AS deposit_license,
-                       p.best_copy_url,
+                       p.best_copy_url, p.is_retracted, {retraction_doi("p")} AS retraction_doi,
                        p.language, p.container_title, p.source_extras, d.abstract, d.keywords,
                        j.id AS serial_id, j.title AS journal_title,
                        CASE WHEN j.id IS NOT NULL THEN {active_issns("j.id")} END AS serial_issns,
@@ -435,6 +436,8 @@ class PublicationDetailQueries:
                 doi_ra=publication_row.doi_ra,
                 doc_type=publication_row.doc_type,
                 oa_status=publication_row.oa_status,
+                is_retracted=publication_row.is_retracted,
+                retraction_doi=publication_row.retraction_doi,
                 license=publication_row.license,
                 deposit_license=publication_row.deposit_license,
                 language=publication_row.language,

@@ -1,6 +1,7 @@
 """Fragments SQL partagés entre read models, rendus depuis les alias de la requête hôte."""
 
 from domain.persons.identifiers import AttributionStatus
+from domain.publications.relations import RelationType
 
 
 def contributor_display_name(source_contribution: str = "sc") -> str:
@@ -77,3 +78,14 @@ def current_laboratory_label(person: str = "p") -> str:
         JOIN structures cl_s ON cl_s.id = cl_hp.structure_id
         WHERE cl_hp.person_id = {person}.id AND {current_hr_period("cl_hp")}
     )"""
+
+
+def retraction_doi(publication: str = "p") -> str:
+    """Renvoie le DOI à consulter pour la rétractation de la publication aliasée `publication` : celui de son avis de rétractation (`has_retraction`), à défaut son propre DOI. NULL pour une publication non rétractée."""
+    return (
+        f"CASE WHEN {publication}.is_retracted THEN coalesce("
+        "(SELECT min(r.target_doi) FROM publication_relations r"
+        f" WHERE r.from_publication_id = {publication}.id"
+        f" AND r.relation_type = '{RelationType.HAS_RETRACTION.value}'),"
+        f" {publication}.doi) END"
+    )

@@ -189,6 +189,9 @@ class PublicationListItem(Model):
     oa_status: str
     access_url: str | None
     """Lien d'accès (`domain.publications.access.access_url`)."""
+    is_retracted: bool
+    retraction_doi: str | None
+    """DOI à consulter pour la rétractation (`retraction_doi`)."""
     license: str | None
     """Licence de la version éditeur."""
     citation_top: str | None
@@ -284,6 +287,9 @@ class PublicationDetailCore(Model):
     """Agence d'enregistrement du préfixe DOI (Crossref, DataCite), d'après `doi_prefixes`."""
     doc_type: str
     oa_status: str
+    is_retracted: bool
+    retraction_doi: str | None
+    """DOI à consulter pour la rétractation (`retraction_doi`)."""
     license: str | None
     """Licence de la version éditeur."""
     deposit_license: str | None

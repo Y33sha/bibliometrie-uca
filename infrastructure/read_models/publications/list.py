@@ -35,6 +35,7 @@ from infrastructure.read_models.publications.models import (
     PublicationListItem,
     PublicationListResponse,
 )
+from infrastructure.read_models.sql_fragments import retraction_doi
 from infrastructure.sql_fragments import (
     cited_by_count,
     fwci,
@@ -383,6 +384,7 @@ class PublicationListQueries:
                 SELECT
                     p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
                     p.oa_status::text AS oa_status, p.best_copy_url,
+                    p.is_retracted, {retraction_doi("p")} AS retraction_doi,
                     p.license::text AS license,
                     {CITATION_TOP_SQL} AS citation_top,
                     j.id AS serial_id,
@@ -454,6 +456,8 @@ class PublicationListQueries:
                 doc_type=r.doc_type,
                 oa_status=r.oa_status,
                 access_url=access_url(r.best_copy_url, oa_status=r.oa_status, doi=r.doi),
+                is_retracted=r.is_retracted,
+                retraction_doi=r.retraction_doi,
                 license=r.license,
                 citation_top=r.citation_top,
                 serial_id=r.serial_id,

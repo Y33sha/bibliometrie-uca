@@ -316,7 +316,7 @@
 					</div>
 					</div>
 				</div>
-				<div class="notice-access"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} docType={p.doc_type} compact /></div>
+				<div class="notice-access"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} docType={p.doc_type} retracted={p.is_retracted} retractionDoi={p.retraction_doi} compact /></div>
 			</li>
 		{/each}
 	</ul>
@@ -436,7 +436,7 @@
 					{#if col('sources')}<td class="links-cell">
 						<SourceLinks ids={[['hal', p.hal_id], ['openalex', p.openalex_id], ['scanr', p.scanr_id], ['wos', p.wos_id]]} urls={p.record_urls} />
 					</td>{/if}
-					<td class="access-cell"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} docType={p.doc_type} compact /></td>
+					<td class="access-cell"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} docType={p.doc_type} retracted={p.is_retracted} retractionDoi={p.retraction_doi} compact /></td>
 				</tr>
 			{/each}
 		{/if}
