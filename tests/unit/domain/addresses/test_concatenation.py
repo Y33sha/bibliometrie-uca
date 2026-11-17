@@ -33,3 +33,7 @@ from domain.addresses.concatenation import is_concatenated
 )
 def test_adresse_concatenee(raw_text, expected):
     assert is_concatenated(raw_text) is expected
+
+
+def test_parenthese_non_fermee_sans_backtracking_exponentiel():
+    assert is_concatenated("(" + "A." * 5000) is False
