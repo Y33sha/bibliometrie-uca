@@ -60,6 +60,9 @@ from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger
 from pipeline.runtime.observability.progress import Progress, track_progress, waiting
 from pipeline.transformation.persons.first_names import complete_reduced_first_names
 from pipeline.transformation.persons.person_writes import add_identifiers_from_contributions
+from pipeline.transformation.persons.populate_person_name_forms import (
+    populate as populate_person_name_forms,
+)
 from pipeline.transformation.persons.store import (
     fetch_contribution_contexts,
     fetch_identifier_to_person_map,
@@ -561,7 +564,8 @@ def resolve_contributions(
     - application des épinglages ;
     - complétion des prénoms réduits (`complete_reduced_first_names`) ;
     - par lot de publications : décision des contributions sans personne et des contributions en file, retrait des personnes non désignées par la décision (`release_contributions`), écriture des rattachements ;
-    - création des personnes des contributions du périmètre au nom inconnu (`create_persons`).
+    - formes de nom tirées des contributions rattachées (`populate_person_name_forms`), puis rechargement de l'index ;
+    - nouvelle décision des contributions du périmètre au nom inconnu, et création des personnes des noms encore inconnus (`create_persons`).
     """
     if rebuild:
         marked = mark_all_for_resolution(conn)
@@ -609,6 +613,12 @@ def resolve_contributions(
                     taken_to_create[publication_id] = taken.get(publication_id, frozenset())
             decisions |= batch_decisions
     _log_identified(logger, decisions, pinned)
+
+    # Les noms des contributions rattachées dans ce passage deviennent des formes de nom de leur personne avant la création.
+    with waiting(f"{BRANCH}formes de nom des contributions rattachées", logger) as line:
+        populate_person_name_forms(conn)
+        index = load_index(conn, completion.conflicting)
+        line.erase()
 
     open_section(logger, "Création de nouvelles personnes")
     undecidable = sum(1 for d in unidentified if d.outcome == ContributionOutcome.SKIP)

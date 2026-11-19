@@ -146,6 +146,27 @@ class TestCreation:
 
         assert _person_name(conn, _person(conn, contribution)[0]) == ("Durand", "Claire")
 
+    def test_une_graphie_rattachee_dans_le_meme_run_evite_la_creation(self, sa_sync_conn):
+        conn = sa_sync_conn
+        person = insert_person(conn, "Martin", first_name="Jean")
+        insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="confirmed")
+        _contribution(
+            conn,
+            insert_publication(conn),
+            [
+                ("crossref", "Jean Martin", {"orcid": _ORCID}, True),
+                ("wos", "Jean Martinez", None, True),
+            ],
+        )
+        variant = _contribution(
+            conn, insert_publication(conn), [("hal", "Jean Martinez", None, True)]
+        )
+
+        counts = resolve_contributions(conn, logging.getLogger("test"))
+
+        assert _person(conn, variant) == (person, "name")
+        assert counts["created"] == 0
+
 
 def test_une_personne_deja_rattachee_dans_la_publication_n_est_pas_reprise(sa_sync_conn):
     conn = sa_sync_conn
