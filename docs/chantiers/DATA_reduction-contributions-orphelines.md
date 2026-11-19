@@ -98,7 +98,16 @@ Au 2026-11-19, 387 orphelines ont leur personne rattachée à une autre contribu
 
   Une liste de référence est complète et d'une source hors WoS : WoS fusionne des homonymes. Deux ORCID non neutralisés différents pour ce nom, dans les listes de la publication, désignent deux homonymes. L'occurrence gardée est celle dont le rang relatif est le plus proche de celui du nom dans les listes de référence.
 - [x] Mesure du 2026-11-19 (`simulation_doublons.py`) : 129 des 140 doublons confirmés par un même ORCID et 112 des 168 doublons sans contrôle disparaissent ; les homonymes « Xu », « Schmidt » et « Dias » restent distincts. Sur 3 000 publications tirées au hasard, 35 nouveaux doublons dans 15 publications, relus justes. L'alignement prend 8 % de temps en plus, 14 % sur les 50 plus longues listes.
-- [ ] Recalcul des contributions de toutes les publications (`--rebuild-author-grouping`), puis bilan des orphelines.
+- [x] Recalcul des contributions de toutes les publications (`--rebuild-author-grouping`). Run du 2026-11-19 : 461 orphelines ramenées à 212, dont 138 ont leur personne rattachée à une autre contribution de la publication. Motifs de ces 138 (`doublons_restants_motifs.py`) :
+
+  | Motif | Orphelines |
+  |---|---|
+  | Nom listé deux fois par chaque enregistrement source de la publication | 38 |
+  | Liste des membres d'un collectif ajoutée à une liste d'au moins 100 auteurs : une liste complète cite le nom une fois, et sa longueur sépare les rangs des deux occurrences | 24, plus 14 où cette liste est celle de WoS |
+  | Aucun enregistrement source partagé avec l'autre contribution | 11 |
+  | Même ORCID, neutralisé ou non, sur les deux occurrences | 9 |
+  | Nom et prénom inversés | 3 |
+  | Autres, surtout dans les grandes collaborations | 39 |
 
 ### Phase 3 — Enregistrements d'une même source et alignements manqués
 
@@ -113,7 +122,7 @@ Au 2026-11-19, 387 orphelines ont leur personne rattachée à une autre contribu
 L'indice de périmètre « déposant du brevet » va à tous les inventeurs de la famille. HAL donne par défaut le rôle d'auteur aux inventeurs. Ce rôle permettait à un co-inventeur extérieur de fonder une personne : 56 personnes sans fiche RH au 2026-11-19.
 
 - [x] Une contribution d'une publication de type brevet a le seul rôle inventeur (`ROLE_BY_DOC_TYPE`). La décision du rattachement juge la création d'une personne sur les rôles de la contribution. Un changement de type de la publication remet ses contributions en recomposition.
-- [ ] Remise en file des 410 contributions de brevet au rôle d'auteur (`requeue_doc_type_roles`), puis `run_pipeline --from author_grouping`.
+- [x] Remise en file des 410 contributions de brevet au rôle d'auteur (`requeue_doc_type_roles`), puis `run_pipeline --from author_grouping`.
 
 ### Phase 6 — Documentation
 
