@@ -9,6 +9,7 @@ from application.ports.repositories.address_repository import AddressCountryFilt
 from domain.addresses.address_origin import AddressOrigin
 from domain.config import ConfigKey
 from domain.contributions.author_positions import SCANR_TRUNCATED_LENGTHS, AuthorPosition
+from domain.contributions.contribution_roles import ROLE_BY_DOC_TYPE
 from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.creation import ROLES_WITHOUT_CREATION
 from domain.persons.identifiers import (
@@ -399,10 +400,16 @@ def openalex_publisher_records(publication_ids: str) -> str:
     """
 
 
+_DOC_TYPE_ROLES = ", ".join(
+    f"('{doc_type}'::doc_type, ARRAY['{role}'])" for doc_type, role in ROLE_BY_DOC_TYPE.items()
+)
+"""Lignes `(type de document, rôles)` de `ROLE_BY_DOC_TYPE`."""
+
+
 def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
     """Renvoie l'instruction recomposant les attributs des contributions de la requête `contribution_ids` depuis leurs contributions sources.
 
-    Ses rôles et ses indices de périmètre sont l'union de ceux de ses contributions sources. Quand une de ses contributions sources est dans l'enregistrement OpenAlex éditeur, au DOI de la publication, les indices d'affiliation des autres enregistrements OpenAlex sont écartés (`AFFILIATION_EVIDENCE`). Ses positions d'auteur (`AuthorPosition`) :
+    Ses rôles et ses indices de périmètre sont l'union de ceux de ses contributions sources. Le type de sa publication peut imposer un rôle unique (`ROLE_BY_DOC_TYPE`). Quand une de ses contributions sources est dans l'enregistrement OpenAlex éditeur, au DOI de la publication, les indices d'affiliation des autres enregistrements OpenAlex sont écartés (`AFFILIATION_EVIDENCE`). Ses positions d'auteur (`AuthorPosition`) :
 
     - `corresponding` : une de ses contributions sources est correspondante ;
     - `first` : la contribution reçoit la majorité des votes des listes d'auteurs pour le premier rang ;
@@ -446,10 +453,18 @@ def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
                        AND e = ANY({AFFILIATION_EVIDENCE_SQL}))
             GROUP BY m.contribution_id
         ),
-        rol AS (
+        source_roles AS (
             SELECT m.contribution_id, array_agg(DISTINCT r ORDER BY r) AS roles
             FROM members m, LATERAL unnest(m.roles) AS r
             GROUP BY m.contribution_id
+        ),
+        rol AS (
+            SELECT s.contribution_id, coalesce(t.roles, sr.roles) AS roles
+            FROM scal s
+            JOIN contributions g ON g.id = s.contribution_id
+            JOIN publications p ON p.id = g.publication_id
+            LEFT JOIN source_roles sr ON sr.contribution_id = s.contribution_id
+            LEFT JOIN (VALUES {_DOC_TYPE_ROLES}) AS t (doc_type, roles) ON t.doc_type = p.doc_type
         ),
         author_lists AS (
             SELECT sr.id AS source_record_id, sr.publication_id, sr.source, sr.source_id,

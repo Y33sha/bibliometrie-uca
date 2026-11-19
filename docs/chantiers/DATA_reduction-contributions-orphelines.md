@@ -91,7 +91,14 @@ Un indice désigne une personne candidate quand elle seule partage cet indice av
 
 - [ ] Relecture des 11 conflits de noms, des 10 orphelines aux candidats tous rejetés et du conflit d'identifiants.
 
-### Phase 5 — Documentation
+### Phase 5 — Contributions des brevets
+
+L'indice de périmètre « déposant du brevet » va à tous les inventeurs de la famille. HAL donne par défaut le rôle d'auteur aux inventeurs. Ce rôle permettait à un co-inventeur extérieur de fonder une personne : 56 personnes sans fiche RH au 2026-11-19.
+
+- [x] Une contribution d'une publication de type brevet a le seul rôle inventeur (`ROLE_BY_DOC_TYPE`). La décision du rattachement juge la création d'une personne sur les rôles de la contribution. Un changement de type de la publication remet ses contributions en recomposition.
+- [ ] Remise en file des 410 contributions de brevet au rôle d'auteur (`requeue_doc_type_roles`), puis `run_pipeline --from author_grouping`.
+
+### Phase 6 — Documentation
 
 - [ ] Mise à jour de la documentation du rattachement des personnes.
 

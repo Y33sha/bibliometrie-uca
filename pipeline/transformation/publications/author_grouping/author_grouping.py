@@ -392,6 +392,8 @@ _CHILDREN = (
             "source_contributions.source",
             "source_record_identifiers",
             "publications.doi",
+            # Type de document qui impose le rôle des contributions (`ROLE_BY_DOC_TYPE`).
+            "publications.doc_type",
             "contributions.id",
             "contributions.publication_id",
             "contributions.author_positions",
@@ -414,6 +416,7 @@ _CHILDREN = (
             "aligned_source_contributions",
             "source_records.publication_id",
             "publications.doi",
+            "publications.doc_type",
         ),
         run=_attributes,
         section="Attributs des contributions",

@@ -102,7 +102,6 @@ class AlignedSourceContribution:
     name: ContributorName
     identifiers: Mapping[str, str]
     """Identifiants non neutralisés."""
-    roles: Sequence[str] = ()
     pinned_person_id: int | None = None
     """Personne sur laquelle l'administration a épinglé la contribution source."""
 
@@ -128,6 +127,8 @@ class AlignedContribution:
     members: Sequence[AlignedSourceContribution]
     in_perimeter: bool
     """Appartenance de la contribution au périmètre (`contributions.in_perimeter`)."""
+    roles: Sequence[str] = ()
+    """Rôles de la contribution (`contributions.roles`)."""
 
 
 @dataclass(frozen=True)
@@ -218,7 +219,7 @@ def decide_contribution(
             reason=ContributionSkipReason.OUT_OF_PERIMETER,
             refused=tuple(refused),
         )
-    return _decide_by_name(members, index, rejected_person_ids, tuple(refused))
+    return _decide_by_name(contribution, index, rejected_person_ids, tuple(refused))
 
 
 def _identified_persons(
@@ -273,15 +274,15 @@ def _intersect(
 
 
 def _decide_by_name(
-    members: Sequence[AlignedSourceContribution],
+    contribution: AlignedContribution,
     index: PersonIndex,
     rejected_person_ids: frozenset[int],
     refused: tuple[tuple[str, str], ...],
 ) -> ContributionDecision:
-    """Décide par le nom des contributions sources. La forme de nom exacte désigne ses personnes ; à défaut, les initiales compatibles (`compatible_persons`) désignent les leurs. Les personnes rejetées pour la publication sont écartées."""
+    """Décide par le nom des contributions sources. La forme de nom exacte désigne ses personnes ; à défaut, les initiales compatibles (`compatible_persons`) désignent les leurs. Les personnes rejetées pour la publication sont écartées. Les rôles de la contribution décident de la création d'une personne."""
     named: list[dict[int, ContributionMatchReason]] = []
     rejected_only = False
-    for m in members:
+    for m in contribution.members:
         reason = ContributionMatchReason.NAME
         person_ids = next(
             (index.name_forms[f] for f in m.name_forms if f in index.name_forms), None
@@ -306,7 +307,7 @@ def _decide_by_name(
             reason=ContributionSkipReason.ALL_CANDIDATES_REJECTED,
             refused=refused,
         )
-    if any(allow_person_creation(list(m.roles)) for m in members):
+    if allow_person_creation(contribution.roles):
         return ContributionDecision(ContributionOutcome.CREATE, refused=refused)
     return ContributionDecision(
         ContributionOutcome.SKIP,
