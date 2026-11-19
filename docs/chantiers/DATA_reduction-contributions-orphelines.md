@@ -22,6 +22,7 @@ Les 389 contributions dont la personne est rattachée à une autre contribution 
 - Chaque catégorie d'orphelines se résout par une règle du pipeline.
 - Les indices se mesurent sur les orphelines et sur un jeu de contrôle : contributions rattachées par un identifiant ou à la main, au nom désignant plusieurs personnes.
 - Le chantier [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md) reprend après celui-ci.
+- Une forme de nom ambiguë se départage par une cascade d'indices : coauteurs, structure du référentiel, structure HAL, revue, années d'activité. La première étape qui désigne une seule personne candidate décide.
 
 ## Phasage
 
@@ -71,8 +72,10 @@ Un indice désigne une personne candidate quand elle seule partage cet indice av
   | Coauteurs, laboratoire, structures HAL, revue | 453 | 688 / 3 |
   | Coauteurs, laboratoire, structures HAL, revue, discipline | 475 | 699 / 5 |
   | Coauteurs, laboratoire, structures HAL, revue, discipline, années | 488 | 703 / 5 |
+  | Coauteurs, laboratoire, structures HAL, revue, années | 477 | 692 / 3 |
+  | Coauteurs, laboratoire ou structures HAL en une étape, revue, années | 475 | 679 / 3 |
 
-  Des profils tirés des seuls rattachements par identifiant ou à la main départagent autant de cas du contrôle, et moins d'orphelines.
+  Des profils tirés des seuls rattachements par identifiant ou à la main départagent autant de cas du contrôle, et moins d'orphelines. L'indice laboratoire réunit les structures du référentiel atteintes par l'adresse, le ROR ou la structure HAL. L'indice structures HAL ajoute les structures HAL hors du référentiel, et les équipes ou départements HAL rattachés à un laboratoire du référentiel.
 - [x] Rejets d'une personne comme indice négatif (idée de ReCiter) : la personne candidate est écartée quand la publication partage un coauteur ou un laboratoire avec ses publications rejetées, et aucun avec ses propres publications. Sur le contrôle épuré, l'indice écarte 26 fois une autre personne et jamais la personne de référence. Les cas écartés sont déjà départagés par la cascade.
 - [ ] Règle de départage dans la phase `persons`, avec les indices retenus.
 
