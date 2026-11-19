@@ -28,6 +28,7 @@ Un jeu d'évaluation tiré des verdicts humains existe depuis le 2026-10-19 (`bu
 
 ### Phase 3 — Rattachements et corrections
 
+- [ ] Rejets d'une personne comme signal d'attribution erronée par une source (HAL, ScanR), pour défaire les attributions semblables : nom courant, sujets éloignés des publications de la personne.
 - [ ] Précision et rappel de la résolution par contribution sur le jeu d'évaluation.
 - [ ] Relecture des personnes supprimées par la purge, et des contributions laissées sans personne parce que leur personne est déjà dans la publication, au regard du gel du 2026-10-24.
 - [ ] Repérage des erreurs des sources révélées par une contribution : des contributions sources d'une même contribution qui désigneraient seules des personnes différentes signalent une erreur de groupement, de nom, d'identifiant ou d'affiliation. Outil de l'administration, comme pour les fusions suspectes de publications.
