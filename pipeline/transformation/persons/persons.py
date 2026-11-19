@@ -78,6 +78,21 @@ def _purge(ctx: PhaseContext) -> PhaseMetrics:
     return PhaseMetrics(extras=dict(counts))
 
 
+_TIE_BREAK_READS = (
+    "contributions.resolution_mode",
+    "source_contribution_structures",
+    "structures.structure_type",
+    "source_contribution_hal_structures",
+    "hal_structures",
+    "publications.serial_id",
+    "publications.publication_year",
+)
+"""Données lues par le départage d'une forme de nom ambiguë (`decide_with_tie_break`)."""
+
+_TIE_BREAK_PREVIOUS_RUN = ("publications.serial_id", "publications.publication_year")
+"""Données du départage écrites au run précédent : publications supprimées par `finalize.purge_publications`."""
+
+
 _CHILDREN = (
     Task(
         "arbitrate_identifiers",
@@ -135,6 +150,7 @@ _CHILDREN = (
             # Personnes à fiche RH, dont la complétion des prénoms laisse le prénom tel quel.
             "hr_records",
             "contribution_resolution_queue",
+            *_TIE_BREAK_READS,
         ),
         writes=(
             "contributions.person_id",
@@ -155,6 +171,7 @@ _CHILDREN = (
             # Contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
             "aligned_source_contributions",
             "source_records.publication_id",
+            *_TIE_BREAK_PREVIOUS_RUN,
         ),
         run=_resolve_contributions,
         section="Identification des contributions",
@@ -186,7 +203,6 @@ _CHILDREN = (
         reads=(
             "contributions.publication_id",
             "contributions.person_id",
-            "contributions.resolution_mode",
             "contributions.perimeter_evidence",
             # Une contribution des seuls rôles sans création de personne laisse supprimer sa personne.
             "contributions.roles",
@@ -203,6 +219,7 @@ _CHILDREN = (
             "confirmed_source_contributions",
             "rejected_contributions",
             "distinct_persons",
+            *_TIE_BREAK_READS,
         ),
         # La suppression d'une personne emporte ses formes de nom et vide ses contributions ; une contribution rattachée par le nom dont la décision change est marquée pour la redécision de sa personne.
         writes=(
@@ -218,6 +235,7 @@ _CHILDREN = (
             "contributions",
             "aligned_source_contributions",
             "source_records.publication_id",
+            *_TIE_BREAK_PREVIOUS_RUN,
         ),
         run=_purge,
         section="Purge des personnes",

@@ -13,6 +13,7 @@ def _metrics():
             "match:orcid": 4,
             "match:manual": 1,
             "match:name": 1,
+            "match:coauthors": 2,
             "skip:ambiguous_name_form": 3,
             "create": 1,
         },
@@ -31,6 +32,11 @@ def test_la_table_compte_les_rattachements_par_mode_epinglages_compris():
         "idref": 0,
         "name": 1,
         "compatible_name": 0,
+        "coauthors": 2,
+        "laboratory": 0,
+        "hal_structure": 0,
+        "serial": 0,
+        "activity_years": 0,
         "created": 0,
     }
 

@@ -1,10 +1,19 @@
 """Accès aux personnes, partagés par plusieurs tâches de la phase `persons`."""
 
-from sqlalchemy import Connection, text
+from collections import defaultdict
+from collections.abc import Collection, Sequence
 
+from sqlalchemy import Connection, Row, text
+
+from domain.persons.contribution_matching import TIE_BREAK_REASONS
 from domain.persons.identifiers import HUMAN_ATTRIBUTION_STATUSES, AttributionStatus
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.source_contribution_matching import IdentifiedPerson, Namesake
+from domain.persons.tie_break import (
+    TIE_BREAK_HAL_STRUCTURE_TYPES,
+    TIE_BREAK_STRUCTURE_TYPES,
+    ContributionContext,
+)
 from infrastructure.sql_fragments import REJECTED_PAIRS, active_name_form, in_clause
 
 
@@ -73,6 +82,75 @@ def fetch_name_form_status_map(conn: Connection) -> dict[tuple[str, int], str]:
         """)
     ).all()
     return {(r.name_form, r.person_id): r.status for r in rows}
+
+
+_TIE_BREAK_MODES = in_clause(TIE_BREAK_REASONS)
+
+_CONTEXTS_SQL = f"""
+    SELECT g.id, g.person_id, g.publication_id, p.serial_id, p.publication_year,
+           ARRAY(
+               SELECT o.person_id FROM contributions o
+               WHERE o.publication_id = g.publication_id AND o.id <> g.id AND o.person_id IS NOT NULL
+                 AND o.resolution_mode::text NOT IN {_TIE_BREAK_MODES}
+           ) AS persons,
+           ARRAY(
+               SELECT DISTINCT scs.structure_id
+               FROM aligned_source_contributions gm
+               JOIN source_contribution_structures scs ON scs.source_contribution_id = gm.source_contribution_id
+               JOIN structures s ON s.id = scs.structure_id
+               WHERE gm.contribution_id = g.id AND s.structure_type::text IN {in_clause(TIE_BREAK_STRUCTURE_TYPES)}
+           ) AS laboratories,
+           ARRAY(
+               SELECT DISTINCT sch.hal_structure_id
+               FROM aligned_source_contributions gm
+               JOIN source_contribution_hal_structures sch ON sch.source_contribution_id = gm.source_contribution_id
+               JOIN hal_structures h ON h.hal_structure_id = sch.hal_structure_id
+               WHERE gm.contribution_id = g.id AND h.structure_type IN {in_clause(TIE_BREAK_HAL_STRUCTURE_TYPES)}
+           ) AS hal_structures
+    FROM contributions g
+    JOIN publications p ON p.id = g.publication_id
+    WHERE {{where}}
+"""
+"""Contexte de chaque contribution retenue par `where` (`ContributionContext`). Les rattachements par départage sont absents des personnes de la publication."""
+
+
+def _context(row: Row[tuple[object, ...]]) -> ContributionContext:
+    return ContributionContext(
+        row.publication_id,
+        frozenset(row.persons),
+        frozenset(row.laboratories),
+        frozenset(row.hal_structures),
+        row.serial_id,
+        row.publication_year,
+    )
+
+
+def fetch_contribution_contexts(
+    conn: Connection, contribution_ids: Sequence[int]
+) -> dict[int, ContributionContext]:
+    """Renvoie le contexte de chaque contribution, pour le départage d'une forme de nom ambiguë."""
+    rows = conn.execute(
+        text(_CONTEXTS_SQL.format(where="g.id = ANY(:ids)")), {"ids": list(contribution_ids)}
+    )
+    return {r.id: _context(r) for r in rows}
+
+
+def fetch_person_profiles(
+    conn: Connection, person_ids: Collection[int]
+) -> dict[int, list[ContributionContext]]:
+    """Renvoie les contextes des contributions de chaque personne, hors rattachement par départage."""
+    rows = conn.execute(
+        text(
+            _CONTEXTS_SQL.format(
+                where=f"g.person_id = ANY(:ids) AND g.resolution_mode::text NOT IN {_TIE_BREAK_MODES}"
+            )
+        ),
+        {"ids": list(person_ids)},
+    )
+    profiles: dict[int, list[ContributionContext]] = defaultdict(list)
+    for r in rows:
+        profiles[r.person_id].append(_context(r))
+    return profiles
 
 
 def fetch_rejected_person_ids_by_publication(conn: Connection) -> dict[int, frozenset[int]]:

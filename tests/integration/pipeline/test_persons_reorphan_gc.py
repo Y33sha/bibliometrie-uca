@@ -25,10 +25,10 @@ from tests.integration.helpers.queues import queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
-def _source_contribution(conn, *, form):
-    publication = insert_publication(conn, "t")
+def _source_contribution(conn, *, form, publication=None):
+    publication = publication or insert_publication(conn, "t")
     source_record = insert_source_record(
-        conn, publication, source_id=f"hal-{publication}", title="t"
+        conn, publication, source_id=f"hal-{publication}-{form}", title="t"
     )
     return insert_source_contribution(
         conn,
@@ -39,9 +39,9 @@ def _source_contribution(conn, *, form):
     )
 
 
-def _contribution(conn, *, form, person_id, mode="name", in_perimeter=True):
-    """Insère une contribution source de forme `form`, seule dans sa contribution rattachée à la personne `person_id` par le mode `mode`. Renvoie l'`id` de la contribution."""
-    source_contribution = _source_contribution(conn, form=form)
+def _contribution(conn, *, form, person_id, mode="name", in_perimeter=True, publication=None):
+    """Insère une contribution source de forme `form`, seule dans sa contribution rattachée à la personne `person_id` par le mode `mode`, dans la publication `publication` ou une nouvelle. Renvoie l'`id` de la contribution."""
+    source_contribution = _source_contribution(conn, form=form, publication=publication)
     return insert_person_contribution(
         conn, source_contribution, person_id=person_id, mode=mode, in_perimeter=in_perimeter
     )
@@ -107,6 +107,41 @@ def test_seules_les_contributions_nominales_a_forme_ambigue_sont_marquees(sa_syn
 
     assert queued(conn, Queue.CONTRIBUTION_RESOLUTION) == {by_name, by_compatible_name}
     assert contribution_person(conn, by_name)[0] == a
+
+
+def _departaged(conn, *, coauthor_present):
+    """Rattache par les coauteurs la contribution « j martin » à Jean Martin, homonyme de Jeanne Martin. Claire Bernard est coauteur de Jean dans une autre publication, et figure dans la publication de la contribution si `coauthor_present`. Renvoie la contribution et Jean."""
+    jean = insert_person(conn, "Martin", first_name="Jean")
+    jeanne = insert_person(conn, "Martin", first_name="Jeanne")
+    claire = insert_person(conn, "Bernard", first_name="Claire")
+    insert_person_name_form(conn, jean, name_form="j martin")
+    insert_person_name_form(conn, jeanne, name_form="j martin")
+    earlier = insert_publication(conn, "t")
+    _contribution(conn, form="jean martin", person_id=jean, publication=earlier)
+    _contribution(conn, form="claire bernard", person_id=claire, publication=earlier)
+    publication = insert_publication(conn, "t")
+    if coauthor_present:
+        _contribution(conn, form="claire bernard", person_id=claire, publication=publication)
+    contribution = _contribution(
+        conn, form="j martin", person_id=jean, mode="coauthors", publication=publication
+    )
+    return contribution, jean
+
+
+def test_un_rattachement_par_departage_dont_l_indice_tient_n_est_pas_marque(sa_sync_conn):
+    conn = sa_sync_conn
+    contribution, jean = _departaged(conn, coauthor_present=True)
+
+    assert mark_ambiguous_nominal(conn) == 0
+    assert contribution_person(conn, contribution)[0] == jean
+
+
+def test_un_rattachement_par_departage_sans_indice_est_marque(sa_sync_conn):
+    conn = sa_sync_conn
+    contribution, _ = _departaged(conn, coauthor_present=False)
+
+    assert mark_ambiguous_nominal(conn) == 1
+    assert queued(conn, Queue.CONTRIBUTION_RESOLUTION) == {contribution}
 
 
 def test_une_forme_rejetee_ne_designe_pas_sa_personne(sa_sync_conn):

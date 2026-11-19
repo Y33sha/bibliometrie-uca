@@ -454,6 +454,34 @@ class TestPersonIndex:
         assert _person(conn, contribution) == (kept, "name")
 
 
+def test_un_coauteur_habituel_departage_une_forme_de_nom_ambigue(sa_sync_conn):
+    """« J Dupont » désigne Jean et Jacques Dupont. Claire Bernard, coauteur de Jean dans une autre publication, figure dans la publication : la contribution revient à Jean."""
+    conn = sa_sync_conn
+    jean = person_repository(conn).create("Dupont", "Jean")
+    person_repository(conn).create("Dupont", "Jacques")
+    claire = person_repository(conn).create("Bernard", "Claire")
+    earlier = insert_publication(conn)
+    _attach(conn, _contribution(conn, earlier, [("hal", "Jean Dupont", None, True)]), jean, "name")
+    _attach(
+        conn,
+        _contribution(conn, earlier, [("openalex", "Claire Bernard", None, True)]),
+        claire,
+        "name",
+    )
+    publication = insert_publication(conn)
+    _attach(
+        conn,
+        _contribution(conn, publication, [("hal", "Claire Bernard", None, True)]),
+        claire,
+        "name",
+    )
+    contribution = _contribution(conn, publication, [("openalex", "J Dupont", None, True)])
+
+    resolve_contributions(conn, logging.getLogger("test"))
+
+    assert _person(conn, contribution) == (jean, "coauthors")
+
+
 def test_un_membre_du_jury_au_nom_inconnu_reste_sans_personne(sa_sync_conn):
     """Une contribution source du jury au nom inconnu reste sans personne ; un auteur au nom inconnu fonde une personne."""
     conn = sa_sync_conn
