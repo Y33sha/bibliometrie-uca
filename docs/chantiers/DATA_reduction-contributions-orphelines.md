@@ -117,7 +117,11 @@ Au 2026-11-19, 387 orphelines ont leur personne rattachée à une autre contribu
 
 ### Phase 3 — Enregistrements d'une même source et alignements manqués
 
-- [ ] Diagnostic des 8 orphelines issues de deux enregistrements d'une même source et des 3 alignements manqués.
+- [x] Diagnostic des 11 orphelines sans enregistrement source partagé avec la contribution de leur personne (`sans_enregistrement_partage.py`) :
+  - changement de nom entre deux enregistrements sources, même rang et autres auteurs identiques (6) : Vernier et Gable, Van Lander et Maneval (3 publications), Araujo da Silva et Guérin, Batisse et Lance ;
+  - nom mal découpé par la source (4) : « as / gremeau », « hang nguyen / and », « nemo » pour « nemoto / rie » ;
+  - fusion erronée de deux communications HAL de même titre, aux listes d'auteurs différentes (1).
+- [ ] Alignement par le rang : dans un trou d'un seul auteur de chaque côté, la contribution source rejoint la contribution quand l'initiale du prénom concorde, dans une liste de moins de 300 auteurs. Simulation du 2026-11-19 (`simulation_trou_unique.py`) : 5 des 11 orphelines résolues ; sur 3 000 publications tirées au hasard, 8 liens ajoutés, dont 7 changements de nom plausibles. Au-delà de 300 auteurs, les liens ajoutés sont souvent faux (Reboud et Rebollo de Miguel, Xia et Xie).
 
 ### Phase 4 — Cas restants
 
