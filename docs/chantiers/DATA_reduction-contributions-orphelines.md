@@ -113,7 +113,7 @@ Au 2026-11-19, 387 orphelines ont leur personne rattachée à une autre contribu
   - même ORCID d'auteur sur les deux occurrences, quelle que soit la longueur de la liste. Seuls HAL et INSPIRE donnent un ORCID d'auteur. Crossref, OpenAlex et DataCite donnent un même ORCID à des homonymes voisins (deux « Rossi, E. ») ;
   - nom et prénom permutés, comptés comme un même nom complet.
 - [x] Mesure du 2026-11-19 (`simulation_regle_300.py`) : 53 des 138 couples résolus (seuil 37, ORCID 11, noms permutés 5). Sur 3 000 publications tirées au hasard et les 3 013 publications à liste d'au moins 100 auteurs : 1 776 doublons ajoutés dans 226 publications (seuil 1 471, ORCID 232, noms permutés 73), justes sur l'échantillon relu. Durée de la détection inchangée.
-- [ ] Recalcul des contributions de toutes les publications (`--rebuild-author-grouping`), puis bilan des orphelines.
+- [x] Recalcul des contributions de toutes les publications (`--rebuild-author-grouping`). Run du 2026-11-19 : 212 orphelines ramenées à 159. Parmi elles, 87 ont leur personne rattachée à une autre contribution de la publication. Motifs : nom listé deux fois par chaque enregistrement source (36), aucun enregistrement source partagé (11), liste de membres dans une liste d'au moins 300 auteurs (4), autres cas des grandes collaborations surtout (36).
 
 ### Phase 3 — Enregistrements d'une même source et alignements manqués
 
