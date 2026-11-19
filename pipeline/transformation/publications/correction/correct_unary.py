@@ -1,6 +1,6 @@
 """Tâche unaire de la phase `metadata_correction` : correction de chaque enregistrement source par `correct_source_record`, et écriture des seules mises à jour effectives.
 
-Les revues sont typées à ce stade : la phase suit `publishing`. La correction repart des valeurs d'avant correction. Un changement de type de revue qui déclenche ou retire une règle s'applique au run suivant.
+Les revues sont typées à ce stade : la phase suit `publishing`. La correction repart des valeurs d'avant correction.
 """
 
 import logging
