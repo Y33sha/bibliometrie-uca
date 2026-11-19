@@ -43,7 +43,8 @@ _SOURCE_CONTRIBUTIONS_SQL = text(f"""
            sc.id, sc.author_position AS position,
            ci.last_name_normalized AS last_name,
            coalesce(ci.first_name_normalized, '') AS first_name,
-           coalesce({_known_first_name("orcid")}, {_known_first_name("idref")}, '') AS known_first_name
+           coalesce({_known_first_name("orcid")}, {_known_first_name("idref")}, '') AS known_first_name,
+           coalesce({usable_identifier("'orcid'")}, '') AS orcid
     FROM source_records sr
     JOIN source_contributions sc ON sc.source_record_id = sr.id
     JOIN contributor_information ci ON ci.id = sc.contributor_information_id
@@ -124,6 +125,8 @@ class SourceContributionRow:
     last_name: str
     first_name: str
     known_first_name: str = ""
+    orcid: str = ""
+    """ORCID non neutralisé."""
 
 
 @dataclass(frozen=True, slots=True)

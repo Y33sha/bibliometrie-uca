@@ -85,11 +85,20 @@ Un indice désigne une personne candidate quand elle seule partage cet indice av
   - [x] Purge : la redécision des contributions rattachées par le nom ou par la cascade passe par la même cascade. Un changement de mode de rattachement marque aussi la contribution.
   - [x] Tests : un test du domaine par indice et pour l'ordre de la cascade ; tests d'intégration du rattachement et de la purge.
   - [x] Mesure du 2026-11-19 sur la base de production (`simulation_cascade.py`) : 477 orphelines départagées (coauteurs 422, années 24, revue 19, laboratoire 8, structure HAL 4), en 5,9 s.
-  - [ ] Après la migration : snapshot du schéma, run de la phase `persons`, capture de la vue du pipeline.
+  - [x] Après la migration : snapshot du schéma, run de la phase `persons`. Run du 2026-11-19 : 944 orphelines ramenées à 461, 492 rattachements par la cascade.
+  - [ ] Capture de la vue du pipeline.
 
 ### Phase 2 — Auteur listé deux fois dans un enregistrement source
 
-- [ ] Règle de réunion des deux contributions sources d'un enregistrement désignant la même personne, à décider. 378 orphelines.
+Au 2026-11-19, 387 orphelines ont leur personne rattachée à une autre contribution de la publication. La détection existante des doublons d'auteur (`duplicate_of`) compare les noms à l'identique. Elle manque deux cas : une source liste l'auteur deux fois sous deux graphies (INSPIRE : « Porteboeuf, Sarah Julie » et « Porteboeuf-Houssais, S. ») ; Crossref et OpenAlex ajoutent la liste des membres d'un collectif, aux initiales, à la suite des auteurs. D'autres paires sont des homonymes réels, listés deux fois par toutes les sources (« Xu, Z. » dans les grandes collaborations).
+
+- [x] Détection des doublons d'auteur par comparaison des listes de la publication (`cross_list_duplicates`). Deux contributions sources d'une liste au nom d'un même auteur forment un doublon :
+  - dans une liste de moins de 100 auteurs : une liste de référence cite le nom une seule fois, ou l'une a un prénom complet et l'autre des initiales, ou elles ont le même nom complet ;
+  - dans une grande collaboration : les deux occurrences sont à 10 rangs au plus, un nom de famille prolonge l'autre, et une liste de référence cite le nom une seule fois.
+
+  Une liste de référence est complète et d'une source hors WoS : WoS fusionne des homonymes. Deux ORCID non neutralisés différents pour ce nom, dans les listes de la publication, désignent deux homonymes. L'occurrence gardée est celle dont le rang relatif est le plus proche de celui du nom dans les listes de référence.
+- [x] Mesure du 2026-11-19 (`simulation_doublons.py`) : 129 des 140 doublons confirmés par un même ORCID et 112 des 168 doublons sans contrôle disparaissent ; les homonymes « Xu », « Schmidt » et « Dias » restent distincts. Sur 3 000 publications tirées au hasard, 35 nouveaux doublons dans 15 publications, relus justes. L'alignement prend 8 % de temps en plus, 14 % sur les 50 plus longues listes.
+- [ ] Recalcul des contributions de toutes les publications (`--rebuild-author-grouping`), puis bilan des orphelines.
 
 ### Phase 3 — Enregistrements d'une même source et alignements manqués
 

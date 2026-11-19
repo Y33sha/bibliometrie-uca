@@ -93,6 +93,8 @@ class SourceContribution:
     """Rang dans la liste ordonnée des auteurs, `None` hors de cette liste (jury de thèse chez theses.fr)."""
     last_name: str
     first_name: str
+    orcid: str = ""
+    """ORCID non neutralisé."""
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,7 @@
 """Doublons d'auteur dans la liste d'un enregistrement source (`domain.contributions.author_duplicates`)."""
 
 from domain.contributions.author_duplicates import (
+    cross_list_duplicates,
     duplicate_source_contributions,
     unaligned_duplicates,
 )
@@ -121,3 +122,95 @@ def test_des_noms_repetes_a_distance_sous_le_seuil_restent_des_homonymes():
     names[20:20] = ["nom3"]
     names[30:30] = ["nom7"]
     assert duplicate_source_contributions(_source_record(names)) == {}
+
+
+class TestCrossListDuplicates:
+    def test_un_nom_repete_sous_deux_graphies_et_cite_une_fois_ailleurs_est_un_doublon(self):
+        """INSPIRE liste « porteboeuf / sarah julie » puis « porteboeuf houssais / s » ; HAL le cite une fois, en dernier. L'occurrence au rang de HAL est gardée."""
+        inspire = _record(
+            1, [("leroy", "anne"), ("porteboeuf", "sarah julie"), ("porteboeuf houssais", "s")]
+        )
+        hal = _record(2, [("leroy", "anne"), ("porteboeuf houssais", "s")])
+
+        assert cross_list_duplicates({1: inspire, 2: hal}, references={1, 2}) == {101: 102}
+
+    def test_l_occurrence_au_rang_des_autres_listes_est_gardee(self):
+        """HAL répète « delabaere / amelie » en tête ; OpenAlex le cite une fois, en dernier."""
+        hal = _record(1, [("delabaere", "amelie"), ("leduc", "france"), ("delabaere", "amelie")])
+        openalex = _record(2, [("leduc", "france"), ("delabaere", "amelie")])
+
+        assert cross_list_duplicates({1: hal, 2: openalex}, references={1, 2}) == {100: 102}
+
+    def test_une_liste_hors_des_listes_de_reference_ne_compte_pas(self):
+        inspire = _record(1, [("leroy", "anne"), ("porteboeuf", "s"), ("porteboeuf houssais", "s")])
+        scanr = _record(2, [("porteboeuf houssais", "s")])
+
+        assert cross_list_duplicates({1: inspire, 2: scanr}, references={1}) == {}
+
+    def test_des_initiales_face_au_prenom_complet_signalent_deux_listes_bout_a_bout(self):
+        """Toutes les sources ajoutent la liste des membres, aux initiales, après les auteurs."""
+        authors = [("llorca", "pierre michel"), ("martin", "anne")]
+        members = [("durand", "p"), ("llorca", "p m")]
+        records = {n: _record(n, authors + members) for n in (1, 2)}
+
+        assert cross_list_duplicates(records, references={1, 2}) == {103: 100, 203: 200}
+
+    def test_un_nom_complet_repete_dans_une_courte_liste_est_un_doublon(self):
+        records = {n: _record(n, [("godi", "patricia"), ("godi", "patricia")]) for n in (1, 2)}
+
+        assert cross_list_duplicates(records, references={1, 2}) == {101: 100, 201: 200}
+
+    def test_un_nom_complet_repete_dans_une_grande_collaboration_reste_des_homonymes(self):
+        names = [(f"nom{i}", "jean") for i in range(120)] + [("hou", "yingrui"), ("hou", "yingrui")]
+        records = {n: _record(n, names) for n in (10, 20)}
+
+        assert cross_list_duplicates(records, references={10, 20}) == {}
+
+    def test_un_nom_de_famille_prolonge_dans_une_grande_collaboration_est_un_doublon(self):
+        others = [(f"nom{i}", "jean") for i in range(120)]
+        inspire = _record(
+            10, [*others, ("porteboeuf", "sarah julie"), ("porteboeuf houssais", "s")]
+        )
+        hal = _record(20, [*others, ("porteboeuf houssais", "s")])
+
+        assert cross_list_duplicates({10: inspire, 20: hal}, references={10, 20}) == {1120: 1121}
+
+    def test_des_initiales_proches_dans_une_grande_collaboration_restent_des_homonymes(self):
+        """« wang / y » et « wang / y w » chez Crossref : une autre liste qui cite le nom une fois ne suffit pas."""
+        others = [(f"nom{i}", "jean") for i in range(120)]
+        crossref = _record(10, [*others, ("wang", "y"), ("wang", "y w")])
+        hal = _record(20, [*others, ("wang", "y")])
+
+        assert cross_list_duplicates({10: crossref, 20: hal}, references={10, 20}) == {}
+
+    def test_deux_prenoms_differents_de_meme_initiale_sont_deux_auteurs(self):
+        hal = _record(1, [("li", "yanru"), ("li", "yujie")])
+        crossref = _record(2, [("li", "yanru")])
+
+        assert cross_list_duplicates({1: hal, 2: crossref}, references={1, 2}) == {}
+
+    def test_des_homonymes_presents_dans_toutes_les_listes_restent_distincts(self):
+        records = {n: _record(n, [("xu", "z"), ("xu", "z"), ("martin", "anne")]) for n in (1, 2)}
+
+        assert cross_list_duplicates(records, references={1, 2}) == {}
+
+    def test_deux_orcid_differents_dans_une_autre_liste_designent_deux_homonymes(self):
+        """Crossref liste deux « schmidt / j » sans ORCID ; HAL leur donne deux ORCID différents."""
+        crossref = _record(1, [("schmidt", "j"), ("martin", "anne"), ("schmidt", "j")])
+        hal = [
+            SourceContribution(200, 2, 0, "schmidt", "j", "0000-0003-3424-337X"),
+            SourceContribution(201, 2, 1, "martin", "anne"),
+            SourceContribution(202, 2, 2, "schmidt", "j", "0000-0003-4027-7875"),
+        ]
+        scanr = _record(3, [("schmidt", "j"), ("martin", "anne")])
+
+        assert cross_list_duplicates({1: crossref, 2: hal, 3: scanr}, references={1, 2, 3}) == {}
+
+    def test_deux_orcid_differents_designent_deux_homonymes(self):
+        doubled = [
+            SourceContribution(100, 1, 0, "schmidt", "j", "0000-0003-3424-337X"),
+            SourceContribution(101, 1, 1, "schmidt", "j", "0000-0003-4027-7875"),
+        ]
+        once = _record(2, [("schmidt", "j")])
+
+        assert cross_list_duplicates({1: doubled, 2: once}, references={1, 2}) == {}
