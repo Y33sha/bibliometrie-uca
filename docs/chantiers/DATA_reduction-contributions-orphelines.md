@@ -77,7 +77,14 @@ Un indice désigne une personne candidate quand elle seule partage cet indice av
 
   Des profils tirés des seuls rattachements par identifiant ou à la main départagent autant de cas du contrôle, et moins d'orphelines. L'indice laboratoire réunit les structures du référentiel atteintes par l'adresse, le ROR ou la structure HAL. L'indice structures HAL ajoute les structures HAL hors du référentiel, et les équipes ou départements HAL rattachés à un laboratoire du référentiel.
 - [x] Rejets d'une personne comme indice négatif (idée de ReCiter) : la personne candidate est écartée quand la publication partage un coauteur ou un laboratoire avec ses publications rejetées, et aucun avec ses propres publications. Sur le contrôle épuré, l'indice écarte 26 fois une autre personne et jamais la personne de référence. Les cas écartés sont déjà départagés par la cascade.
-- [ ] Règle de départage dans la phase `persons`, avec les indices retenus.
+- [ ] Règle de départage dans la phase `persons`, avec les indices retenus :
+  - [ ] Règle du domaine : cascade ordonnée d'indices. Chaque indice reçoit le contexte de la contribution et les profils des personnes candidates, et désigne une personne ou aucune. Constantes du domaine : structures du référentiel retenues (laboratoires et équipes, hors CHU), types de structure HAL retenus (laboratoire, équipe, département), écart d'années (2), seuils de coauteurs (1, puis 2).
+  - [ ] Décision : `decide_contribution` renvoie les personnes candidates d'une forme de nom ambiguë. La cascade décide ces contributions avant `settle_publication`. Dans une publication, un rattachement par la cascade cède devant un rattachement par le nom.
+  - [ ] Mode de rattachement : une valeur de `resolution_mode` par indice (migration), pour mesurer chaque indice et retrouver ses rattachements. Libellés dans la vue du pipeline de l'administration.
+  - [ ] Chargement par lot de publications : contexte des contributions ambiguës du lot (personnes rattachées à la publication, structures, revue, année) et profils de leurs personnes candidates, hors publication décidée. Profils et coauteurs présents viennent des seuls rattachements hors cascade, donc le résultat est indépendant de l'ordre des lots.
+  - [ ] Purge : la redécision des contributions rattachées par le nom ou par la cascade passe par la même cascade.
+  - [ ] Tests : un test du domaine par indice et pour l'ordre de la cascade ; tests d'intégration du rattachement et de la purge.
+  - [ ] Mesure avant commit, sur la base de production : durée de la tâche, orphelines départagées face aux 477 attendues.
 
 ### Phase 2 — Auteur listé deux fois dans un enregistrement source
 
