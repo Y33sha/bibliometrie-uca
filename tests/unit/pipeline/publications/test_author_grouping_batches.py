@@ -1,11 +1,28 @@
-"""Lots de publications et écritures de la phase `author_grouping`."""
+"""Lots de publications, contributions sources et écritures de la phase `author_grouping`."""
 
 from pipeline.transformation.publications.author_grouping import author_grouping
 from pipeline.transformation.publications.author_grouping.author_grouping import (
+    contributions_by_source_record,
     membership_changes,
     publication_batches,
 )
-from pipeline.transformation.publications.author_grouping.store import MembershipRow
+from pipeline.transformation.publications.author_grouping.store import (
+    MembershipRow,
+    SourceContributionRow,
+)
+
+
+def test_seuls_hal_et_inspire_donnent_un_orcid_d_auteur():
+    orcid = "0000-0002-2646-6189"
+    rows = [
+        SourceContributionRow(1, 10, "hal", 100, 0, "martin", "anne", raw_orcid=orcid),
+        SourceContributionRow(1, 20, "inspire", 200, 0, "martin", "anne", raw_orcid=orcid),
+        SourceContributionRow(1, 30, "crossref", 300, 0, "martin", "anne", raw_orcid=orcid),
+    ]
+
+    records = contributions_by_source_record(rows)
+
+    assert [records[r][0].author_orcid for r in (10, 20, 30)] == [orcid, orcid, ""]
 
 
 def test_un_lot_se_ferme_au_plafond_de_contributions_sources(monkeypatch):

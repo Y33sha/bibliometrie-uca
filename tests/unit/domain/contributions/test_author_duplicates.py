@@ -1,6 +1,7 @@
 """Doublons d'auteur dans la liste d'un enregistrement source (`domain.contributions.author_duplicates`)."""
 
 from domain.contributions.author_duplicates import (
+    LARGE_LIST_AUTHORS,
     cross_list_duplicates,
     duplicate_source_contributions,
     unaligned_duplicates,
@@ -19,6 +20,11 @@ def _record(source_record: int, names: list[tuple[str, str]]) -> list[SourceCont
         SourceContribution(source_record * 100 + pos, source_record, pos, last, first)
         for pos, (last, first) in enumerate(names)
     ]
+
+
+def _others(n: int, prefix: str = "nom") -> list[tuple[str, str]]:
+    """Renvoie `n` auteurs aux noms tous différents."""
+    return [(f"{prefix}{i}", "jean") for i in range(n)]
 
 
 def _unaligned_duplicates(source_records: dict[int, list[SourceContribution]]) -> dict[int, int]:
@@ -161,27 +167,63 @@ class TestCrossListDuplicates:
         assert cross_list_duplicates(records, references={1, 2}) == {101: 100, 201: 200}
 
     def test_un_nom_complet_repete_dans_une_grande_collaboration_reste_des_homonymes(self):
-        names = [(f"nom{i}", "jean") for i in range(120)] + [("hou", "yingrui"), ("hou", "yingrui")]
+        names = [*_others(LARGE_LIST_AUTHORS), ("hou", "yingrui"), ("hou", "yingrui")]
         records = {n: _record(n, names) for n in (10, 20)}
 
         assert cross_list_duplicates(records, references={10, 20}) == {}
 
     def test_un_nom_de_famille_prolonge_dans_une_grande_collaboration_est_un_doublon(self):
-        others = [(f"nom{i}", "jean") for i in range(120)]
+        n = LARGE_LIST_AUTHORS
         inspire = _record(
-            10, [*others, ("porteboeuf", "sarah julie"), ("porteboeuf houssais", "s")]
+            10, [*_others(n), ("porteboeuf", "sarah julie"), ("porteboeuf houssais", "s")]
         )
-        hal = _record(20, [*others, ("porteboeuf houssais", "s")])
+        hal = _record(20, [*_others(n), ("porteboeuf houssais", "s")])
 
-        assert cross_list_duplicates({10: inspire, 20: hal}, references={10, 20}) == {1120: 1121}
+        assert cross_list_duplicates({10: inspire, 20: hal}, references={10, 20}) == {
+            1000 + n: 1000 + n + 1
+        }
 
     def test_des_initiales_proches_dans_une_grande_collaboration_restent_des_homonymes(self):
         """« wang / y » et « wang / y w » chez Crossref : une autre liste qui cite le nom une fois ne suffit pas."""
-        others = [(f"nom{i}", "jean") for i in range(120)]
-        crossref = _record(10, [*others, ("wang", "y"), ("wang", "y w")])
-        hal = _record(20, [*others, ("wang", "y")])
+        crossref = _record(10, [*_others(LARGE_LIST_AUTHORS), ("wang", "y"), ("wang", "y w")])
+        hal = _record(20, [*_others(LARGE_LIST_AUTHORS), ("wang", "y")])
 
         assert cross_list_duplicates({10: crossref, 20: hal}, references={10, 20}) == {}
+
+    def test_une_liste_de_membres_sous_le_seuil_des_grandes_collaborations_donne_un_doublon(self):
+        """Essai clinique de 150 noms : « souweine / bertrand » parmi les auteurs, « souweine / b » parmi les membres ; HAL liste seulement les auteurs."""
+        authors = [("souweine", "bertrand"), *_others(20)]
+        openalex = _record(10, [*authors, *_others(128, "membre"), ("souweine", "b")])
+        hal = _record(20, authors)
+
+        assert cross_list_duplicates({10: openalex, 20: hal}, references={10, 20}) == {1149: 1000}
+
+    def test_un_orcid_commun_signale_un_doublon_a_distance_dans_une_grande_collaboration(self):
+        n = LARGE_LIST_AUTHORS
+        orcid = "0000-0002-2646-6189"
+        inspire = [
+            SourceContribution(1, 1, 0, "porteboeuf", "sarah julie", "", orcid),
+            *_record(1, _others(n))[1:],
+            SourceContribution(2, 1, n, "porteboeuf houssais", "s", "", orcid),
+        ]
+
+        assert cross_list_duplicates({1: inspire}, references={1}) == {2: 1}
+
+    def test_un_orcid_commun_a_deux_noms_differents_ne_signale_pas_de_doublon(self):
+        """Une source donne l'ORCID d'un auteur à tous les auteurs de la liste."""
+        orcid = "0000-0002-2646-6189"
+        crossref = [
+            SourceContribution(1, 1, 0, "martin", "anne", "", orcid),
+            SourceContribution(2, 1, 1, "durand", "paul", "", orcid),
+        ]
+
+        assert cross_list_duplicates({1: crossref}, references={1}) == {}
+
+    def test_nom_et_prenom_permutes_dans_une_courte_liste_signalent_un_doublon(self):
+        names = [("de chazeron", "ingrid"), ("martin", "anne"), ("ingrid", "de chazeron")]
+        records = {n: _record(n, names) for n in (1, 2)}
+
+        assert cross_list_duplicates(records, references={1, 2}) == {102: 100, 202: 200}
 
     def test_deux_prenoms_differents_de_meme_initiale_sont_deux_auteurs(self):
         hal = _record(1, [("li", "yanru"), ("li", "yujie")])

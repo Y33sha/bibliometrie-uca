@@ -95,6 +95,8 @@ class SourceContribution:
     first_name: str
     orcid: str = ""
     """ORCID non neutralisé."""
+    author_orcid: str = ""
+    """ORCID donné par une source de `SOURCES_WITH_AUTHOR_ORCID`, neutralisé ou non."""
 
 
 @dataclass(frozen=True)

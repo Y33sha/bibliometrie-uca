@@ -6,7 +6,7 @@ Avant l'alignement, la liste seule les révèle : la source répète tout ou par
 from collections import Counter, defaultdict
 from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from functools import lru_cache
-from itertools import pairwise
+from itertools import chain, pairwise
 
 from domain.contributions.author_grouping import Contribution, SourceContribution
 from domain.persons.name_matching import is_full_first_name, names_compatible
@@ -20,7 +20,9 @@ MIN_DOUBLED_PAIRS = 4
 """Nombre de paires côte à côte, de noms différents et à la suite, qui signale une liste où chaque nom est répété à sa place."""
 SOURCES_MERGING_HOMONYMS: frozenset[str] = frozenset({Source.WOS})
 """Sources qui fusionnent des homonymes de la liste d'auteurs. Leur liste ne prouve pas un doublon (`cross_list_duplicates`)."""
-LARGE_LIST_AUTHORS = 100
+SOURCES_WITH_AUTHOR_ORCID: frozenset[str] = frozenset({Source.HAL, Source.INSPIRE})
+"""Sources dont l'ORCID désigne l'auteur de la contribution source, même répété dans la liste : compte de l'auteur chez HAL, listes vérifiées chez INSPIRE. Crossref, OpenAlex et DataCite donnent un même ORCID à des homonymes voisins."""
+LARGE_LIST_AUTHORS = 300
 """Longueur d'une liste de grande collaboration. Une grande collaboration compte des homonymes aux noms et aux initiales proches."""
 MAX_GAP_IN_LARGE_LIST = 10
 """Écart maximal de rang entre les deux inscriptions d'un auteur dans la liste alphabétique d'une grande collaboration, comptée dans l'ordre de la liste. D'autres noms s'intercalent entre deux graphies voisines (« porteboeuf », « porteboeuf houssais »)."""
@@ -82,10 +84,11 @@ def cross_list_duplicates(
 
     Dans la liste d'un enregistrement source, deux contributions sources au nom d'un même auteur (`_same_author`) forment un doublon :
 
+    - quand elles ont le même ORCID d'auteur (`SourceContribution.author_orcid`) ;
     - dans une grande collaboration (`LARGE_LIST_AUTHORS`), quand elles sont voisines (`MAX_GAP_IN_LARGE_LIST`), qu'un nom de famille prolonge l'autre (`_extended_last_name`) et qu'une liste de référence cite le nom une seule fois ;
-    - sinon, quand une liste de référence cite le nom une seule fois, quand l'une a un prénom complet et l'autre des initiales (deux listes mises bout à bout), ou quand elles ont le même nom et le même prénom complet.
+    - sinon, quand une liste de référence cite le nom une seule fois, quand l'une a un prénom complet et l'autre des initiales (deux listes mises bout à bout), ou quand elles ont le même nom et le même prénom complet, dans cet ordre ou permutés.
 
-    Deux ORCID différents pour ce nom, dans les listes de la publication, désignent deux homonymes.
+    Hors ORCID commun, deux ORCID non neutralisés différents pour ce nom, dans les listes de la publication, désignent deux homonymes.
 
     Args:
         source_records: contributions sources de chaque enregistrement source.
@@ -112,7 +115,11 @@ def cross_list_duplicates(
         pairs = (
             _neighbour_pairs(ordered) if large else _same_author_pairs(ordered, index_of(record))
         )
-        for a, b in pairs:
+        candidates = chain(
+            ((a, b, True) for a, b in _same_orcid_pairs(ordered)),
+            ((a, b, False) for a, b in pairs),
+        )
+        for a, b, same_orcid in candidates:
             if a.id in duplicates or b.id in duplicates:
                 continue
             single = [
@@ -120,12 +127,26 @@ def cross_list_duplicates(
                 for o in others
                 if len(cited := _namesakes(a, b, index_of(o))) == 1
             ]
-            if (single or (not large and _repeated_in_small_list(a, b))) and len(
-                _orcids(a, b, map(index_of, lists))
-            ) <= 1:
+            if same_orcid or (
+                (single or (not large and _repeated_in_small_list(a, b)))
+                and len(_orcids(a, b, map(index_of, lists))) <= 1
+            ):
                 kept, repeated = _kept_occurrence(a, b, len(ordered), single)
                 duplicates[repeated.id] = kept.id
     return duplicates
+
+
+def _same_orcid_pairs(
+    ordered: Sequence[SourceContribution],
+) -> Iterator[tuple[SourceContribution, SourceContribution]]:
+    """Renvoie les paires de contributions sources de la liste au nom d'un même auteur (`_same_author`) et au même ORCID d'auteur, dans l'ordre de la liste."""
+    by_orcid: dict[str, list[SourceContribution]] = defaultdict(list)
+    for s in ordered:
+        if s.author_orcid:
+            by_orcid[s.author_orcid].append(s)
+    for occurrences in by_orcid.values():
+        if len(occurrences) > 1:
+            yield from _same_author_pairs(occurrences, _word_index(occurrences))
 
 
 def _kept_occurrence(
@@ -196,9 +217,21 @@ def _same_author(a: SourceContribution, b: SourceContribution) -> bool:
 
 @lru_cache(maxsize=1_000_000)
 def _same_author_names(last_a: str, first_a: str, last_b: str, first_b: str) -> bool:
-    """Vrai si les deux noms sont compatibles (`names_compatible`), ou si un nom de famille prolonge l'autre avec des initiales compatibles (`_extended_last_name`)."""
-    return names_compatible(last_a, first_a, last_b, first_b) or _extended_last_name(
-        last_a, first_a, last_b, first_b
+    """Vrai si les deux noms sont compatibles (`names_compatible`), si un nom de famille prolonge l'autre avec des initiales compatibles (`_extended_last_name`), ou si nom et prénom sont permutés (`_swapped_names`)."""
+    return (
+        names_compatible(last_a, first_a, last_b, first_b)
+        or _extended_last_name(last_a, first_a, last_b, first_b)
+        or _swapped_names(last_a, first_a, last_b, first_b)
+    )
+
+
+def _swapped_names(last_a: str, first_a: str, last_b: str, first_b: str) -> bool:
+    """Vrai si le nom de famille de l'un est le prénom complet de l'autre, et réciproquement : « ingrid / de chazeron » et « de chazeron / ingrid »."""
+    return (
+        last_a != first_a
+        and (last_a, first_a) == (first_b, last_b)
+        and is_full_first_name(first_a)
+        and is_full_first_name(first_b)
     )
 
 
@@ -218,10 +251,14 @@ def _extended_last_name(last_a: str, first_a: str, last_b: str, first_b: str) ->
 
 
 def _repeated_in_small_list(a: SourceContribution, b: SourceContribution) -> bool:
-    """Vrai si l'une a un prénom complet et l'autre des initiales, ou si elles ont le même nom et le même prénom complet."""
-    return is_full_first_name(a.first_name) != is_full_first_name(b.first_name) or (
-        (a.last_name, a.first_name) == (b.last_name, b.first_name)
-        and is_full_first_name(a.first_name)
+    """Vrai si l'une a un prénom complet et l'autre des initiales, ou si elles ont le même nom et le même prénom complet, dans cet ordre ou permutés (`_swapped_names`)."""
+    return (
+        is_full_first_name(a.first_name) != is_full_first_name(b.first_name)
+        or (
+            (a.last_name, a.first_name) == (b.last_name, b.first_name)
+            and is_full_first_name(a.first_name)
+        )
+        or _swapped_names(a.last_name, a.first_name, b.last_name, b.first_name)
     )
 
 

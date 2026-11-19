@@ -16,6 +16,7 @@ from sqlalchemy import Connection
 
 from domain.contributions.author_duplicates import (
     SOURCES_MERGING_HOMONYMS,
+    SOURCES_WITH_AUTHOR_ORCID,
     cross_list_duplicates,
     duplicate_source_contributions,
     unaligned_duplicates,
@@ -84,7 +85,13 @@ def contributions_by_source_record(
         first_name = with_known_first_name(row.first_name, row.known_first_name)
         source_records.setdefault(row.source_record, []).append(
             SourceContribution(
-                row.id, row.source_record, row.position, row.last_name, first_name, row.orcid
+                row.id,
+                row.source_record,
+                row.position,
+                row.last_name,
+                first_name,
+                row.orcid,
+                row.raw_orcid if row.source in SOURCES_WITH_AUTHOR_ORCID else "",
             )
         )
     return source_records
@@ -145,7 +152,7 @@ def membership_changes(
 
 
 # Échanges entre processus, en tuples : contribution source (champs de `SourceContributionRow`), appartenance (contribution source, enregistrement source, méthode), contribution (référence, appartenances).
-type SourceContributionTuple = tuple[int, int, str, int, int | None, str, str, str, str]
+type SourceContributionTuple = tuple[int, int, str, int, int | None, str, str, str, str, str]
 type MemberTuple = tuple[int, int, str]
 type ContributionTuple = tuple[int, list[MemberTuple]]
 type Aligned = tuple[list[ContributionTuple], dict[int, int]]
