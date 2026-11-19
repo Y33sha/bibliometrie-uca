@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jEmokkdFeCStmLZXnmspA6Xw6YL0BEwKMOspGwnTiyEQiYDeJ7wW2CcOx0KpygZ
+\restrict TpN8tnXFfnKhfse8bhahGtn25sV2cehWAlj0K9y7OUsjAy4YgtjWlHZGexKUu6f
 
 -- Dumped from database version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
@@ -434,7 +434,12 @@ CREATE TYPE public.resolution_mode AS ENUM (
     'hal_person_id',
     'idref',
     'name',
-    'compatible_name'
+    'compatible_name',
+    'coauthors',
+    'laboratory',
+    'hal_structure',
+    'serial',
+    'activity_years'
 );
 
 
@@ -6324,5 +6329,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jEmokkdFeCStmLZXnmspA6Xw6YL0BEwKMOspGwnTiyEQiYDeJ7wW2CcOx0KpygZ
+\unrestrict TpN8tnXFfnKhfse8bhahGtn25sV2cehWAlj0K9y7OUsjAy4YgtjWlHZGexKUu6f
 
