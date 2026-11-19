@@ -47,15 +47,9 @@ def case_priority(values: tuple[str, ...], col: str) -> str:
     return f"CASE {col} {whens} END"
 
 
-def person_source_contribution(source_contribution: str = "sc") -> str:
-    """Renvoie la condition vraie quand la contribution source aliasée `source_contribution` désigne une personne, donc appartient à une contribution (`aligned_source_contributions`).
-
-    Les contributions sources collectives, les doublons d'auteur et les contributions sources des enregistrements sources écartés de l'alignement restent hors contribution.
-    """
-    return (
-        "EXISTS (SELECT 1 FROM aligned_source_contributions gm"
-        f" WHERE gm.source_contribution_id = {source_contribution}.id)"
-    )
+def individual_source_contribution(source_contribution: str = "sc") -> str:
+    """Renvoie la condition vraie quand la contribution source aliasée `source_contribution` désigne un auteur individuel : ni collective, ni doublon d'auteur (`duplicate_of`)."""
+    return f"NOT {source_contribution}.collective AND {source_contribution}.duplicate_of IS NULL"
 
 
 CONTRIBUTIONS_AND_SOURCES = """
