@@ -5,9 +5,9 @@ Les épinglages s'appliquent d'abord : une contribution à contribution source �
 Sont décidées :
 
 - les contributions sans personne du périmètre, ou ayant une contribution source épinglée, ou une contribution source à identifiant fiable d'attribution confirmée ou authentifiée, à une personne non marquée hors périmètre ;
-- les contributions non manuelles de la file.
+- les contributions de la file, hors décision de l'administration (`HUMAN_DECISION_REASONS`).
 
-Une contribution de la file garde sa personne si sa décision la désigne encore, et la perd sinon. `--rebuild-persons` met en file toutes les contributions rattachées hors épinglage. Les contributions se décident par lots de publications, contre l'index chargé en début de tâche. Le contexte d'une contribution départage les personnes candidates d'une forme de nom ambiguë (`decide_with_tie_break`). Les contributions du périmètre au nom inconnu sont traitées ensuite, une à une, contre l'index tenu à jour. Chacune rejoint une personne créée dans le même passage, ou fonde la sienne (`create_persons`).
+Une contribution de la file garde sa personne si sa décision la désigne encore, et la perd sinon. `--rebuild-persons` met en file toutes les contributions rattachées hors décision de l'administration. Les contributions se décident par lots de publications, contre l'index chargé en début de tâche. Le contexte d'une contribution départage les personnes candidates d'une forme de nom ambiguë (`decide_with_tie_break`). Les contributions du périmètre au nom inconnu sont traitées ensuite, une à une, contre l'index tenu à jour. Chacune rejoint une personne créée dans le même passage, ou fonde la sienne (`create_persons`).
 """
 
 from collections import Counter, defaultdict
@@ -20,6 +20,7 @@ from domain.contributions.contribution_roles import ContributionRole
 from domain.errors import ValidationError
 from domain.normalize import normalize_text
 from domain.persons.contribution_matching import (
+    HUMAN_DECISION_REASONS,
     IDENTIFIER_ORDER,
     AlignedContribution,
     AlignedSourceContribution,
@@ -108,7 +109,7 @@ _CANDIDATES_SQL = " UNION ".join(
         SELECT g.id AS contribution_id
         FROM {_RESOLUTION_SNAPSHOT} q
         JOIN contributions g ON g.id = q.id
-        WHERE g.resolution_mode IS DISTINCT FROM '{ContributionMatchReason.MANUAL}'
+        WHERE g.resolution_mode IS NULL OR g.resolution_mode::text NOT IN {in_clause(HUMAN_DECISION_REASONS)}
         """,
         *(
             strong_identifier_source_contributions(
@@ -156,9 +157,9 @@ _CONTRIBUTION_MEMBERS_SQL = _members_sql("WHERE g.id = ANY(:contributions)")
 
 _MARK_ALL_SQL = f"""
     SELECT id FROM contributions
-    WHERE person_id IS NOT NULL AND resolution_mode IS DISTINCT FROM '{ContributionMatchReason.MANUAL}'
+    WHERE person_id IS NOT NULL AND resolution_mode::text NOT IN {in_clause(HUMAN_DECISION_REASONS)}
 """
-"""Contributions rattachées hors épinglage, mises en file par `--rebuild-persons`."""
+"""Contributions rattachées hors décision de l'administration, mises en file par `--rebuild-persons`."""
 
 _TAKEN_SQL = """
     SELECT publication_id, array_agg(person_id) AS person_ids
@@ -206,14 +207,14 @@ def load_index(conn: Connection, conflicting: frozenset[int] = frozenset()) -> P
 
 
 def mark_all_for_resolution(conn: Connection) -> int:
-    """Met en file de redécision (`Queue.CONTRIBUTION_RESOLUTION`) les contributions rattachées hors épinglage. Renvoie le nombre de contributions marquées."""
+    """Met en file de redécision (`Queue.CONTRIBUTION_RESOLUTION`) les contributions rattachées hors décision de l'administration. Renvoie le nombre de contributions marquées."""
     return enqueue(conn, Queue.CONTRIBUTION_RESOLUTION, _MARK_ALL_SQL, {})
 
 
 def prepare_candidates(conn: Connection) -> list[int]:
     """Matérialise les contributions à décider et renvoie leurs publications, triées.
 
-    Les contributions à décider sont les contributions sans personne et les contributions non manuelles de la file. La file est relevée (`snapshot`). `resolve_contributions` supprime ensuite de la file les marquages relevés.
+    Les contributions à décider sont les contributions sans personne et les contributions de la file, hors décision de l'administration. La file est relevée (`snapshot`). `resolve_contributions` supprime ensuite de la file les marquages relevés.
 
     La table temporaire est analysée : l'estimation du nombre de contributions guide la jointure avec leurs contributions sources.
     """
@@ -563,7 +564,7 @@ def resolve_contributions(
 
     Étapes, dans l'ordre :
 
-    - avec `rebuild`, mise en file des contributions rattachées hors épinglage (`mark_all_for_resolution`) ;
+    - avec `rebuild`, mise en file des contributions rattachées hors décision de l'administration (`mark_all_for_resolution`) ;
     - application des épinglages ;
     - complétion des prénoms réduits (`complete_reduced_first_names`) ;
     - par lot de publications : décision des contributions sans personne et des contributions en file, retrait des personnes non désignées par la décision (`release_contributions`), écriture des rattachements ;

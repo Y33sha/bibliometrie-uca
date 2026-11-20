@@ -151,6 +151,10 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     ],
   },
   normalize: {
+    summary: [
+      { key: "identifiers_neutralized", label: "Identifiants portés sous le nom d'une autre personne, neutralisés" },
+      { key: "marked_contributions", label: "Contributions à redécider (identifiant neutralisé)" },
+    ],
     tables: [
       {
         source: "table",
@@ -276,12 +280,6 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "unordered", label: "Liens par la ressemblance des noms hors de l'ordre" },
     ],
   },
-  identifier_arbitration: {
-    summary: [
-      { key: "identifiers_neutralized", label: "Identifiants portés sous le nom d'une autre personne, neutralisés" },
-      { key: "marked_contributions", label: "Contributions à redécider (identifiant neutralisé)" },
-    ],
-  },
   persons: {
     summary: [
       { key: "groups", label: "Contributions sans personne examinées" },
@@ -297,6 +295,9 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "skip:person_in_other_group", label: "Contributions sans personne (personne déjà présente dans la publication)" },
       { key: "skip:creation_not_allowed", label: "Contributions sans personne (rôles de jury seuls)" },
       { key: "skip:out_of_perimeter", label: "Contributions sans personne (hors périmètre)" },
+      { key: "homonyms_created", label: "Homonymes de personnes rejetées créés" },
+      { key: "homonyms_deleted", label: "Homonymes sans contribution supprimés" },
+      { key: "homonym_contributions_released", label: "Contributions détachées d'un homonyme" },
       { key: "first_names_completed", label: "Prénoms complétés" },
       { key: "ambiguous_marked", label: "Contributions à redécider (nom devenu ambigu)" },
       { key: "deleted_attributions", label: "Attributions d'identifiant supprimées" },
@@ -311,6 +312,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
         firstColumnLabel: "Mode de rattachement",
         rowLabels: {
           manual: "Épinglage",
+          homonym: "Homonyme d'une personne rejetée",
           orcid: "ORCID",
           hal_person_id: "Compte HAL",
           idref: "IdRef",

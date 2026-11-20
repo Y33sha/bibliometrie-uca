@@ -146,10 +146,12 @@ Un rejet de l'administration écarte une personne d'une publication. La contribu
 - [x] Simulation du 2026-11-20 (`simulation_homonymes.py`) : un homonyme par personne rejetée, de profil tiré des contributions rejetées ; la cascade de départage choisit entre la personne et son homonyme.
   - Contributions des personnes rattachées par le nom ou par départage : 292 gardées, 1 passée à l'homonyme, 25 sans personne.
   - Contributions rejetées du périmètre, jugées chacune sans sa publication : par le nom, 164 à l'homonyme, 11 à la personne, 6 à aucune ; par un identifiant de la personne, le rattachement par identifiant l'emporte.
-- [ ] Migration : colonne `persons.homonym_of`, valeur `homonym` de `resolution_mode`.
-- [ ] Tâche `persons.attach_homonyms`, avant le rattachement : la contribution sans personne d'une publication rejetée pour une personne, seule au nom de la personne, rejoint l'homonyme de la personne. L'homonyme est créé au besoin, au nom de la personne, exclu hors périmètre. Une contribution rattachée à l'homonyme dont le rejet a disparu perd sa personne.
-- [ ] Fusion de personnes : l'homonyme de la personne absorbée devient celui de la personne conservée.
-- [ ] Tests, run, bilan des orphelines et des rattachements à l'homonyme.
+- [x] Migration `d7e2b9f4a061` : colonne `persons.homonym_of`, valeur `homonym` de `resolution_mode`.
+- [x] Tâche `persons.attach_homonyms`, avant le rattachement : la contribution sans personne d'une publication rejetée pour une personne, seule au nom de la personne, rejoint l'homonyme de la personne. L'homonyme est créé au besoin, au nom de la personne, exclu hors périmètre. Une contribution rattachée à l'homonyme dont le rejet a disparu perd sa personne.
+- [x] Rattachement : les contributions de l'homonyme, comme les épinglages, restent hors de la redécision (`HUMAN_DECISION_REASONS`).
+- [x] Fusion de personnes : l'homonyme de la personne absorbée devient celui de la personne conservée.
+- [x] Tests du domaine et de la tâche.
+- [ ] Deux runs : le premier crée les homonymes, sa purge marque les contributions devenues ambiguës, le second les redécide. Bilan des orphelines et des rattachements à l'homonyme.
 
 ### Phase 7 — Documentation
 
