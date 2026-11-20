@@ -1,12 +1,15 @@
 """Doublons d'auteur dans la liste d'un enregistrement source (`domain.contributions.author_duplicates`)."""
 
 from domain.contributions.author_duplicates import (
-    LARGE_LIST_AUTHORS,
     cross_list_duplicates,
     duplicate_source_contributions,
     unaligned_duplicates,
 )
-from domain.contributions.author_grouping import SourceContribution, align_publication
+from domain.contributions.author_grouping import (
+    LARGE_LIST_AUTHORS,
+    SourceContribution,
+    align_publication,
+)
 
 
 def _source_record(names: list[str]) -> list[SourceContribution]:

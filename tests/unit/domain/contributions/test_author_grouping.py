@@ -3,6 +3,7 @@
 import pytest
 
 from domain.contributions.author_grouping import (
+    LARGE_LIST_AUTHORS,
     GroupingMethod,
     SourceContribution,
     align_publication,
@@ -51,6 +52,42 @@ class TestAlignPublication:
             {1: _source_record(1, reference), 2: _source_record(2, other)}
         )
         assert _pair(100, 200, GroupingMethod.GAP) in _aligned(contributions)
+
+    def test_un_changement_de_nom_se_lie_seul_dans_son_trou(self):
+        """« vernier / jessica » et « gable / jessica s m » au même rang : même initiale du prénom, seuls dans leur trou."""
+        reference = [("sauvayre", "romy"), ("vernier", "jessica"), ("chauviere", "cedric")]
+        other = [("sauvayre", "romy"), ("gable", "jessica s m"), ("chauviere", "cedric")]
+        contributions = align_publication(
+            {1: _source_record(1, reference), 2: _source_record(2, other)}
+        )
+        assert _pair(101, 201, GroupingMethod.GAP) in _aligned(contributions)
+
+    def test_un_auteur_seul_de_chaque_cote_se_lie_par_l_initiale_du_prenom(self):
+        contributions = align_publication(
+            {
+                1: _source_record(1, [("van lander", "axelle")]),
+                2: _source_record(2, [("maneval", "axelle")]),
+            }
+        )
+        assert _aligned(contributions) == [_pair(100, 200, GroupingMethod.GAP)]
+
+    def test_deux_prenoms_d_initiales_differentes_restent_deux_auteurs(self):
+        reference = [("sauvayre", "romy"), ("vernier", "jessica"), ("chauviere", "cedric")]
+        other = [("sauvayre", "romy"), ("gable", "paul"), ("chauviere", "cedric")]
+        contributions = align_publication(
+            {1: _source_record(1, reference), 2: _source_record(2, other)}
+        )
+        assert len(contributions) == 4
+
+    def test_un_changement_de_nom_reste_sans_lien_dans_une_grande_collaboration(self):
+        others = [(f"nom{i}", "jean") for i in range(LARGE_LIST_AUTHORS)]
+        contributions = align_publication(
+            {
+                10: _source_record(10, [*others, ("reboud", "meril")]),
+                20: _source_record(20, [*others, ("rebollo de miguel", "m")]),
+            }
+        )
+        assert len(contributions) == LARGE_LIST_AUTHORS + 2
 
     def test_homonymes_lies_dans_l_ordre_de_leur_trou(self):
         names = [("martin", "a"), ("zhang", "y"), ("zhang", "y"), ("durand", "c")]

@@ -8,7 +8,11 @@ from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from functools import lru_cache
 from itertools import chain, pairwise
 
-from domain.contributions.author_grouping import Contribution, SourceContribution
+from domain.contributions.author_grouping import (
+    LARGE_LIST_AUTHORS,
+    Contribution,
+    SourceContribution,
+)
 from domain.persons.name_matching import is_full_first_name, names_compatible
 from domain.sources.registry import Source
 
@@ -22,8 +26,6 @@ SOURCES_MERGING_HOMONYMS: frozenset[str] = frozenset({Source.WOS})
 """Sources qui fusionnent des homonymes de la liste d'auteurs. Leur liste ne prouve pas un doublon (`cross_list_duplicates`)."""
 SOURCES_WITH_AUTHOR_ORCID: frozenset[str] = frozenset({Source.HAL, Source.INSPIRE})
 """Sources dont l'ORCID désigne l'auteur de la contribution source, même répété dans la liste : compte de l'auteur chez HAL, listes vérifiées chez INSPIRE. Crossref, OpenAlex et DataCite donnent un même ORCID à des homonymes voisins."""
-LARGE_LIST_AUTHORS = 300
-"""Longueur d'une liste de grande collaboration. Une grande collaboration compte des homonymes aux noms et aux initiales proches."""
 MAX_GAP_IN_LARGE_LIST = 10
 """Écart maximal de rang entre les deux inscriptions d'un auteur dans la liste alphabétique d'une grande collaboration, comptée dans l'ordre de la liste. D'autres noms s'intercalent entre deux graphies voisines (« porteboeuf », « porteboeuf houssais »)."""
 
