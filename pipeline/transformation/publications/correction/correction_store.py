@@ -565,9 +565,9 @@ class SourceRecordCorrectionStore:
                     WHERE sr.doc_type = '{DocType.DATASET.value}'
                 ),
                 unresolved_dois AS ({_UNRESOLVED_DOIS_SQL}),
-                -- Collections figshare typées dataset, une par titre et année : un titre partagé par deux collections n'en désigne aucune. Une collection se compte par son DOI sans suffixe de version.
+                -- Collections figshare typées dataset, une par titre et année : un titre partagé par deux collections n'en désigne aucune. Une collection se compte par son DOI sans suffixe de version. Son DOI cible est le plus petit de ses DOI enregistrés chez doi.org, donc la forme sans version quand elle est enregistrée.
                 figshare_collections AS (
-                    SELECT sr.title_normalized, sr.publication_year, min(c.doi) AS doi
+                    SELECT sr.title_normalized, sr.publication_year, min(d.doi) AS doi
                     FROM source_records sr
                     JOIN record_dois d ON d.id = sr.id
                     CROSS JOIN LATERAL (
@@ -575,6 +575,7 @@ class SourceRecordCorrectionStore:
                     ) c
                     WHERE sr.doc_type = '{DocType.DATASET.value}'
                       AND starts_with(d.doi, '{FIGSHARE_COLLECTION_DOI_PREFIX}')
+                      AND d.doi NOT IN (SELECT d FROM unresolved_dois)
                     GROUP BY sr.title_normalized, sr.publication_year
                     HAVING count(DISTINCT c.doi) = 1
                 ),

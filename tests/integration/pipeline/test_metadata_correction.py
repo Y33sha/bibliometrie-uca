@@ -1032,6 +1032,28 @@ def test_figshare_additional_file_targets_the_collection_present_with_its_versio
     assert _targets(conn)["10.6084/m9.figshare.23538907"] == "10.6084/m9.figshare.c.6702115"
 
 
+def test_figshare_additional_file_targets_the_versioned_doi_of_the_collection(sa_sync_conn):
+    """Cas réel (`10.6084/m9.figshare.c.7304499`) : la collection est présente sous sa forme `.v1`, et sa forme sans version est inconnue de doi.org. La pièce a pour cible la forme `.v1`."""
+    conn = sa_sync_conn
+    _seed_figshare(
+        conn, source_id="c", doi="10.6084/m9.figshare.c.6702115.v1", title_normalized=_ARTICLE
+    )
+    conn.execute(
+        text(
+            "INSERT INTO dois (doi, registered, resolved_at)"
+            " VALUES ('10.6084/m9.figshare.c.6702115', FALSE, now())"
+        )
+    )
+    _seed_figshare(
+        conn,
+        source_id="f1",
+        doi="10.6084/m9.figshare.23538907",
+        title_normalized=f"additional file 1 of {_ARTICLE}",
+    )
+    _apply_cluster(conn)
+    assert _targets(conn) == {"10.6084/m9.figshare.23538907": "10.6084/m9.figshare.c.6702115.v1"}
+
+
 def test_figshare_additional_file_stays_without_collection(sa_sync_conn):
     conn = sa_sync_conn
     piece = _seed_figshare(
