@@ -62,9 +62,9 @@ def _run(contexte, *, processed=7, in_perimeter=3):
         ),
         patch.object(
             phase,
-            "populate",
+            "decide_source_contribution_perimeter",
             side_effect=lambda conn, logger, ids: (
-                vus.__setitem__("populate", ids) or InPerimeterSyncCounts(added=4, removed=1)
+                vus.__setitem__("perimeter", ids) or InPerimeterSyncCounts(added=4, removed=1)
             ),
         ),
         patch.object(countries, "funnel", return_value={"cited_addresses": 9}),
@@ -95,7 +95,7 @@ def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte):
 def test_les_deux_taches_lisent_le_perimetre_des_personnes(contexte):
     _, vus = _run(contexte)
 
-    assert vus["resolution"] == vus["populate"] == set(PERIMETRE)
+    assert vus["resolution"] == vus["perimeter"] == set(PERIMETRE)
 
 
 def test_perimetre_d_extraction_vide_arrete_la_phase(contexte, perimetre):
@@ -119,7 +119,11 @@ def test_rafraichit_le_referentiel_ror_et_reprend_ses_metriques(contexte):
             "run_resolution",
             return_value=ResolutionStats(processed=0, in_perimeter=0, affiliations=0),
         ),
-        patch.object(phase, "populate", return_value=InPerimeterSyncCounts(added=0, removed=0)),
+        patch.object(
+            phase,
+            "decide_source_contribution_perimeter",
+            return_value=InPerimeterSyncCounts(added=0, removed=0),
+        ),
         patch.object(countries, "funnel", return_value={}),
     ):
         metrics = run_phase(_phase(ror), contexte())

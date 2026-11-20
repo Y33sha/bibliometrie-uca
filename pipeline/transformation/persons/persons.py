@@ -118,7 +118,7 @@ _CHILDREN = (
             "person_identifiers",
         ),
         previous_run=(
-            # Identifiants attribués par `resolve_contributions` et supprimés par `purge` ; contributions rattachées par `resolve_contributions` et vidées par `purge`.
+            # Identifiants attribués par `resolve_contributions` et supprimés par `purge_persons` ; contributions rattachées par `resolve_contributions` et vidées par `purge_persons`.
             "person_identifiers",
             "contributions",
             # Contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
@@ -162,7 +162,7 @@ _CHILDREN = (
             "contribution_resolution_queue",
         ),
         previous_run=(
-            # Formes de nom régénérées par `populate` ; personnes, identifiants et formes supprimés, contributions vidées et marquées par `purge`.
+            # Formes de nom régénérées par `populate_person_name_forms` ; personnes, identifiants et formes supprimés, contributions vidées et marquées par `purge_persons`.
             "person_identifiers",
             "person_name_forms",
             "persons",
@@ -188,7 +188,7 @@ _CHILDREN = (
             "person_name_forms",
         ),
         writes=("person_name_forms",),
-        # Contributions vidées et personnes supprimées par `purge` ; alignements supprimés par `finalize.purge_publications`.
+        # Contributions vidées et personnes supprimées par `purge_persons` ; alignements supprimés par `finalize.purge_publications`.
         previous_run=(
             "persons",
             "person_name_forms",
@@ -199,7 +199,7 @@ _CHILDREN = (
         section="Rafraîchissement des formes de nom associées aux personnes",
     ),
     Task(
-        "purge",
+        "purge_persons",
         reads=(
             "contributions.publication_id",
             "contributions.person_id",
@@ -249,7 +249,7 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
         resolution=by_task["resolve_contributions"].extras,
         arbitration=by_task["arbitrate_identifiers"].extras,
         name_forms=by_task["populate_person_name_forms"].extras,
-        purge=by_task["purge"].extras,
+        purge=by_task["purge_persons"].extras,
     )
 
 

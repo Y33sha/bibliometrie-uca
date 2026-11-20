@@ -22,7 +22,7 @@ def _ingest(ctx: PhaseContext) -> PhaseMetrics:
 
 _CHILDREN = (
     Task(
-        "ingest",
+        "derive_publication_subjects",
         reads=(
             "publications.id",
             "publications.subjects_ingested_at",
@@ -38,7 +38,7 @@ _CHILDREN = (
         section="Liens publications-sujets",
     ),
     Task(
-        "usage",
+        "count_subject_usage",
         reads=(
             "publication_subjects",
             "subjects.id",

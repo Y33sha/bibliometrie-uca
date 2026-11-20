@@ -1,4 +1,4 @@
-"""Phase `relations`, tâche `notices` : reconstruction à chaque run des relations des publications avec leurs errata et leurs avis (correction, rétractation, préoccupation).
+"""Phase `relations`, tâche `link_notices` : reconstruction à chaque run des relations des publications avec leurs errata et leurs avis (correction, rétractation, préoccupation).
 
 Errata et avis de rétractation sont hors des publications (`OUT_OF_SCOPE_DOC_TYPES`) : chaque relation part de la publication concernée et vise le DOI de l'avis. Les relations viennent de quatre signaux, par ordre de priorité :
 
@@ -299,7 +299,7 @@ def rebuild(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
 
 TASKS = (
     Task(
-        "notices",
+        "link_notices",
         reads=(
             *(
                 f"source_records.{column}"

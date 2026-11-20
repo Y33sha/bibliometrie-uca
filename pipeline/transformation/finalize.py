@@ -199,8 +199,8 @@ _PUBLICATIONS_IN_PERIMETER = Task(
 )
 
 
-_STRUCTURES = Task(
-    "structures",
+_REFRESH_STRUCTURE_VIEWS = Task(
+    "refresh_structure_views",
     reads=(
         "source_contribution_structures",
         "contributions.id",
@@ -334,7 +334,7 @@ _PUBLICATION_COUNTS = Task(
 _CHILDREN = (
     _PURGE_PUBLICATIONS,
     _PUBLICATIONS_IN_PERIMETER,
-    _STRUCTURES,
+    _REFRESH_STRUCTURE_VIEWS,
     Step(
         "publishing_cleanup",
         "publications → éditeur de chaque revue, référentiels de l'édition sans entrée vide",

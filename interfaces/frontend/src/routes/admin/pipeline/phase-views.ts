@@ -221,10 +221,10 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       ],
       rows: [
         { key: "serial_by_doi", label: "Rattachement à la publication en série (par DOI)" },
-        { key: "unary", label: "Corrections à l'unité" },
+        { key: "correct_source_records", label: "Corrections à l'unité" },
         { key: "doi_targets", label: "Cibles des DOI de formes secondaires" },
         { key: "remove_identifiers", label: "Retraits de DOI par confrontation de documents" },
-        { key: "matchable", label: "Mise à l'écart de la réconciliation" },
+        { key: "decide_matchability", label: "Mise à l'écart de la réconciliation" },
       ],
     },
     tables: [

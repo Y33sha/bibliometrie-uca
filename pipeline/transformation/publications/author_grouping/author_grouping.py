@@ -332,13 +332,13 @@ def build_contributions(
     return metrics
 
 
-def _build(ctx: PhaseContext) -> PhaseMetrics:
+def _align_source_contributions(ctx: PhaseContext) -> PhaseMetrics:
     """Recalcule les contributions des publications en file."""
     with ctx.open_tx() as conn:
         return build_contributions(conn, ctx.logger, rebuild=ctx.options.rebuild_author_grouping)
 
 
-def _attributes(ctx: PhaseContext) -> PhaseMetrics:
+def _recompute_contribution_attributes(ctx: PhaseContext) -> PhaseMetrics:
     """Recalcule les attributs des contributions en file. Les attributs ont leur propre file : l'affiliation d'une contribution source change sans changer sa contribution."""
     t0 = time.perf_counter()
     with (
@@ -356,7 +356,7 @@ def _attributes(ctx: PhaseContext) -> PhaseMetrics:
 
 _CHILDREN = (
     Task(
-        "build",
+        "align_source_contributions",
         reads=(
             "publications.id",
             "publication_contributions_queue",
@@ -401,10 +401,10 @@ _CHILDREN = (
             "persons",
             "source_contributions.neutralized_identifiers",
         ),
-        run=_build,
+        run=_align_source_contributions,
     ),
     Task(
-        "attributes",
+        "recompute_contribution_attributes",
         reads=(
             "contribution_attributes_queue",
             "aligned_source_contributions",
@@ -448,7 +448,7 @@ _CHILDREN = (
             "publications.doi",
             "publications.doc_type",
         ),
-        run=_attributes,
+        run=_recompute_contribution_attributes,
         section="Attributs des contributions",
     ),
 )
@@ -456,8 +456,8 @@ _CHILDREN = (
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques du recalcul des contributions, avec le nombre de contributions aux attributs mis à jour."""
-    metrics = by_task["build"]
-    metrics.details["attributes_updated"] = by_task["attributes"].updated
+    metrics = by_task["align_source_contributions"]
+    metrics.details["attributes_updated"] = by_task["recompute_contribution_attributes"].updated
     return metrics
 
 

@@ -9,7 +9,7 @@ La phase s'arrête en échec si le périmètre d'extraction ne contient aucune s
 5. **Résolution des adresses** (`affiliations.resolve_addresses`) : rattache les adresses aux structures connues.
 6. **Partenaires de thèse** (`affiliations.resolve_thesis_partners`) : rattache aux structures les PPN des laboratoires partenaires de thèse.
 7. **Pays** (`pipeline.transformation.countries.countries`) : pays des adresses, puis des contributions sources, des enregistrements sources et des publications.
-8. **Contributions sources du périmètre** (`affiliations.populate`) : pose sur chaque contribution source les indices de son entrée dans le périmètre, d'après les structures atteintes et les identifiants des personnes à fiche RH.
+8. **Contributions sources du périmètre** (`affiliations.decide_source_contribution_perimeter`) : pose sur chaque contribution source les indices de son entrée dans le périmètre, d'après les structures atteintes et les identifiants des personnes à fiche RH.
 """
 
 from __future__ import annotations
@@ -75,10 +75,10 @@ def _resolve_thesis_partners(ctx: PhaseContext) -> PhaseMetrics:
     return PhaseMetrics(report=f"{resolved} laboratoires partenaires rattachés sur {partners}")
 
 
-def _populate(ctx: PhaseContext) -> PhaseMetrics:
+def _decide_source_contribution_perimeter(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         perimeter_ids = set(get_persons_structure_ids_list(conn))
-        counts = populate(conn, ctx.logger, perimeter_ids)
+        counts = decide_source_contribution_perimeter(conn, ctx.logger, perimeter_ids)
     entered = quantity(counts.added, "contribution source entrée", "contributions sources entrées")
     metrics = PhaseMetrics(
         report=f"{entered} dans le périmètre, {counts.removed} {inflect(counts.removed, 'sortie')}"
@@ -90,7 +90,7 @@ def _populate(ctx: PhaseContext) -> PhaseMetrics:
     return metrics
 
 
-def populate(
+def decide_source_contribution_perimeter(
     conn: Connection, logger: logging.Logger, perimeter_ids: set[int]
 ) -> InPerimeterSyncCounts:
     """Pose sur les contributions sources les indices de leur entrée dans le périmètre. Renvoie le nombre d'entrées et de sorties du périmètre. L'appelant commite."""
@@ -216,8 +216,8 @@ _RESOLVE_THESIS_PARTNERS = Task(
 )
 
 
-_POPULATE = Task(
-    "populate",
+_DECIDE_SOURCE_CONTRIBUTION_PERIMETER = Task(
+    "decide_source_contribution_perimeter",
     reads=(
         "address_structures",
         "addresses.is_concatenated",
@@ -262,7 +262,7 @@ _POPULATE = Task(
         "source_contributions.neutralized_identifiers",
         "aligned_source_contributions",
     ),
-    run=_populate,
+    run=_decide_source_contribution_perimeter,
     section="Rattachement des structures aux auteurs des documents",
 )
 
@@ -284,7 +284,7 @@ _CHILDREN = (
         ),
     ),
     countries.STEP,
-    _POPULATE,
+    _DECIDE_SOURCE_CONTRIBUTION_PERIMETER,
 )
 
 
@@ -296,7 +296,9 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     metrics.details["summary"] = {
         **cast("dict[str, int]", metrics.details["summary"]),
         **countries.funnel(by_task),
-        **cast("dict[str, int]", by_task["populate"].details["summary"]),
+        **cast(
+            "dict[str, int]", by_task["decide_source_contribution_perimeter"].details["summary"]
+        ),
     }
     return metrics
 

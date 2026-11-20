@@ -111,7 +111,7 @@ _CHILDREN = (
         run=_reconcile,
     ),
     Task(
-        "consolidate",
+        "consolidate_publications",
         reads=(*_CONSOLIDATION_READS, "publications_queue"),
         writes=(*_CONSOLIDATION_WRITES, "publications_queue"),
         previous_run=_CONSOLIDATION_PREVIOUS_RUN,

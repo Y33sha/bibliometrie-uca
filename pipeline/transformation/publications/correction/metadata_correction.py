@@ -2,11 +2,11 @@
 
 Tâches (`pipeline.graph`), dans l'ordre du graphe :
 
-- **serial_by_doi** rattache la revue manquante désignée par l'espace de noms du DOI. Elle passe en premier : la correction unaire lit le type de la revue rattachée, et requalifie l'enregistrement source au même run.
-- **unary** applique à chaque enregistrement source les règles de correction (`correct_source_record`), et retire les identifiants et les liens des dépôts HAL introuvables.
+- **serial_by_doi** rattache la revue manquante désignée par l'espace de noms du DOI. Elle passe en premier : `correct_source_records` lit le type de la revue rattachée, et requalifie l'enregistrement source au même run.
+- **correct_source_records** applique à chaque enregistrement source les règles de correction (`correct_source_record`), et retire les identifiants et les liens des dépôts HAL introuvables.
 - **doi_targets** donne une cible au DOI des formes secondaires DataCite d'une œuvre présente en base.
 - **remove_identifiers** retire le DOI partagé par des œuvres distinctes (ouvrage et chapitre, volume d'actes et communication, enregistrement source d'une autre œuvre), et le DOI inconnu de doi.org.
-- **matchable** écarte de la réconciliation des enregistrements sources (`is_matchable`), d'après les valeurs corrigées.
+- **decide_matchability** écarte de la réconciliation des enregistrements sources (`is_matchable`), d'après les valeurs corrigées.
 
 Chaque tâche renvoie ses éléments examinés (`total`), mis à jour (`updated`), et son décompte par règle (`extras`).
 """
@@ -50,7 +50,7 @@ _CHILDREN = (
         run=in_transaction(serial_by_doi.run),
     ),
     Task(
-        "unary",
+        "correct_source_records",
         reads=(
             *(
                 f"source_records.{column}"
@@ -158,7 +158,7 @@ _CHILDREN = (
         run=in_transaction(remove_identifiers.run),
     ),
     Task(
-        "matchable",
+        "decide_matchability",
         reads=(
             *(
                 f"source_records.{column}"

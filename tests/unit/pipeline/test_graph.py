@@ -185,13 +185,15 @@ def test_la_resolution_des_adresses_suit_leur_nettoyage():
 
 def test_les_decomptes_de_sujets_ne_dependent_pas_des_publications():
     """Les décomptes lisent seulement `publication_subjects` : le périmètre des publications ne les concerne pas."""
-    deps = dependencies(ALL_TASKS)["subjects.usage"]
+    deps = dependencies(ALL_TASKS)["subjects.count_subject_usage"]
     assert "finalize.publications_in_perimeter" not in deps
 
 
 def test_les_vues_des_structures_suivent_la_purge_des_publications():
     """La purge supprime les contributions des publications purgées : les vues portent sur les contributions restantes."""
-    assert "finalize.purge_publications" in dependencies(ALL_TASKS)["finalize.structures"]
+    assert (
+        "finalize.purge_publications" in dependencies(ALL_TASKS)["finalize.refresh_structure_views"]
+    )
 
 
 def test_les_referentiels_vides_se_suppriment_monographies_puis_revues_puis_editeurs():

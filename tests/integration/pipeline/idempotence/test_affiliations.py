@@ -1,4 +1,4 @@
-"""Phase `affiliations` (`populate`) : indices de périmètre et structures des contributions sources, idempotence, marquages en aval."""
+"""Phase `affiliations` (`decide_source_contribution_perimeter`) : indices de périmètre et structures des contributions sources, idempotence, marquages en aval."""
 
 from infrastructure.db.queues import Queue
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
@@ -75,14 +75,14 @@ def _setup_affiliations_test_data(conn):
     refresh_perimeter_structures(conn)
 
 
-def _run_populate_affiliations(conn):
-    """Exécute `populate` sur la connexion du test."""
+def _run_perimeter_decision(conn):
+    """Exécute `decide_source_contribution_perimeter` sur la connexion du test."""
     import logging
 
     from infrastructure.read_models.perimeters.queries import get_persons_structure_ids
-    from pipeline.transformation.structures.affiliations import populate
+    from pipeline.transformation.structures.affiliations import decide_source_contribution_perimeter
 
-    populate(
+    decide_source_contribution_perimeter(
         conn,
         logging.getLogger("test"),
         get_persons_structure_ids(conn),
@@ -112,13 +112,13 @@ def _count_affiliations(conn) -> dict:
     return counts
 
 
-class TestPopulateAffiliationsIdempotence:
-    """`populate` lancé deux fois donne le même résultat."""
+class TestPerimeterDecisionIdempotence:
+    """`decide_source_contribution_perimeter` lancé deux fois donne le même résultat."""
 
     def test_double_run_same_counts(self, sa_sync_conn):
         _setup_affiliations_test_data(sa_sync_conn)
 
-        _run_populate_affiliations(sa_sync_conn)
+        _run_perimeter_decision(sa_sync_conn)
         counts_1 = _count_affiliations(sa_sync_conn)
 
         # La contribution source HAL, sans adresse, reste hors périmètre.
@@ -127,25 +127,27 @@ class TestPopulateAffiliationsIdempotence:
             "La contribution OA doit avoir des structure_ids"
         )
 
-        _run_populate_affiliations(sa_sync_conn)
+        _run_perimeter_decision(sa_sync_conn)
         counts_2 = _count_affiliations(sa_sync_conn)
 
         assert counts_2 == counts_1, (
             f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
         )
 
-    def test_populate_is_source_agnostic(self, sa_sync_conn):
-        """`populate` traite toutes les sources : une contribution source OpenAlex reçoit sa structure, même hors d'un run limité à OpenAlex."""
+    def test_perimeter_decision_is_source_agnostic(self, sa_sync_conn):
+        """`decide_source_contribution_perimeter` traite toutes les sources : une contribution source OpenAlex reçoit sa structure, même hors d'un run limité à OpenAlex."""
         import logging
 
         from sqlalchemy import text
 
         from infrastructure.read_models.perimeters.queries import get_persons_structure_ids
-        from pipeline.transformation.structures.affiliations import populate
+        from pipeline.transformation.structures.affiliations import (
+            decide_source_contribution_perimeter,
+        )
 
         _setup_affiliations_test_data(sa_sync_conn)
 
-        populate(
+        decide_source_contribution_perimeter(
             sa_sync_conn,
             logging.getLogger("test"),
             get_persons_structure_ids(sa_sync_conn),
@@ -195,7 +197,7 @@ class TestPopulateAffiliationsTheses:
         )
         insert_source_contribution_address(sa_sync_conn, 80003, address_id=80001)
 
-        _run_populate_affiliations(sa_sync_conn)
+        _run_perimeter_decision(sa_sync_conn)
 
         row = sa_sync_conn.execute(
             text(
@@ -227,7 +229,7 @@ class TestEntreeDansLePerimetre:
         _setup_affiliations_test_data(sa_sync_conn)
         self._orpheline(sa_sync_conn)
 
-        _run_populate_affiliations(sa_sync_conn)
+        _run_perimeter_decision(sa_sync_conn)
 
         assert _marked_for_reconciliation(sa_sync_conn, 80002) is True
 
@@ -235,7 +237,7 @@ class TestEntreeDansLePerimetre:
         _setup_affiliations_test_data(sa_sync_conn)
         clear(sa_sync_conn, Queue.SOURCE_RECORD_KEYS)
 
-        _run_populate_affiliations(sa_sync_conn)
+        _run_perimeter_decision(sa_sync_conn)
 
         assert _marked_for_reconciliation(sa_sync_conn, 80002) is False
 
@@ -247,7 +249,7 @@ class TestEntreeDansLePerimetre:
         align_unaligned(sa_sync_conn)
         clear(sa_sync_conn, Queue.CONTRIBUTION_ATTRIBUTES)
 
-        _run_populate_affiliations(sa_sync_conn)
+        _run_perimeter_decision(sa_sync_conn)
 
         contribution = sa_sync_conn.execute(
             text(
