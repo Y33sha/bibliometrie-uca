@@ -130,14 +130,15 @@ def _by_doi(target: Source) -> Task:
     """Renvoie la recherche par DOI dans `target`, source interrogeable par DOI."""
     return _channel(
         f"doi.{target}",
-        # DOI candidats de la vue `candidate_dois`, bornés à la fenêtre d'années du run par les enregistrements sources de leur publication, et agence d'enregistrement pour Crossref et DataCite.
+        # DOI candidats de la vue `candidate_dois`, bornés à la fenêtre d'années du run par les enregistrements sources de leur publication, privés des DOI inconnus de doi.org, et agence d'enregistrement pour Crossref et DataCite.
         reads=(
             "source_record_identifiers",
             "source_records.publication_year",
             "publication_relations",
+            "dois.registered",
             *(("doi_prefixes.ra",) if PROFILES[target].registration_agency else ()),
         ),
-        previous_run=("doi_prefixes", "publication_relations"),
+        previous_run=("doi_prefixes", "publication_relations", "dois"),
         network=target,
         identifier="DOI",
         run=lambda ctx, scope: _run_fetch_missing_doi(ctx, scope, target),
