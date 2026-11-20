@@ -33,6 +33,7 @@ PHASE_ORDER: tuple[str, ...] = (
     "subjects",
     "author_grouping",
     "persons",
+    "suspect_attributions",
     "finalize",
     "open_access",
 )

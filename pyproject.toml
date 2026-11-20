@@ -21,6 +21,7 @@ dependencies = [
     "pydantic-settings==2.16.2",
     "pyahocorasick==2.3.1",      # automate Aho-Corasick : matching multi-formes des adresses (phase affiliations)
     "defusedxml==0.7.1",         # lecture du TEI des enregistrements HAL, sans développer les entités XML
+    "igraph==1.0.0",             # partition de Leiden des publications d'une personne (phase suspect_attributions)
     "orjson>=3.13.0",
     "xxhash>=4.0.2",
 ]

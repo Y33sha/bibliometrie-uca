@@ -14,6 +14,7 @@ from enum import StrEnum
 
 from domain.persons.contribution_matching import (
     ContributionDecision,
+    ContributionMatchReason,
     ContributionOutcome,
     ContributionSkipReason,
 )
@@ -46,6 +47,16 @@ class ClueFamily(StrEnum):
 
 Clue = tuple[ClueFamily, int]
 
+CLUE_HAL_STRUCTURE_TYPES: frozenset[str] = frozenset(
+    {"laboratory", "researchteam", "department", "regrouplaboratory"}
+)
+"""Types des structures HAL de la famille `HAL_STRUCTURE`. Les établissements sont communs à trop de publications."""
+
+ANCHOR_MODES: frozenset[ContributionMatchReason] = frozenset(
+    {ContributionMatchReason.ORCID, ContributionMatchReason.MANUAL}
+)
+"""Modes de rattachement d'une contribution ancrée. ScanR attribue par IdRef et HAL par idHAL : ces modes sont sujets aux fausses attributions."""
+
 
 @dataclass(frozen=True)
 class PublicationClues:
@@ -53,7 +64,7 @@ class PublicationClues:
 
     contribution_id: int
     anchored: bool
-    """Contribution rattachée par ORCID ou épinglée : la publication est sûrement de la personne."""
+    """Contribution rattachée par un mode de `ANCHOR_MODES` : la publication est sûrement de la personne."""
     clues: frozenset[Clue]
 
 
