@@ -259,7 +259,6 @@ _DECIDE_SOURCE_CONTRIBUTION_PERIMETER = Task(
     previous_run=(
         "source_records.publication_id",
         "person_identifiers",
-        "source_contributions.neutralized_identifiers",
         "aligned_source_contributions",
     ),
     run=_decide_source_contribution_perimeter,

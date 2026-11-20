@@ -396,10 +396,9 @@ _CHILDREN = (
             "source_records.publication_id",
             # Marquages retirés par la tâche elle-même.
             "publication_contributions_queue",
-            # Personnes, identifiants, neutralisations et personnes des contributions, écrits par la phase `persons`.
+            # Personnes, identifiants et personnes des contributions, écrits par la phase `persons`.
             "person_identifiers",
             "persons",
-            "source_contributions.neutralized_identifiers",
         ),
         run=_align_source_contributions,
     ),

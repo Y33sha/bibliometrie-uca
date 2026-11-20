@@ -272,6 +272,12 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "unordered", label: "Liens par la ressemblance des noms hors de l'ordre" },
     ],
   },
+  identifier_arbitration: {
+    summary: [
+      { key: "identifiers_neutralized", label: "Identifiants portés sous le nom d'une autre personne, neutralisés" },
+      { key: "marked_contributions", label: "Contributions à redécider (identifiant neutralisé)" },
+    ],
+  },
   persons: {
     summary: [
       { key: "groups", label: "Contributions sans personne examinées" },
@@ -288,7 +294,6 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "skip:creation_not_allowed", label: "Contributions sans personne (rôles de jury seuls)" },
       { key: "skip:out_of_perimeter", label: "Contributions sans personne (hors périmètre)" },
       { key: "first_names_completed", label: "Prénoms complétés" },
-      { key: "identifiers_neutralized", label: "Identifiants portés sous le nom d'une autre personne, neutralisés" },
       { key: "ambiguous_marked", label: "Contributions à redécider (nom devenu ambigu)" },
       { key: "deleted_attributions", label: "Attributions d'identifiant supprimées" },
       { key: "deleted_persons", label: "Personnes supprimées" },

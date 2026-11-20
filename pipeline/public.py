@@ -22,6 +22,7 @@ PHASE_ORDER: tuple[str, ...] = (
     "fetch_stale",
     "fetch_truncated",
     "normalize",
+    "identifier_arbitration",
     "affiliations",
     "dois",
     "publishing",

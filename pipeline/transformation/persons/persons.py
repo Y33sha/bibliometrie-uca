@@ -1,4 +1,4 @@
-"""Phase `persons` : arbitrage des identifiants (`identifier_arbitration`), rattachement des contributions aux personnes (`contribution_resolution`), formes de nom (`populate_person_name_forms`), puis purge (`purge`). Chaque tâche a sa transaction."""
+"""Phase `persons` : rattachement des contributions aux personnes (`contribution_resolution`), formes de nom (`populate_person_name_forms`), puis purge (`purge`). Chaque tâche a sa transaction."""
 
 from __future__ import annotations
 
@@ -10,26 +10,9 @@ from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, infle
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.transformation.persons.contribution_resolution import resolve_contributions
-from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.metrics import build_metrics
 from pipeline.transformation.persons.populate_person_name_forms import populate
 from pipeline.transformation.persons.purge import purge
-
-
-def _arbitrate_identifiers(ctx: PhaseContext) -> PhaseMetrics:
-    with (
-        ctx.open_tx() as conn,
-        waiting(f"{BRANCH}en cours", ctx.logger) as line,
-    ):
-        counts = arbitrate_identifier_conflicts(conn)
-        line.erase()
-    neutralized = counts["neutralized"]
-    report = (
-        f"{quantity(neutralized, 'identifiant')} {inflect(neutralized, 'neutralisé')}"
-        if neutralized
-        else "rien à faire"
-    )
-    return PhaseMetrics(extras=counts, report=report)
 
 
 def _resolve_contributions(ctx: PhaseContext) -> PhaseMetrics:
@@ -94,41 +77,6 @@ _TIE_BREAK_PREVIOUS_RUN = ("publications.serial_id", "publications.publication_y
 
 
 _CHILDREN = (
-    Task(
-        "arbitrate_identifiers",
-        reads=(
-            "contributor_information",
-            "source_contributions.neutralized_identifiers",
-            "source_contributions.contributor_information_id",
-            "source_contributions.source",
-            "source_contributions.source_record_id",
-            "source_records.publication_id",
-            "contributions.id",
-            "contributions.person_id",
-            "contributions.resolution_mode",
-            "aligned_source_contributions",
-            "person_identifiers",
-        ),
-        writes=(
-            "source_contributions.neutralized_identifiers",
-            # Publications dont une contribution source change de neutralisation : leurs contributions sont à recalculer.
-            "publication_contributions_queue",
-            # Contributions rattachées par un identifiant neutralisé ou transféré, à redécider.
-            "contribution_resolution_queue",
-            "person_identifiers",
-        ),
-        previous_run=(
-            # Identifiants attribués par `resolve_contributions` et supprimés par `purge_persons` ; contributions rattachées par `resolve_contributions` et vidées par `purge_persons`.
-            "person_identifiers",
-            "contributions",
-            # Contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
-            "aligned_source_contributions",
-            "source_records.publication_id",
-        ),
-        run=_arbitrate_identifiers,
-        section="Conflits d'identifiants",
-        label="Identifiants portés sous le nom d'une autre personne",
-    ),
     Task(
         "resolve_contributions",
         reads=(
@@ -247,7 +195,6 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques de la phase, d'après les décomptes de ses tâches."""
     return build_metrics(
         resolution=by_task["resolve_contributions"].extras,
-        arbitration=by_task["arbitrate_identifiers"].extras,
         name_forms=by_task["populate_person_name_forms"].extras,
         purge=by_task["purge_persons"].extras,
     )

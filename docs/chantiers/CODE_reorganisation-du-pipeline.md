@@ -40,8 +40,8 @@ Le relevé montre aussi des phases qui réunissent des tâches indépendantes : 
 
 ### Phase 3 — Arbitrage des identifiants
 
-- [ ] Phase `identifier_arbitration` : `arbitrate_identifiers` quitte `persons` et passe juste après `normalize`.
-- [ ] Le bilan de `persons` perd celui de l'arbitrage, repris par la phase nouvelle.
+- [x] Phase `identifier_arbitration` : `arbitrate_identifiers` quitte `persons` et passe juste après `normalize`.
+- [x] Le bilan de `persons` perd celui de l'arbitrage, repris par la phase nouvelle avec sa vue dans l'administration.
 
 ### Phase 4 — Référentiels ROR et HAL, pays
 
