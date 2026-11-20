@@ -1,15 +1,12 @@
-"""Phase `affiliations` : structures, pays et indices de périmètre des contributions sources.
+"""Phase `affiliations` : structures et indices de périmètre des contributions sources.
 
 La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure. Ses tâches (`pipeline.graph`) ont chacune leur transaction :
 
-1. **Référentiel ROR** (`affiliations.refresh_ror`) : importe la dernière version du dump ROR, si elle reste à importer.
-2. **Référentiel des structures HAL** (`affiliations.refresh_hal_structures`) : charge les structures HAL citées et absentes du référentiel.
-3. **Origine des adresses** (`affiliations.classify_addresses`) : classe le texte des adresses sans origine en adresse brute, libellé HAL ou nom seul.
-4. **Adresses concaténées** (`affiliations.detect_concatenated_addresses`) : repère parmi les adresses non examinées celles qui réunissent plusieurs affiliations, chacune suivie des initiales de ses auteurs. Une adresse concaténée est sans indice de périmètre.
-5. **Résolution des adresses** (`affiliations.resolve_addresses`) : rattache les adresses aux structures connues.
-6. **Partenaires de thèse** (`affiliations.resolve_thesis_partners`) : rattache aux structures les PPN des laboratoires partenaires de thèse.
-7. **Pays** (`pipeline.transformation.countries.countries`) : pays des adresses, puis des contributions sources, des enregistrements sources et des publications.
-8. **Contributions sources du périmètre** (`affiliations.decide_source_contribution_perimeter`) : pose sur chaque contribution source les indices de son entrée dans le périmètre, d'après les structures atteintes et les identifiants des personnes à fiche RH.
+1. **Origine des adresses** (`affiliations.classify_addresses`) : classe le texte des adresses sans origine en adresse brute, libellé HAL ou nom seul.
+2. **Adresses concaténées** (`affiliations.detect_concatenated_addresses`) : repère parmi les adresses non examinées celles qui réunissent plusieurs affiliations, chacune suivie des initiales de ses auteurs. Une adresse concaténée est sans indice de périmètre.
+3. **Résolution des adresses** (`affiliations.resolve_addresses`) : rattache les adresses aux structures connues.
+4. **Partenaires de thèse** (`affiliations.resolve_thesis_partners`) : rattache aux structures les PPN des laboratoires partenaires de thèse.
+5. **Contributions sources du périmètre** (`affiliations.decide_source_contribution_perimeter`) : pose sur chaque contribution source les indices de son entrée dans le périmètre, d'après les structures atteintes et les identifiants des personnes à fiche RH.
 """
 
 from __future__ import annotations
@@ -24,22 +21,14 @@ from infrastructure.read_models.perimeters.queries import (
     get_persons_structure_ids_list,
 )
 from pipeline.graph import Block, Phase, Step, Task, in_transaction
-from pipeline.http.polite_pool import default_user_agent
-from pipeline.ingestion.complements.ror import ZenodoRorDumpSource
-from pipeline.ingestion.hal.api import HalStructuresClient
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
-from pipeline.transformation.countries import countries
 from pipeline.transformation.structures.address_concatenation import detect_concatenated_addresses
 from pipeline.transformation.structures.address_origin import classify_addresses
 from pipeline.transformation.structures.address_resolution import (
     run_resolution,
-)
-from pipeline.transformation.structures.hal_structures import (
-    HalStructureStore,
-    run_refresh_hal_structures,
 )
 from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
 from pipeline.transformation.structures.perimeter import check_extraction_perimeter
@@ -48,7 +37,6 @@ from pipeline.transformation.structures.perimeter_evidence import (
     refresh_source_contribution_structures,
     sync_perimeter_evidence,
 )
-from pipeline.transformation.structures.ror import RorStore, run_refresh_ror
 
 
 def _resolve_addresses(ctx: PhaseContext) -> PhaseMetrics:
@@ -99,60 +87,6 @@ def decide_source_contribution_perimeter(
         counts = sync_perimeter_evidence(conn, perimeter_ids=list(perimeter_ids))
         line.erase()
     return counts
-
-
-def _refresh_hal_structures(ctx: PhaseContext) -> PhaseMetrics:
-    """Charge le référentiel des structures HAL."""
-    with ctx.open_tx() as conn:
-        return run_refresh_hal_structures(
-            conn,
-            source=HalStructuresClient(),
-            store=HalStructureStore(conn),
-            logger=ctx.logger,
-            refresh_stale=ctx.options.policy.refresh_hal_structures,
-        )
-
-
-def _refresh_ror(ctx: PhaseContext) -> PhaseMetrics:
-    """Rafraîchit le référentiel ROR depuis le dump publié sur Zenodo."""
-    # Le dump est public : l'adresse du polite pool est facultative.
-    source = ZenodoRorDumpSource(user_agent=default_user_agent(), logger=ctx.logger)
-    with ctx.open_tx() as conn:
-        return run_refresh_ror(conn, source=source, store=RorStore(conn), logger=ctx.logger)
-
-
-_REFRESH_ROR = Task(
-    "refresh_ror",
-    reads=("ror_dump_imports", "source_contribution_rors"),
-    writes=(
-        "ror_organizations",
-        "ror_relations",
-        "ror_dump_imports",
-        # Dépendants d'une organisation qui change de pays.
-        "source_contribution_countries_queue",
-    ),
-    previous_run=("ror_dump_imports",),
-    network="zenodo",
-    run=_refresh_ror,
-    section="Référentiel ROR",
-)
-
-
-_REFRESH_HAL_STRUCTURES = Task(
-    "refresh_hal_structures",
-    reads=("source_contribution_hal_structures",),
-    writes=(
-        "hal_structures",
-        "hal_structure_relations",
-        "hal_structure_aliases",
-        # Contributions sources d'une structure qui change de pays.
-        "source_contribution_countries_queue",
-    ),
-    previous_run=("hal_structures", "hal_structure_aliases"),
-    network="hal",
-    run=_refresh_hal_structures,
-    section="Référentiel des structures HAL",
-)
 
 
 _CLASSIFY_ADDRESSES = Task(
@@ -271,30 +205,21 @@ _CHILDREN = (
         "structures",
         "adresses, identifiants ROR et HAL, partenaires de thèse → structures des contributions sources",
         (
-            Step(
-                "referentials",
-                "dump ROR, structures HAL citées → référentiels ROR et HAL à jour",
-                (_REFRESH_ROR, _REFRESH_HAL_STRUCTURES),
-            ),
             _CLASSIFY_ADDRESSES,
             _DETECT_CONCATENATED_ADDRESSES,
             _RESOLVE_ADDRESSES,
             _RESOLVE_THESIS_PARTNERS,
         ),
     ),
-    countries.STEP,
     _DECIDE_SOURCE_CONTRIBUTION_PERIMETER,
 )
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
-    """Renvoie les métriques de la résolution des adresses, avec les détails des deux référentiels, l'entonnoir des pays des adresses, et les entrées et sorties du périmètre."""
+    """Renvoie les métriques de la résolution des adresses, avec les entrées et sorties du périmètre."""
     metrics = by_task["resolve_addresses"]
-    metrics.details.update(by_task["refresh_ror"].details)
-    metrics.details.update(by_task["refresh_hal_structures"].details)
     metrics.details["summary"] = {
         **cast("dict[str, int]", metrics.details["summary"]),
-        **countries.funnel(by_task),
         **cast(
             "dict[str, int]", by_task["decide_source_contribution_perimeter"].details["summary"]
         ),
@@ -304,7 +229,7 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
 
 PHASE = Phase(
     "affiliations",
-    "Structures, pays et périmètre des contributions sources",
+    "Structures et périmètre des contributions sources",
     _CHILDREN,
     Block.SOURCE_RECORDS,
     check=check_extraction_perimeter,

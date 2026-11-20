@@ -45,9 +45,10 @@ Le relevé montre aussi des phases qui réunissent des tâches indépendantes : 
 
 ### Phase 4 — Référentiels ROR et HAL, pays
 
-- [ ] Phase `structure_referentials` : `refresh_ror` et `refresh_hal_structures` quittent `affiliations`.
-- [ ] Phase `countries` : les quatre tâches des pays quittent `affiliations`.
-- [ ] Bilan de chaque phase (`assemble`) et vues de l'administration : le référentiel ROR et l'entonnoir des pays quittent la vue de `affiliations`.
+- [x] Phase `structure_referentials` : `refresh_ror` et `refresh_hal_structures` quittent `affiliations`.
+- [x] Phase `countries` : les quatre tâches des pays quittent `affiliations`.
+- [x] Bilan de chaque phase (`assemble`) et vues de l'administration : l'entonnoir des pays quitte la vue de `affiliations` pour celle de `countries`. La vue `countries` d'une ancienne phase du même nom disparaît.
+- [x] Ordre des phases : `normalize`, `structure_referentials`, `dois`, `publishing`, `identifier_arbitration`, `affiliations`, `countries`, `metadata_correction`.
 
 ### Phase 5 — Blocs
 

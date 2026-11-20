@@ -17,6 +17,7 @@ from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation import finalize
+from pipeline.transformation.countries import countries
 from pipeline.transformation.dois import dois
 from pipeline.transformation.persons import arbitration, persons
 from pipeline.transformation.publications import open_access, publications
@@ -25,7 +26,7 @@ from pipeline.transformation.publications.correction import metadata_correction
 from pipeline.transformation.publications.relations import relations
 from pipeline.transformation.publications.subjects import subjects
 from pipeline.transformation.publishing import publishing
-from pipeline.transformation.structures import affiliations
+from pipeline.transformation.structures import affiliations, referentials
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
 PHASES: tuple[Phase, ...] = (
@@ -35,10 +36,12 @@ PHASES: tuple[Phase, ...] = (
     fetch_stale.PHASE,
     fetch_truncated.PHASE,
     normalize.PHASE,
-    arbitration.PHASE,
-    affiliations.PHASE,
+    referentials.PHASE,
     dois.PHASE,
     publishing.PHASE,
+    arbitration.PHASE,
+    affiliations.PHASE,
+    countries.PHASE,
     metadata_correction.PHASE,
     publications.PHASE,
     author_grouping.PHASE,
