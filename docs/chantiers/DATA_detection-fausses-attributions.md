@@ -43,6 +43,11 @@ Mesures de la phase 1 (`data/experiments/fausses-attributions/`). Jeu de validat
 - Détecteur amorcé par les clusters signalés du criblage (`amorce_cluster.py`) : 3 contributions suspectes de plus sur 2 615, dont 2 rattachées par ORCID. Sur le stock, les clusters réunissent déjà les fausses attributions. Le détecteur sert aux publications à venir.
 - Détection unifiée par clusters (`unifie.py`) : le graphe réunit les publications de la personne et k publications rejetées ; une publication est suspecte dans un cluster contenant une publication rejetée. À amorce égale, la cascade de départage donne dix fois moins de fausses alertes. Son rappel moyen par personne est meilleur dès k = 3 : 0,91 contre 0,87 pour k = 3, 0,96 contre 0,79 pour k = 10. Les clusters servent donc seulement aux personnes sans rejet.
 - Le criblage complet prend 50 secondes et 400 Mo.
+- Épreuve sur les données actuelles (`epreuve.py`). Chaque cluster signalé est vérifié par l'ORCID et les adresses de ses contributions sources, et par les périodes RH de la personne. 22 des 37 clusters sont des fausses attributions : 21 personnes, 143 publications. 13 clusters sont de vraies publications de la personne, 2 restent incertains.
+  - Fausses attributions : ORCID différent de celui de la personne, ou adresses hors d'Auvergne, le plus souvent dans une autre discipline.
+  - Vraies publications : adresses en Auvergne (10 clusters), ou thèses sans adresse (3 clusters).
+  - Témoins, tirés des clusters principaux : 1 ORCID différent et 14 adresses hors d'Auvergne sur 168 contributions.
+  - La cascade de départage signale 3 publications des personnes du jeu de validation : 2 de la personne, 1 incertaine.
 
 ## Décisions
 
