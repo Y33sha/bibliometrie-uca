@@ -91,24 +91,24 @@ class ContributionService:
     def assign_orphan_contribution(
         self, person_id: int, contribution_id: int, *, force: bool = False
     ) -> None:
-        """Attribue une contribution orpheline (sans personne) à une personne.
+        """Attribue à une personne une contribution sans personne, ou épingle une contribution déjà rattachée à elle.
 
         Si la paire (publication, personne) est rejetée, `force` retire d'abord le rejet (`_resolve_rejection`). La contribution est ensuite rattachée à la personne (`_attach_contributions`).
 
         Raises:
             RejectedPairError: paire rejetée, sans `force`.
             NotFoundError: personne ou contribution absente.
-            ConflictError: contribution déjà rattachée à une personne, ou personne qui a déjà une contribution manuelle dans la publication.
+            ConflictError: contribution rattachée à une autre personne, ou personne qui a déjà une contribution manuelle dans la publication.
         """
         self._require_person(person_id)
 
         contribution = next(iter(self._contributions.find_contributions([contribution_id])), None)
         if contribution is None:
             raise NotFoundError(f"Contribution #{contribution_id} introuvable")
-        if contribution["person_id"] is not None:
+        if contribution["person_id"] not in (None, person_id):
             raise ConflictError(
                 f"La contribution #{contribution_id} est déjà attribuée à la personne "
-                f"#{contribution['person_id']} ; seule une contribution orpheline peut être attribuée."
+                f"#{contribution['person_id']} : seule cette personne peut la recevoir."
             )
         manual = self._contributions.manual_contributions_of_person(
             person_id, [contribution["publication_id"]]
@@ -143,9 +143,9 @@ class ContributionService:
     def batch_assign_orphan_contributions(
         self, person_id: int, contribution_ids: list[int], *, force: bool = False
     ) -> int:
-        """Attribue en lot des contributions orphelines à une personne. Renvoie le nombre de contributions rattachées.
+        """Attribue en lot à une personne des contributions sans personne, ou épingle des contributions déjà rattachées à elle. Renvoie le nombre de contributions rattachées.
 
-        Une contribution absente, déjà rattachée, ou dans une publication où la personne a déjà une contribution manuelle est écartée du lot et journalisée. Le reste du lot est rattaché (`_attach_contributions`).
+        Une contribution absente, rattachée à une autre personne, ou dans une publication où la personne a déjà une contribution manuelle est écartée du lot et journalisée. Le reste du lot est rattaché (`_attach_contributions`).
 
         Les rejets se contrôlent sur toutes les publications du lot (`_resolve_rejection`). Sans `force`, une seule paire rejetée bloque le lot. Avec `force`, les rejets sont d'abord retirés.
 
@@ -158,19 +158,19 @@ class ContributionService:
 
         self._require_person(person_id)
 
-        orphans = [
+        assignable = [
             g
             for g in self._contributions.find_contributions(contribution_ids)
-            if g["person_id"] is None
+            if g["person_id"] in (None, person_id)
         ]
         manual = self._contributions.manual_contributions_of_person(
-            person_id, sorted({g["publication_id"] for g in orphans})
+            person_id, sorted({g["publication_id"] for g in assignable})
         )
-        contributions = [g for g in orphans if g["publication_id"] not in manual]
+        contributions = [g for g in assignable if g["publication_id"] not in manual]
         skipped = sorted(set(contribution_ids) - {g["id"] for g in contributions})
         if skipped:
             logger.warning(
-                "Rattachement à la personne %d : contributions absentes, déjà rattachées, ou dans une publication où la personne a déjà une contribution manuelle, écartées : %s",
+                "Rattachement à la personne %d : contributions absentes, rattachées à une autre personne, ou dans une publication où la personne a déjà une contribution manuelle, écartées : %s",
                 person_id,
                 skipped,
             )
