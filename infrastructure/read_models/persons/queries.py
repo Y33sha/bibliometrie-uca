@@ -4,7 +4,7 @@ Le package est organisé par thème, une classe par module :
 - `list` : liste, recherche, personne en administration, formes de nom
 - `facets` : facettes de la liste
 - `detail` : profil, thèses, adresses, tableau de bord, sujets
-- `admin` : contributions par forme de nom, files de triage des formes et des identifiants
+- `admin` : contributions par forme de nom, files de triage des formes, des identifiants et des attributions suspectes
 - `identifiers` : identifiants d'une personne, partagés par la liste et le profil
 
 `PersonsQueries` réunit ces classes.

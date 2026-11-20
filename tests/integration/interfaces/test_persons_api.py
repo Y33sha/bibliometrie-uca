@@ -519,6 +519,7 @@ class TestTriageQueues:
         "ambiguous-name-forms",
         "identifier-conflicts",
         "name-duplicates",
+        "suspect-attributions",
     )
 
     @pytest.mark.parametrize("queue", QUEUES)
@@ -540,6 +541,46 @@ class TestTriageQueues:
     def test_rejects_per_page_above_ceiling(self, client, queue):
         r = client.get(f"/api/persons/{queue}", params={"per_page": 500})
         assert r.status_code == 422
+
+
+class TestSuspectAttributions:
+    """La file des attributions suspectes groupe les contributions signalées encore rattachées à leur personne, hors épinglage."""
+
+    @staticmethod
+    def _flag(contribution: int, person: int) -> None:
+        with owner_pool() as cur:
+            cur.execute(
+                "INSERT INTO suspect_contributions VALUES (%s, %s, 'cluster', 1)",
+                (contribution, person),
+            )
+
+    @staticmethod
+    def _group(client, person: int) -> dict | None:
+        groups = client.get("/api/persons/suspect-attributions", params={"per_page": 200}).json()
+        return next((g for g in groups["groups"] if g["person"]["person_id"] == person), None)
+
+    def test_un_cluster_signale_apparait_avec_ses_publications(self, client):
+        person = seed_person(uniq("Suspect"), "Ec")
+        publication, contribution = _seed_perimeter_contribution(
+            person, "idref", raw_author_name="Ec Suspect"
+        )
+        self._flag(contribution, person)
+
+        group = self._group(client, person)
+
+        assert group is not None
+        assert (group["reason"], group["cluster"]) == ("cluster", 1)
+        assert [p["publication_id"] for p in group["publications"]] == [publication]
+        assert group["publications"][0]["resolution_mode"] == "idref"
+
+    def test_une_contribution_epinglee_sort_de_la_file(self, client):
+        person = seed_person(uniq("Confirme"), "Ec")
+        _, contribution = _seed_perimeter_contribution(
+            person, "manual", raw_author_name="Ec Confirme"
+        )
+        self._flag(contribution, person)
+
+        assert self._group(client, person) is None
 
 
 class TestPersonAdminProjection:

@@ -1232,6 +1232,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/persons/suspect-attributions/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suspect Attributions Count
+         * @description Renvoie le compteur de l'onglet « Attributions suspectes » (badge).
+         */
+        get: operations["suspect_attributions_count_api_persons_suspect_attributions_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/suspect-attributions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suspect Attributions
+         * @description Liste par page les attributions suspectes en attente, groupées par personne et par motif : cluster isolé de ses publications, ou publications proches des publications rejetées pour elle.
+         *
+         *     Les groupes sans contribution affiliée au périmètre viennent en tête. L'administration rejette un groupe (`detach-contributions`) ou le confirme par l'épinglage de ses contributions (`/contributions/orphans/batch-assign`).
+         */
+        get: operations["suspect_attributions_api_persons_suspect_attributions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/persons/mark-distinct": {
         parameters: {
             query?: never;
@@ -6624,6 +6666,31 @@ export interface components {
             /** Vocabularies */
             vocabularies: components["schemas"]["FacetOption"][];
         };
+        /** SuspectAttributionsResponse */
+        SuspectAttributionsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Groups */
+            groups: components["schemas"]["SuspectGroupOut"][];
+            /** Pages */
+            readonly pages: number;
+        };
+        /**
+         * SuspectGroupOut
+         * @description Attributions suspectes d'une personne, par motif : un cluster isolé, ou les publications proches des publications rejetées pour elle.
+         */
+        SuspectGroupOut: {
+            person: components["schemas"]["CurationPersonOut"];
+            reason: components["schemas"]["SuspectReason"];
+            /** Cluster */
+            cluster: number | null;
+            /** Publications */
+            publications: components["schemas"]["SuspectPublicationOut"][];
+        };
         /**
          * SuspectMergeOut
          * @description Publication de la file des fusions suspectes : moins de la moitié de ses contributions sources d'auteur ont un correspondant dans un autre enregistrement source.
@@ -6676,6 +6743,37 @@ export interface components {
             /** Pages */
             readonly pages: number;
         };
+        /**
+         * SuspectPublicationOut
+         * @description Publication d'une attribution suspecte, par la contribution de la personne.
+         */
+        SuspectPublicationOut: {
+            /** Contribution Id */
+            contribution_id: number;
+            /** Publication Id */
+            publication_id: number;
+            /** Title */
+            title: string;
+            /** Publication Year */
+            publication_year: number | null;
+            /** Container Title */
+            container_title: string | null;
+            /** Doi */
+            doi: string | null;
+            /** Resolution Mode */
+            resolution_mode: string;
+            /**
+             * Affiliated
+             * @description Contribution affiliée au périmètre par une adresse, un ROR ou une structure HAL de ses contributions sources.
+             */
+            affiliated: boolean;
+        };
+        /**
+         * SuspectReason
+         * @description Motif du signalement d'une contribution, valeur de `suspect_contributions.reason`.
+         * @enum {string}
+         */
+        SuspectReason: "cluster" | "rejected_publications";
         /** ThesesContributionOut */
         ThesesContributionOut: {
             /** Id */
@@ -8939,6 +9037,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NameDuplicatesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suspect_attributions_count_api_persons_suspect_attributions_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    suspect_attributions_api_persons_suspect_attributions_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuspectAttributionsResponse"];
                 };
             };
             /** @description Validation Error */
