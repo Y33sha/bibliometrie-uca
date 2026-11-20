@@ -28,10 +28,10 @@ Le relevé montre aussi des phases qui réunissent des tâches indépendantes : 
 
 ### Phase 1 — Statut open access en fin de run
 
-- [ ] `verify_unpaywall` choisit ses DOI parmi ceux des publications, hors DOI DataCite.
-- [ ] Tâche `recompute_oa_status` : statut open access des publications dont le verdict d'Unpaywall change. `verify_unpaywall` cesse de mettre ces publications dans `publications_queue`.
-- [ ] Phase `open_access`, après `finalize`, avec ses lectures et écritures déclarées, et sa vue dans l'administration du pipeline.
-- [ ] Tests : DOI choisis, statut recalculé sans consolidation.
+- [x] `verify_unpaywall` choisit ses DOI parmi ceux des publications, hors DOI DataCite.
+- [x] Tâche `recompute_oa_status` : statut open access de chaque publication, écrit quand il change. Le recalcul suit le verdict d'Unpaywall, la fin d'un embargo et le modèle open access de la revue. Mesure du 2026-11-20 : 58 s pour 79 210 publications, 9 statuts périmés. `verify_unpaywall` cesse de mettre des publications dans `publications_queue`.
+- [x] Phase `open_access`, après `finalize`, avec ses lectures et écritures déclarées, et sa vue dans l'administration du pipeline.
+- [x] Tests : verdicts écrits sans mise en file, statut recalculé sans consolidation.
 
 ### Phase 2 — Fin de `publishing`
 

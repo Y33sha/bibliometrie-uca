@@ -170,7 +170,7 @@ def _run(
     return task.run(_context(logger))
 
 
-def test_les_reponses_changees_mettent_leurs_publications_en_file(logger, http_mock):
+def test_les_verdicts_unpaywall_sont_ecrits_sans_mise_en_file(logger, http_mock):
     _route(http_mock, "10.1/a", status="gold")
     _route(http_mock, "10.1/b", status="green")
     _route(http_mock, "10.1/c", status="bronze")
@@ -187,8 +187,8 @@ def test_les_reponses_changees_mettent_leurs_publications_en_file(logger, http_m
         ("10.1/b", "green"),
         ("10.1/c", "bronze"),
     ]
-    # 10.1/a nouveau et 10.1/b modifié entrent en file ; 10.1/c inchangé reste hors file.
-    assert sorted(queries.enqueued) == ["10.1/a", "10.1/b"]
+    # La phase `open_access` recalcule le statut des publications : aucune n'entre en file.
+    assert queries.enqueued == []
     assert (metrics.total, metrics.new, metrics.updated, metrics.unchanged) == (3, 1, 1, 1)
     assert metrics.extras["not_found"] == 0
     [service] = metrics.details["services"]["rows"]
@@ -198,7 +198,7 @@ def test_les_reponses_changees_mettent_leurs_publications_en_file(logger, http_m
 
 
 def test_les_deux_services_ont_chacun_leur_ligne(logger):
-    resolution, unpaywall = lookups.TASKS
+    resolution, unpaywall = lookups.RESOLVE_DOIS, lookups.VERIFY_UNPAYWALL
     phase = dataclasses.replace(
         next(p for p in PHASES if p.name == "dois"),
         children=(
@@ -222,14 +222,23 @@ def test_les_deux_services_ont_chacun_leur_ligne(logger):
     ]
 
 
-def test_404_ecrit_un_verdict_nul_et_met_la_publication_en_file(logger, http_mock):
+def test_404_ecrit_un_verdict_nul(logger, http_mock):
     _route(http_mock, "10.1/x", http_status=404)
 
     queries = _FakeStore(["10.1/x"], stored={"10.1/x": "closed"})
     metrics = _run(queries, _make_fetcher(), logger)
     assert queries.answers == [("10.1/x", None)]
-    assert queries.enqueued == ["10.1/x"]
     assert (metrics.extras["not_found"], metrics.updated) == (1, 0)
+
+
+def test_les_reponses_changees_de_doi_org_mettent_leurs_publications_en_file(logger):
+    queries = _FakeStore(
+        ["10.1/a", "10.1/b", "10.1/c"],
+        stored={"10.1/b": "https://old.example.org/b", "10.1/c": "https://example.org/c"},
+    )
+    _run(queries, _answering("https://example.org/c"), logger, service=DOI_ORG)
+    # 10.1/a nouveau et 10.1/b modifié entrent en file ; 10.1/c inchangé reste hors file.
+    assert sorted(queries.enqueued) == ["10.1/a", "10.1/b"]
 
 
 def test_unavailable_leaves_doi_unchecked(logger, http_mock):
@@ -291,7 +300,7 @@ def test_skips_without_unpaywall_configuration(logger):
     """Sans configuration Unpaywall, l'accès à la source signale son absence et la tâche s'arrête avant toute transaction."""
     unconfigured = _FakeStore(["10.1/a"])
     open_tx = MagicMock(side_effect=_open_tx)
-    resolution, unpaywall = lookups.TASKS
+    resolution, unpaywall = lookups.RESOLVE_DOIS, lookups.VERIFY_UNPAYWALL
     phase = dataclasses.replace(
         next(p for p in PHASES if p.name == "dois"),
         children=(

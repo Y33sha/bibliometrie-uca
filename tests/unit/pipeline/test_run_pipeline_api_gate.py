@@ -95,7 +95,7 @@ def test_circuit_coupe_signale():
 
 
 def _run_lookups(credentials_missing) -> tuple[PhaseMetrics, list[lookups.DoiService]]:
-    """Exécute les interrogations de doi.org et d'Unpaywall de la phase `dois`, sans réseau ni base, et renvoie leurs métriques et les services interrogés."""
+    """Exécute les interrogations de doi.org et d'Unpaywall dans une même phase, sans réseau ni base, et renvoie leurs métriques et les services interrogés."""
     services = []
 
     def run(task, _ctx):
@@ -105,7 +105,7 @@ def _run_lookups(credentials_missing) -> tuple[PhaseMetrics, list[lookups.DoiSer
     phase = next(p for p in PHASES if p.name == "dois")
     with patch.object(lookups.DoiLookupTask, "run", autospec=True, side_effect=run):
         metrics = run_phase(
-            dataclasses.replace(phase, children=lookups.TASKS),
+            dataclasses.replace(phase, children=(lookups.RESOLVE_DOIS, lookups.VERIFY_UNPAYWALL)),
             phase_context(
                 RunOptions(),
                 credentials_missing=credentials_missing,

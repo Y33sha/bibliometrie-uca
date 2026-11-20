@@ -83,12 +83,14 @@ _CONSOLIDATION_WRITES = (
 
 _CONSOLIDATION_PREVIOUS_RUN = (
     "publications.id",
+    "publications.oa_status",
     "source_records.publication_id",
     "apc_payments.publication_id",
     "serials",
     "monographs",
+    "dois.unpaywall_oa_status",
 )
-"""Lectures du run précédent de la consolidation : publications supprimées, enregistrements sources et paiements APC détachés par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize`."""
+"""Lectures du run précédent de la consolidation : publications supprimées, enregistrements sources et paiements APC détachés par `finalize.purge_publications` ; revues et monographies vides supprimées par `finalize` ; verdict d'Unpaywall et statut open access écrits par la phase `open_access`."""
 
 _CHILDREN = (
     Task(

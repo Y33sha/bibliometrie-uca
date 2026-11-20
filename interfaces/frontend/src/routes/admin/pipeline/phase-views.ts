@@ -73,6 +73,22 @@ const DOI_SERVICES_TABLE: TableView = {
   ],
 };
 
+/** Vue de la phase `open_access`, et de la phase `oa_status` des runs passés. */
+const OA_STATUS_VIEW: PhaseView = {
+  tables: [
+    DOI_SERVICES_TABLE,
+    {
+      source: "table",
+      firstColumnLabel: "Statut OA",
+      columns: [
+        { key: "count", label: "Nombre", pct: true },
+        { key: "delta", label: "Δ", sign: true },
+      ],
+      total: true,
+    },
+  ],
+};
+
 export const PHASE_VIEWS: Record<string, PhaseView> = {
   harvest: {
     tables: [
@@ -323,18 +339,6 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       "{publications_updated} publications mises à jour",
     ],
   },
-  oa_status: {
-    tables: [
-      DOI_SERVICES_TABLE,
-      {
-        source: "table",
-        firstColumnLabel: "Statut OA",
-        columns: [
-          { key: "count", label: "Nombre", pct: true },
-          { key: "delta", label: "Δ", sign: true },
-        ],
-        total: true,
-      },
-    ],
-  },
+  oa_status: OA_STATUS_VIEW,
+  open_access: OA_STATUS_VIEW,
 };
