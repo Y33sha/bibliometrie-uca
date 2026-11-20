@@ -19,7 +19,7 @@ Dans une publication rejetée, la contribution au nom de la personne rejetée es
 
 Mesures du 2026-11-20 (`data/experiments/contributions-orphelines/`), chaque publication jugée sans tenir compte d'elle-même :
 
-- Profil de l'homonyme (`simulation_detection.py`), tiré des 589 contributions sans personne seules au nom de la personne dans leur publication : la cascade de départage du rattachement compare une publication au profil de la personne et à celui de l'homonyme. Elle désigne l'homonyme pour 571 des 589 publications rejetées, et pour 1 des 738 publications non rejetées des 19 personnes concernées. Le rappel suppose au moins deux ou trois rejets pour la personne.
+- Profil des publications rejetées (`simulation_detection.py`), tiré des 589 contributions sans personne seules au nom de la personne dans leur publication : la cascade de départage du rattachement compare une publication au profil de la personne et au profil des publications rejetées. Elle désigne le profil des publications rejetées pour 571 des 589 publications rejetées, et pour 1 des 738 publications non rejetées des 19 personnes concernées. Le rappel suppose au moins deux ou trois rejets pour la personne.
 - Aucun indice commun avec la personne (coauteur, laboratoire, structure HAL, revue) : 584 des 589 publications rejetées, 110 des 738 non rejetées. Parmi les publications non rejetées sans indice commun, la plupart partagent un sous-champ OpenAlex avec la personne ou sont sans sujet OpenAlex.
 - Clusters des publications d'une personne (`clusters_chercheurs.py`) : deux publications sont reliées si elles partagent un coauteur, un laboratoire, une structure HAL, une revue ou un thème OpenAlex ; un cluster est une composante connexe. 577 des 589 publications rejetées tombent dans des clusters sans publication non rejetée. Sur 1 225 personnes à fiche RH, 33 réunissent au moins deux clusters d'au moins trois publications, souvent de sous-champs sans rapport.
 
@@ -38,16 +38,16 @@ Mesures de la phase 1 (`data/experiments/fausses-attributions/`). Jeu de validat
 - Les composantes connexes signalent 559 publications rejetées : elles réunissent la personne et l'homonyme de même discipline. Louvain équivaut à Leiden. Sans les filtres d'ancrage et de conductance, Leiden découpe les publications de la personne en plusieurs clusters : 118 personnes signalées.
 - Apport des indices, hors de la personne à 493 paires : 243 des 301 publications rejetées signalées avec pondération par la rareté, 67 sans pondération, 66 sans coauteurs. Laboratoires, structures HAL et thèmes réduisent les signalements de clusters affiliés. Les domaines HAL de niveau 2 apportent peu, la revue rien, le facteur de taille de collaboration des coauteurs rien. Sous-champs, champs OpenAlex et domaines HAL de niveau 1 relient les clusters et font perdre des rejets.
 - Les 37 clusters signalés ont un cosinus des sous-champs inférieur à 0,3 avec le cluster principal. Ce critère sépare mal un chercheur pluridisciplinaire d'un homonyme.
-- Profil de comparaison (`profil_comparaison.py`). Un homonyme limité aux contributions sans personne attribue à la personne 137 des 139 publications épinglées sur un homonyme créé par l'administration, et 57 des 59 publications détenues par une autre personne à fiche RH. Un homonyme réunissant toutes les publications rejetées, quel que soit le détenteur de la contribution, en désigne 132 et 55. Fausses alertes : 3 des 1 314 publications acceptées.
+- Profil de comparaison (`profil_comparaison.py`). Un profil limité aux contributions sans personne attribue à la personne 137 des 139 publications épinglées sur un homonyme créé par l'administration, et 57 des 59 publications détenues par une autre personne à fiche RH. Un profil réunissant toutes les publications rejetées, quel que soit le détenteur de la contribution, en désigne 132 et 55. Fausses alertes : 3 des 1 314 publications acceptées. Les personnes de nom compatible ajoutées comme concurrentes apportent peu.
 - Détecteur amorcé par k publications rejetées (`amorce.py`) : rappel moyen par personne 0,53 pour k = 1, 0,71 pour 2, 0,91 pour 3, 0,93 pour 5. Fausses alertes : au plus 4 sur 4 050.
 - Détecteur amorcé par les clusters signalés du criblage (`amorce_cluster.py`) : 3 contributions suspectes de plus sur 2 615, dont 2 rattachées par ORCID. Sur le stock, les clusters réunissent déjà les fausses attributions. Le détecteur sert aux publications à venir.
 - Le criblage complet prend 50 secondes et 400 Mo.
 
 ## Décisions
 
-- L'homonyme d'une personne rejetée est une fiche de personne exclue hors périmètre, qui réunit les publications rejetées pour la personne. Il reste hors du rattachement par le nom : il sert seulement de profil de comparaison.
+- Le profil de comparaison d'une personne réunit les publications rejetées pour elle, quel que soit le détenteur de la contribution à son nom. Il se calcule à la demande depuis les rejets.
 - La détection signale à l'administration, qui décide. Aucun détachement automatique.
-- Les clusters amorcent l'homonyme d'une personne sans rejet : l'administration rejette un cluster entier.
+- Pour une personne sans rejet, l'administration rejette un cluster signalé entier : ses publications amorcent le profil de comparaison.
 
 ## Phasage
 
@@ -69,19 +69,13 @@ Scripts de mesure dans `data/experiments/`, sans code du pipeline. Jeu de valida
 - [ ] Calcul des clusters des personnes pour l'administration.
 - [ ] Onglet « Homonymes probables » de l'administration : personnes à plusieurs clusters, sous-champs de chaque cluster, rejet d'un cluster entier.
 
-### Phase 3 — Homonyme des personnes rejetées
+### Phase 3 — Attributions suspectes
 
-- [ ] Migration : colonne `persons.homonym_of`.
-- [ ] Tâche du pipeline : dans une publication rejetée pour une personne, la seule contribution sans personne au nom de la personne rejoint l'homonyme, créé au besoin. Une contribution dont le rejet a disparu perd l'homonyme. Code de départ : commit 0b1be1d1a, sans le rattachement par le nom.
-- [ ] Fusion de personnes : l'homonyme de la personne absorbée devient celui de la personne conservée.
-
-### Phase 4 — Attributions suspectes
-
-- [ ] Détecteur : une publication rattachée à une personne qui a un homonyme, hors épinglage, est suspecte quand la cascade de départage désigne l'homonyme.
+- [ ] Détecteur : une publication rattachée à une personne, hors épinglage, est suspecte quand la cascade de départage désigne le profil des publications rejetées pour la personne.
 - [ ] Onglet « Attributions suspectes » de l'administration : rejet ou confirmation d'un clic.
 - [ ] Mesure sur le stock, puis relecture des alertes.
 
-### Phase 5 — Documentation
+### Phase 4 — Documentation
 
 - [ ] Mise à jour de la documentation du rattachement des personnes et de l'administration.
 
