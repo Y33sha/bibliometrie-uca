@@ -82,16 +82,16 @@ Scripts de mesure dans `data/experiments/`, sans code du pipeline. Jeu de valida
 
 ### Phase 3 — Détection
 
-- [ ] Dépendance `igraph`.
-- [ ] Règle du domaine : graphe pondéré des publications d'une personne, partition de Leiden, clusters signalés.
-- [ ] Migration : table `persons.suspect_contributions`.
-- [ ] Phase du pipeline après `persons` : clusters signalés des personnes à fiche RH, publications des personnes ayant un rejet désignées par la cascade de départage.
+- [x] Dépendance `igraph`.
+- [x] Règle du domaine : graphe pondéré des publications d'une personne, partition de Leiden, clusters signalés.
+- [x] Migration : table `persons.suspect_contributions`.
+- [x] Phase du pipeline après `persons` : clusters signalés des personnes à fiche RH, publications des personnes ayant un rejet désignées par la cascade de départage.
 
 ### Phase 4 — File de l'administration
 
-- [ ] Attribution d'une contribution déjà rattachée à la personne visée : épinglage.
-- [ ] API : compteur et liste de la file, par personne puis par cluster, clusters sans adresse en Auvergne en tête.
-- [ ] Onglet « Attributions suspectes » des files de triage des personnes : rejet ou confirmation d'un cluster ou d'une publication.
+- [x] Attribution d'une contribution déjà rattachée à la personne visée : épinglage.
+- [x] API : compteur et liste de la file, par personne puis par cluster, groupes sans contribution affiliée au périmètre en tête.
+- [x] Onglet « Attributions suspectes » des files de triage des personnes : rejet ou confirmation d'un cluster ou d'une publication.
 - [ ] Mesure sur le stock, puis relecture des alertes.
 
 ### Phase 5 — Indices supplémentaires
