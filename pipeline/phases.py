@@ -1,6 +1,6 @@
 """Phases du pipeline, dans l'ordre d'exécution. Le module de chaque phase la déclare (`PHASE`) : libellé, bloc, étapes et tâches, condition, précondition, métriques.
 
-Chaque phase appartient à un bloc (`Block`). Les enrichissements viennent en dernier. Chacun est indépendant des autres. `fetch_missing` et `dois`, placées avant eux, lisent les relations au run suivant.
+Chaque phase appartient à un bloc (`Block`). L'ordre suit les dépendances entre tâches. `fetch_missing` et `dois` lisent au run suivant les relations écrites par la phase `relations`.
 """
 
 from dataclasses import replace

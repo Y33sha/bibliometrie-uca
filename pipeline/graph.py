@@ -166,12 +166,11 @@ def interface(children: Iterable[Step | Task]) -> tuple[frozenset[str], frozense
 class Block(StrEnum):
     """Bloc du premier niveau de l'arborescence du pipeline. Il regroupe les phases à l'affichage, sans effet sur l'exécution."""
 
-    HARVESTING = "Moissonnage"
+    HARVESTING = "Moissonnage et normalisation"
+    REFERENTIALS = "Référentiels"
     SOURCE_RECORDS = "Enregistrements sources"
     ENTITIES = "Entités"
     DERIVED_DATA = "Données dérivées"
-    ENRICHMENTS = "Enrichissements"
-    """Phases hors résolution d'entités : `--no-extras` les omet."""
 
 
 @dataclass(frozen=True)
@@ -189,12 +188,9 @@ class Phase:
     """Précondition, vérifiée avant les tâches : lève une exception si elle n'est pas remplie."""
     assemble: Callable[[Mapping[str, PhaseMetrics]], PhaseMetrics] | None = None
     """Métriques de la phase, d'après celles de ses tâches exécutées, par nom de tâche. `None` : leur somme."""
+    total_line: bool = False
+    """Après plusieurs tâches exécutées, le journal de la phase se termine par la ligne « Total », somme de leurs bilans."""
 
     @property
     def tasks(self) -> tuple[Task, ...]:
         return leaves(self.children)
-
-    @property
-    def extra(self) -> bool:
-        """Enrichissement : `--no-extras` omet la phase."""
-        return self.block is Block.ENRICHMENTS

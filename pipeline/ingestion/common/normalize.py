@@ -342,6 +342,6 @@ PHASE = Phase(
     "normalize",
     "Normalisation des documents bruts",
     _CHILDREN,
-    Block.SOURCE_RECORDS,
+    Block.HARVESTING,
     assemble=assemble,
 )

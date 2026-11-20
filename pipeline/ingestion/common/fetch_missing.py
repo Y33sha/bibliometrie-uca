@@ -241,4 +241,5 @@ PHASE = Phase(
     _CHILDREN,
     Block.HARVESTING,
     assemble=assemble,
+    total_line=True,
 )

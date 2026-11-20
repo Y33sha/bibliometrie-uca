@@ -115,4 +115,5 @@ PHASE = Phase(
     Block.HARVESTING,
     check=check_extraction_perimeter,
     assemble=assemble,
+    total_line=True,
 )

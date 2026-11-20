@@ -90,6 +90,6 @@ PHASE = Phase(
     "structure_referentials",
     "Référentiels ROR et HAL",
     (REFRESH_ROR, REFRESH_HAL_STRUCTURES),
-    Block.SOURCE_RECORDS,
+    Block.REFERENTIALS,
     assemble=assemble,
 )

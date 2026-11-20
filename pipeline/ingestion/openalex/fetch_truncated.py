@@ -101,4 +101,5 @@ PHASE = Phase(
     "Complétion des listes d'auteurs OpenAlex tronquées",
     _CHILDREN,
     Block.HARVESTING,
+    total_line=True,
 )

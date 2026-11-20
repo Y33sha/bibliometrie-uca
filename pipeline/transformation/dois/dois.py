@@ -13,6 +13,6 @@ PHASE = Phase(
     "dois",
     "Référentiel des DOI",
     (*registration_agencies.TASKS, lookups.RESOLVE_DOIS),
-    Block.SOURCE_RECORDS,
+    Block.REFERENTIALS,
     assemble=lookups.assemble,
 )

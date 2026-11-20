@@ -68,4 +68,5 @@ PHASE = Phase(
     _CHILDREN,
     Block.HARVESTING,
     when=lambda ctx: ctx.options.policy.harvest_by_person,
+    total_line=True,
 )

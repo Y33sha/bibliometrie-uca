@@ -179,12 +179,6 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Exécuter uniquement cette phase",
     )
     parser.add_argument(
-        "--no-extras",
-        action="store_true",
-        help="Omettre les enrichissements terminaux "
-        f"({', '.join(phase.name for phase in PHASES if phase.extra)})",
-    )
-    parser.add_argument(
         "--mode", choices=list(MODE_NAMES), default="full", help="Mode d'exécution (défaut: full)"
     )
     parser.add_argument(
@@ -221,16 +215,10 @@ def _run_options(args: argparse.Namespace) -> RunOptions:
 
 
 def _select_phases_to_run(args: argparse.Namespace) -> list[Phase]:
-    """Renvoie les phases à exécuter selon `--only` ou `--from` (sinon toutes), moins les enrichissements avec `--no-extras`.
-
-    Une phase nommée par `--only` est renvoyée même si c'est un enrichissement.
-    """
+    """Renvoie les phases à exécuter selon `--only` ou `--from`, sinon toutes."""
     if args.only:
         return [phase for phase in PHASES if phase.name == args.only]
-    selected = list(PHASES[PHASE_NAMES.index(args.from_phase) :] if args.from_phase else PHASES)
-    if args.no_extras:
-        selected = [phase for phase in selected if not phase.extra]
-    return selected
+    return list(PHASES[PHASE_NAMES.index(args.from_phase) :] if args.from_phase else PHASES)
 
 
 def _run_title(args: argparse.Namespace, phases: list[Phase]) -> list[str]:
@@ -246,8 +234,6 @@ def _run_title(args: argparse.Namespace, phases: list[Phase]) -> list[str]:
 
     if args.only or args.from_phase:
         settings += setting("phases", ", ".join(phase.name for phase in phases))
-    elif args.no_extras:
-        settings += setting("phases", "sans les enrichissements terminaux")
 
     options = [flag.banner for flag in _RUN_FLAGS if flag.banner and getattr(args, flag.dest)]
     if options:

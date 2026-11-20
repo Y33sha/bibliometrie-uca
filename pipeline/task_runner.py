@@ -11,7 +11,7 @@ from collections.abc import Mapping, Sequence
 from functools import partial
 from itertools import pairwise
 
-from pipeline.graph import Block, Phase, Step, Task, leaves
+from pipeline.graph import Phase, Step, Task, leaves
 from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
@@ -212,7 +212,7 @@ def _outcome(metrics: PhaseMetrics) -> str:
 def run_phase(phase: Phase, ctx: PhaseContext) -> PhaseMetrics:
     """Exécute les tâches d'une phase et renvoie les métriques de la phase.
 
-    Une phase de moissonnage qui a exécuté plusieurs tâches se termine par la ligne « Total », somme de leurs bilans.
+    Une phase à `total_line` qui a exécuté plusieurs tâches se termine par la ligne « Total », somme de leurs bilans.
     """
     if phase.when is not None and not phase.when(ctx):
         ctx.logger.info("%sSautée", LAST_BRANCH)
@@ -226,7 +226,7 @@ def run_phase(phase: Phase, ctx: PhaseContext) -> PhaseMetrics:
         metrics = PhaseMetrics()
         for task_metrics in by_task.values():
             metrics.merge(task_metrics)
-    if phase.block is Block.HARVESTING and len(by_task) > 1:
+    if phase.total_line and len(by_task) > 1:
         ctx.logger.info("")
         ctx.logger.info("Total : %s", metrics.as_summary())
     return metrics

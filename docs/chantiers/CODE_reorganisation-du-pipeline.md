@@ -52,8 +52,9 @@ Le relevé montre aussi des phases qui réunissent des tâches indépendantes : 
 
 ### Phase 5 — Blocs
 
-- [ ] `Block` : blocs « Moissonnage et normalisation », « Référentiels », « Enregistrements sources », « Entités », « Données dérivées ». `normalize` rejoint le premier, `relations` et `subjects` le dernier.
-- [ ] Suppression de `--no-extras` et de `Phase.extra`.
+- [x] `Block` : blocs « Moissonnage et normalisation », « Référentiels », « Enregistrements sources », « Entités », « Données dérivées ». `normalize` rejoint le premier, `relations` et `subjects` le dernier.
+- [x] La ligne « Total » des phases de moissonnage suit l'attribut `Phase.total_line`, sans lien avec le bloc : `normalize` n'en a pas.
+- [x] Suppression de `--no-extras` et de `Phase.extra`.
 
 ### Phase 6 — Documentation
 

@@ -85,4 +85,5 @@ PHASE = Phase(
     Block.HARVESTING,
     when=lambda ctx: ctx.options.policy.fetch_stale,
     assemble=assemble,
+    total_line=True,
 )

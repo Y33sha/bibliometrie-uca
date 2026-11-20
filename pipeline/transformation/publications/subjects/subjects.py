@@ -57,5 +57,5 @@ PHASE = Phase(
     "subjects",
     "Sujets des publications",
     _CHILDREN,
-    Block.ENRICHMENTS,
+    Block.DERIVED_DATA,
 )

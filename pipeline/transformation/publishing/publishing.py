@@ -671,6 +671,6 @@ PHASE = Phase(
     "publishing",
     "Référentiels de l'édition",
     _CHILDREN,
-    Block.SOURCE_RECORDS,
+    Block.REFERENTIALS,
     assemble=assemble,
 )
