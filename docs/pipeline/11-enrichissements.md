@@ -1,6 +1,11 @@
-# Enrichissements
+# Statut open access, relations et sujets
 
-*À jour le 2026-11-17.*
+*À jour le 2026-11-20.*
+
+## Statut open access (`open_access`)
+
+- **`verify_unpaywall`** — demande à [Unpaywall](../glossaire.md#unpaywall) le statut open access du DOI de chaque publication, hors DOI DataCite. Unpaywall reçoit seulement les DOI sans verdict, ou à verdict plus ancien que `unpaywall_recheck_after_days` (15 jours), dans la limite de `unpaywall_max_per_run` (10 000) par exécution. Quand le service est indisponible, le DOI est repris au run suivant.
+- **`recompute_oa_status`** — recalcule le statut open access de chaque publication, et écrit les statuts qui changent : verdict d'Unpaywall, fin d'un embargo, modèle open access de la revue.
 
 ## Relations entre publications (`relations`)
 

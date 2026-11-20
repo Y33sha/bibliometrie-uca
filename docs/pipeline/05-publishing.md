@@ -1,23 +1,14 @@
 # Référentiel des DOI et référentiels de l'édition
 
-*À jour le 2026-11-16.*
+*À jour le 2026-11-20.*
 
 ## Référentiel des DOI (`dois`)
 
-La phase `dois` suit les affiliations. Elle tient les faits obtenus sur chaque DOI connu, lus par le moissonnage, l'édition, la correction et la consolidation des publications. Les DOI connus sont les DOI actifs des enregistrements sources et les cibles des relations (vue `known_dois`), plus la forme sans version de chaque DOI à suffixe de version.
+La phase `dois` suit les référentiels ROR et HAL. Elle tient les faits obtenus sur chaque DOI connu, lus par le moissonnage, l'édition, la correction et la consolidation des publications. Les DOI connus sont les DOI actifs des enregistrements sources et les cibles des relations (vue `known_dois`), plus la forme sans version de chaque DOI à suffixe de version.
 
 - **`resolve_prefixes`** — demande à doi.org l'agence d'enregistrement de chaque préfixe nouveau, et l'enregistre dans `doi_prefixes` : Crossref, DataCite ou inconnue. La recherche des documents manquants ([fetch_missing](02-harvest.md#documents-absents-dune-source-fetch_missing)) adresse ensuite chaque DOI à l'API de son agence.
 - **`resolve_dois`** — demande à l'API des handles de doi.org l'existence et l'URL de résolution de chaque DOI connu (`dois.registered`, `dois.registered_url`). Un DOI inconnu de doi.org sort de la recherche des documents manquants, et la correction le retire des enregistrements sources.
-- **`verify_unpaywall`** — demande à [Unpaywall](../glossaire.md#unpaywall) le statut open access de chaque DOI candidat au DOI d'une publication, hors DOI DataCite. Les DOI candidats suivent la règle des ancres de la [réconciliation](07-publications.md#regrouper-puis-rattacher), sauf les DOI qui ont une cible.
-
-Les publications d'un DOI dont une réponse change entrent dans la file de consolidation. Chaque service reçoit seulement les DOI sans réponse de sa part, ou à réponse plus ancienne que son délai, dans la limite de son plafond par exécution. Ces réglages se modifient dans `admin/config`.
-
-| Service | Plafond | Délai |
-|---|---|---|
-| doi.org | `doi_resolution_max_per_run`, 10 000 | `doi_resolution_recheck_after_days`, 180 jours |
-| Unpaywall | `unpaywall_max_per_run`, 10 000 | `unpaywall_recheck_after_days`, 15 jours |
-
-Quand le service est indisponible, le DOI est repris au run suivant.
+Les publications d'un DOI dont la réponse change entrent dans la file de consolidation. doi.org reçoit seulement les DOI sans réponse, ou à réponse plus ancienne que `doi_resolution_recheck_after_days` (180 jours), dans la limite de `doi_resolution_max_per_run` (10 000) par exécution. Ces réglages se modifient dans `admin/config`. Quand le service est indisponible, le DOI est repris au run suivant.
 
 ## Référentiels de l'édition (`publishing`)
 
@@ -47,13 +38,16 @@ Ces deux étapes corrigent aussi l'agence d'un préfixe inconnu de doi.org, trou
    - **`type_proceedings_serials`** — type en recueil d'actes les revues composées surtout d'articles de congrès, et les revues sans ISSN au titre nommant une édition datée ou des actes (« proceedings »).
    - **`type_journal_serials`** — type en revue les entrées de type inconnu composées en majorité d'articles.
    - **`enrich_serials_from_doaj`** — importe l'export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj) : fiche DOAJ de chaque revue, rattachée par ISSN. Une entrée de type inconnu présente dans le DOAJ devient une revue. Une revue du Diamond Discovery Hub, ou du DOAJ sans APC ni autres frais, est classée diamant.
-- **`learn_serial_doi_namespaces`** — calcule les espaces de noms DOI qui désignent une revue (`10.1016/j.physletb.`), d'après les DOI de ses enregistrements sources (`domain/serials/doi_namespaces.py`).
-
 ### Monographies
 
 - **`attach_monographs`** — rattache chaque enregistrement source qui décrit un volume à sa monographie (`domain/monographs/attachment.py`). Plusieurs monographies d'un même volume fusionnent dans la plus ancienne. Un volume sans monographie en crée une.
 - **`link_monographs_to_collections`** — rattache chaque monographie à sa collection, ou à une série formée des volumes de même titre chez le même éditeur (`domain/serials/series.py`, `domain/monographs/collection.py`).
 - **`type_proceedings_volumes`** — distingue les volumes d'actes des livres (`domain/monographs/proceedings.py`).
+
+### Espaces de noms DOI
+
+- **`learn_serial_doi_namespaces`** — calcule les espaces de noms DOI qui désignent une revue (`10.1016/j.physletb.`), d'après les DOI de ses enregistrements sources (`domain/serials/doi_namespaces.py`). Une collection de livres est sans espace de noms : la suite du DOI désigne le livre.
+- **`serial_by_doi`** — renseigne `serial_id` lorsqu'il est vide et que les DOI actifs de l'enregistrement source tombent dans l'espace de noms d'une seule revue. Les DOI de serveur de preprints restent hors du rattachement : la discussion d'un article Copernicus partage l'espace de noms de sa revue.
 
 ## Import manuel d'un export DOAJ
 

@@ -53,33 +53,42 @@
 
 ## Phases du pipeline
 
-A jour au 2026-11-16. `uv run python -m interfaces.cli.dev.pipeline_tree` affiche l'arborescence complète (blocs, phases, étapes, tâches).
+A jour au 2026-11-20. L'ordre suit les dépendances entre tâches. `uv run python -m interfaces.cli.dev.pipeline_tree` affiche l'arborescence complète (blocs, phases, étapes, tâches).
 
-Moissonnage
-`harvest` — Moissonnage par affiliation (HAL, OpenAlex, WoS, ScanR, theses.fr, DataCite, INSPIRE-HEP, OPS)
-`harvest_by_person` — Moissonnage par identifiant des personnes RH (ORCID, idHAL, IdRef)
-`fetch_missing` — Recherche dans chaque source des documents trouvés dans une autre (hal-id, NNT, numéro de brevet, DOI), sources en parallèle
-`fetch_stale` — Recherche des documents non revus par le moissonnage
-`fetch_truncated` — Complétion des listes d'auteurs OpenAlex tronquées
+Moissonnage et normalisation
+
+- `harvest` — Moissonnage par affiliation (HAL, OpenAlex, WoS, ScanR, theses.fr, DataCite, INSPIRE-HEP, OPS)
+- `harvest_by_person` — Moissonnage par identifiant des personnes RH (ORCID, idHAL, IdRef)
+- `fetch_missing` — Recherche dans chaque source des documents trouvés dans une autre (hal-id, NNT, numéro de brevet, DOI), sources en parallèle
+- `fetch_stale` — Recherche des documents non revus par le moissonnage
+- `fetch_truncated` — Complétion des listes d'auteurs OpenAlex tronquées
+- `normalize` — Normalisation staging → source_records, source_contributions, addresses
+
+Référentiels
+
+- `structure_referentials` — Référentiels ROR et HAL
+- `dois` — Référentiel des DOI : agence des préfixes, existence et URL chez doi.org
+- `publishing` — Référentiels de l'édition : préfixes DOI, éditeurs, publications en série, monographies, espaces de noms DOI des revues
 
 Enregistrements sources
-`normalize` — Normalisation staging → source_records, source_contributions, addresses
-`affiliations` — Structures, pays et périmètre des contributions sources
-`dois` — Référentiel des DOI : agence des préfixes, existence et URL chez doi.org, verdict d'Unpaywall
-`publishing` — Référentiels de l'édition : préfixes DOI, éditeurs, publications en série, monographies
-`metadata_correction` — Correction des enregistrements sources
+
+- `identifier_arbitration` — Arbitrage des identifiants de personne
+- `affiliations` — Structures et périmètre des contributions sources
+- `countries` — Pays des adresses et des enregistrements sources
+- `metadata_correction` — Correction des enregistrements sources
 
 Entités
-`publications` — Rattachement des enregistrements sources aux publications, puis consolidation de la file `publications_queue`
-`author_grouping` — Alignement des auteurs d'une publication entre ses sources
-`persons` — Rattachement des contributions aux personnes
+
+- `publications` — Rattachement des enregistrements sources aux publications, puis consolidation de la file `publications_queue`
+- `author_grouping` — Alignement des auteurs d'une publication entre ses sources
+- `persons` — Rattachement des contributions aux personnes
 
 Données dérivées
-`finalize` — Périmètre des publications, purges, vues des structures, nettoyage des référentiels de l'édition, compteurs
 
-Enrichissements (`--no-extras` les omet)
-`relations` — Relations entre publications
-`subjects` — Sujets des publications
+- `finalize` — Périmètre des publications, purges, vues des structures, nettoyage des référentiels de l'édition, compteurs
+- `open_access` — Verdict d'Unpaywall sur le DOI des publications, statut open access des publications
+- `relations` — Relations entre publications
+- `subjects` — Sujets des publications
 
 ## Conventions du projet
 

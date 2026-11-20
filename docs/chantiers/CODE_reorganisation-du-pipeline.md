@@ -58,7 +58,7 @@ Le relevé montre aussi des phases qui réunissent des tâches indépendantes : 
 
 ### Phase 6 — Documentation
 
-- [ ] Chapitres de `docs/pipeline` et liste des phases de `CLAUDE.md`.
+- [x] Chapitres de `docs/pipeline`, guide d'exploitation, documentation des données et liste des phases de `CLAUDE.md`.
 
 ## Questions ouvertes
 

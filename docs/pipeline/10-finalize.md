@@ -2,7 +2,7 @@
 
 *À jour le 2026-11-16.*
 
-La phase `finalize` met à jour les données qui dérivent des [contributions](../donnees/04-contributions.md), après la résolution des personnes et avant les enrichissements.
+La phase `finalize` met à jour les données qui dérivent des [contributions](../donnees/04-contributions.md), après la résolution des personnes, avant le statut open access, les relations et les sujets.
 
 - **Purge des publications** : une publication sans enregistrement source ou sans contribution rattachée est supprimée, avec ses contributions. Elle perd son dernier enregistrement source quand le document disparaît de sa source, et sa dernière contribution rattachée quand celle-ci perd sa personne. Les étapes suivantes portent sur les publications restantes.
 - **Report sur les publications** : `publications.in_perimeter` est matérialisé.

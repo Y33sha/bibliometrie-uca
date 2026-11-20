@@ -1,6 +1,6 @@
 # Résolution et création des personnes
 
-*À jour le 2026-10-26.*
+*À jour le 2026-11-20.*
 
 La phase `persons` rattache chaque [contribution](../donnees/04-contributions.md) à une [personne](../donnees/05-persons.md). Elle décide la personne à partir de toutes les contributions sources alignées dans la contribution.
 
@@ -35,7 +35,7 @@ Une contribution sans contribution source du périmètre est rattachée seulemen
 La phase décide les contributions sans personne. Une contribution rattachée garde sa personne d'un run à l'autre. Elle entre dans une file de redécision dans quatre cas :
 
 - ses contributions sources alignées changent (phase `author_grouping`) ;
-- l'arbitrage des identifiants neutralise l'identifiant qui l'a rattachée, ou le transfère à une autre personne ;
+- l'arbitrage des identifiants neutralise l'identifiant qui l'a rattachée ;
 - l'administration rejette l'identifiant ou la forme de nom qui l'a rattachée ;
 - la forme de nom qui fonde un rattachement par nom désigne plusieurs personnes (purge).
 
@@ -46,3 +46,7 @@ La phase redécide les contributions de la file, sauf les contributions épingl�
 Les saisies manuelles (épinglage d'une contribution source, formes de nom confirmées ou rejetées, personnes déclarées distinctes) et les données importées (fiches du référentiel RH) sont des entrées fixes, jamais réinitialisées.
 
 Une personne sans contribution du périmètre est supprimée, sauf si elle est présente dans le référentiel RH ou fait l'objet d'une décision humaine. Ses contributions perdent leur personne.
+
+## Arbitrage des identifiants (`identifier_arbitration`)
+
+La phase suit la normalisation, avant le périmètre et l'alignement des auteurs. Une valeur d'identifiant (ORCID, IdRef, `hal_person_id`) contenue dans des contributions sources sous des noms différents va au nom majoritaire. Les contributions sources qui la contiennent sous un autre nom la neutralisent : la valeur ne rattache plus la contribution à une personne, et ne la fait plus entrer dans le périmètre. Les collectifs et les doublons d'auteur ne votent pas.
