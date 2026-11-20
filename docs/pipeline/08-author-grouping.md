@@ -1,6 +1,6 @@
 # Alignement des auteurs
 
-*À jour le 2026-11-04.*
+*À jour le 2026-11-20.*
 
 La phase `author_grouping` réunit dans une [contribution](../donnees/04-contributions.md) les contributions sources d'un même auteur dans une publication, une par enregistrement source au plus (`aligned_source_contributions`). Elle vient après la phase `publications`, qui réunit les enregistrements sources d'un même document, et avant la phase [`persons`](09-persons.md), qui décide la personne de chaque contribution.
 
@@ -16,7 +16,7 @@ Les contributions d'une publication se recalculent entièrement, donc le résult
 
 Ces contributions sources ne sont dans aucune contribution et n'ont pas de personne.
 
-## Alignement
+## Alignement (`align_source_contributions`)
 
 Les enregistrements sources se traitent de la liste d'auteurs la plus longue à la plus courte, chacun face aux contributions déjà formées. Une contribution source rejoint une contribution :
 

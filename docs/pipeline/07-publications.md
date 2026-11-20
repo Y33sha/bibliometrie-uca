@@ -1,8 +1,8 @@
 # Création et résolution des publications
 
-*À jour le 2026-11-16.*
+*À jour le 2026-11-20.*
 
-La phase `publications` maintient les [publications](../donnees/03-publications.md) à partir des enregistrements sources. Une publication regroupe tous les enregistrements sources qui décrivent le même document, quelles que soient leurs sources. La phase rattache chaque enregistrement source à sa publication, en crée une au besoin, et fusionne ou scinde les publications existantes quand le regroupement le commande.
+La phase `publications` maintient les [publications](../donnees/03-publications.md) à partir des enregistrements sources. Une publication regroupe tous les enregistrements sources qui décrivent le même document, quelles que soient leurs sources. La tâche `reconcile` rattache chaque enregistrement source à sa publication, en crée une au besoin, et fusionne ou scinde les publications existantes quand le regroupement le commande.
 
 ## Reconnaître la même publication
 

@@ -9,7 +9,11 @@
 
 ## Relations entre publications (`relations`)
 
-Peuple la table `publication_relations`. Une relation rattache deux publications apparentées : preprint et version publiée, article et supplément de données, chapitre et ouvrage, data paper et jeu de données… Les errata et les avis de rétractation, hors des publications, sont désignés par leur DOI. La phase pose aussi l'indicateur « Rétracté » des publications.
+Peuple la table `publication_relations`. Une relation rattache deux publications apparentées : preprint et version publiée, article et supplément de données, chapitre et ouvrage, data paper et jeu de données… Les errata et les avis de rétractation, hors des publications, sont désignés par leur DOI.
+
+- **`rebuild_publication_relations`** — reconstruit les relations entre publications.
+- **`link_notices`** — reconstruit les relations des publications avec leurs errata et leurs avis.
+- **`flag_retracted_publications`** — pose l'indicateur « Rétracté » des publications : avis de rétractation, rétractation déclarée par Crossref sur le DOI lui-même, ou marque d'OpenAlex.
 
 La table est reconstruite à chaque exécution, à partir de signaux indépendants appliqués dans l'ordre ci-dessous.
 
@@ -21,14 +25,14 @@ La table est reconstruite à chaque exécution, à partir de signaux indépendan
 
 ## Sujets (`subjects`)
 
-**Ingestion.**
+**Ingestion** (`derive_publication_subjects`).
 La normalisation lie chaque enregistrement source aux sujets donnés par sa source (`source_record_subjects`). La phase lie la publication à ces sujets et à leurs ancêtres, dans `publication_subjects`. Le lien garde la source qui a fourni le sujet.
 
 Les publications aux sources modifiées depuis la dernière ingestion de leurs sujets sont retraitées : leurs liens sont reconstruits, sauf ceux marqués `rejected`. L'option `--rebuild-subjects` retraite toutes les publications.
 
 Les sujets liés à aucun enregistrement source ni à aucune publication sont supprimés, sauf les ancêtres d'un sujet lié.
 
-**Co-occurrences.** Recalcule depuis `publication_subjects` :
+**Co-occurrences** (`count_subject_usage`). Recalcule depuis `publication_subjects` :
 
 - `subjects.usage_count` — nombre de publications distinctes par sujet ;
 - `subject_labels` — sujets regroupés par libellé normalisé, tous vocabulaires confondus, avec leur nombre de publications ;

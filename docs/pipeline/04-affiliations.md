@@ -22,6 +22,8 @@ La phase rattache les contributions sources aux structures du périmètre, et ma
    - texte terminé par un nom de pays : adresse brute ;
    - autre texte : nom seul.
 
+- **`detect_concatenated_addresses`** — repère les adresses concaténées : plusieurs affiliations réunies dans un seul texte, chacune suivie des initiales de ses auteurs. Une adresse concaténée est sans indice de périmètre.
+
 - **`resolve_addresses`** — cherche dans le texte de chaque adresse normalisée les formes de nom des structures (`structure_name_forms`). Le résultat est écrit dans `address_structures`, avec la forme de nom détectée. Les rattachements confirmés ou saisis à la main restent en place.
 
    Trois options des formes de nom limitent les faux positifs :
