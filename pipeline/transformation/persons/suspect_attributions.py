@@ -18,8 +18,9 @@ from domain.persons.suspect_attributions import (
     signaled_clusters,
 )
 from pipeline.graph import Block, Phase, Task, in_transaction
-from pipeline.runtime.observability.log_format import quantity
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progress import track_progress, waiting
 from pipeline.transformation.persons.store import (
     fetch_contribution_contexts,
     fetch_person_profiles,
@@ -47,34 +48,61 @@ def leiden(n: int, weights: Mapping[tuple[int, int], float], resolution: float) 
     return list(partition.membership)
 
 
-def detect(conn: Connection, _logger: logging.Logger) -> PhaseMetrics:
-    """Calcule les attributions suspectes et les écrit dans `suspect_contributions`."""
+def detect(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
+    """Calcule les attributions suspectes et les écrit dans `suspect_contributions`. Chaque étape écrit sa ligne au journal."""
     rows: list[tuple[int, int, SuspectReason, int | None]] = []
-    frequencies = fetch_clue_frequencies(conn)
-    for person_id, publications in sorted(fetch_publication_clues(conn).items()):
-        for number, cluster in enumerate(signaled_clusters(publications, frequencies, leiden), 1):
-            rows += [(c, person_id, SuspectReason.CLUSTER, number) for c in cluster]
+    with waiting(f"{BRANCH}fréquence des indices", logger) as line:
+        frequencies = fetch_clue_frequencies(conn)
+        line.conclude(
+            f"{BRANCH}fréquence des indices : {quantity(frequencies.publication_count, 'publication')}"
+        )
+    with waiting(f"{BRANCH}indices des publications des personnes à fiche RH", logger) as line:
+        clues = fetch_publication_clues(conn)
+        line.conclude(
+            f"{BRANCH}indices des publications : {quantity(len(clues), 'personne')} à fiche RH"
+        )
+    with track_progress(len(clues), f"{BRANCH}clusters", logger, erase=True) as progress:
+        for person_id, publications in sorted(clues.items()):
+            for number, cluster in enumerate(
+                signaled_clusters(publications, frequencies, leiden), 1
+            ):
+                rows += [(c, person_id, SuspectReason.CLUSTER, number) for c in cluster]
+            progress.advance()
     in_clusters = {row[0] for row in rows}
     cluster_rows = len(rows)
+    clusters = len({(row[1], row[3]) for row in rows})
+    logger.info(
+        "%sclusters isolés : %s, %s, %s",
+        BRANCH,
+        quantity(len({row[1] for row in rows}), "personne"),
+        quantity(clusters, "cluster"),
+        quantity(cluster_rows, "publication"),
+    )
 
-    rejected_profiles = fetch_rejected_profiles(conn)
-    candidates = [
-        (c, p)
-        for c, p in fetch_candidate_contributions(conn, rejected_profiles)
-        if c not in in_clusters
-    ]
-    contexts = fetch_contribution_contexts(conn, [c for c, _ in candidates])
-    own_profiles = fetch_person_profiles(conn, rejected_profiles)
-    for contribution_id, person_id in candidates:
-        context = contexts.get(contribution_id)
-        if context is not None and resembles_rejected(
-            person_id, context, own_profiles.get(person_id, []), rejected_profiles[person_id]
-        ):
-            rows.append((contribution_id, person_id, SuspectReason.REJECTED_PUBLICATIONS, None))
+    with waiting(f"{LAST_BRANCH}publications proches des publications rejetées", logger) as line:
+        rejected_profiles = fetch_rejected_profiles(conn)
+        candidates = [
+            (c, p)
+            for c, p in fetch_candidate_contributions(conn, rejected_profiles)
+            if c not in in_clusters
+        ]
+        contexts = fetch_contribution_contexts(conn, [c for c, _ in candidates])
+        own_profiles = fetch_person_profiles(conn, rejected_profiles)
+        for contribution_id, person_id in candidates:
+            context = contexts.get(contribution_id)
+            if context is not None and resembles_rejected(
+                person_id, context, own_profiles.get(person_id, []), rejected_profiles[person_id]
+            ):
+                rows.append((contribution_id, person_id, SuspectReason.REJECTED_PUBLICATIONS, None))
+        resembling = len(rows) - cluster_rows
+        line.conclude(
+            f"{LAST_BRANCH}publications proches des publications rejetées :"
+            f" {resembling} sur {quantity(len(candidates), 'publication')}"
+            f" de {quantity(len(rejected_profiles), 'personne')} à rejets"
+        )
 
     write_suspect_contributions(conn, rows)
     persons = len({row[1] for row in rows})
-    resembling = len(rows) - cluster_rows
     return PhaseMetrics(
         extras={
             "suspect_persons": persons,
