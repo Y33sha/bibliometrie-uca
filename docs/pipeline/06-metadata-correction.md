@@ -1,14 +1,12 @@
 # Correction des métadonnées
 
-*À jour le 2026-11-17.*
+*À jour le 2026-11-20.*
 
 La phase `metadata_correction` prépare les `source_records` pour que le [rattachement des publications](07-publications.md) s'appuie sur des valeurs propres. Elle tourne après [`publishing`](05-publishing.md) : le typage des revues alimente les règles dépendantes de la revue.
 
 Les corrections sont écrites sur les colonnes des `source_records` ; la valeur d'origine est conservée dans `corrections`, et chaque correction est recalculée à partir d'elle à chaque exécution. Un identifiant retiré reste dans `source_record_identifiers`, avec la règle qui le retire (`removed_by`).
 
-- **`serial_by_doi`** — renseigne `serial_id` lorsqu'il est vide et que les DOI actifs de l'enregistrement source tombent dans l'espace de noms d'une seule revue (`serial_doi_namespaces`, calculée par [`publishing`](05-publishing.md)). Les DOI de serveur de preprints restent hors du rattachement : la discussion d'un article Copernicus partage l'espace de noms de sa revue.
-
-- **`correct_unary`** — applique les règles de correction qui s'appliquent à un enregistrement isolé. Ces règles corrigent le type de document et les identifiants associés au document. Un dépôt HAL introuvable dans HAL (`failed_lookups`) est retiré des identifiants, des liens et des localisations.
+- **`correct_source_records`** — applique les règles de correction qui s'appliquent à un enregistrement isolé. Ces règles corrigent le type de document et les identifiants associés au document. Un dépôt HAL introuvable dans HAL (`failed_lookups`) est retiré des identifiants, des liens et des localisations.
     *Exemples : un document typé « thèse » paru dans une revue est retypé en article, et perd ses identifiants de thèse ; un article avec un titre préfixé « Erratum: » est retypé en erratum.*
 
 - **`doi_targets`** — relie le DOI d'une forme secondaire au DOI de l'œuvre principale présente en base et connue de doi.org. Par exemple, un entrepôt comme Zenodo attribue un DOI à chaque version d'un dépôt, plus un **DOI concept** couvrant toutes les versions, que déclarent les métadonnées DataCite. Un DOI à suffixe de version a pour cible sa forme sans version quand c'est le DOI d'un enregistrement source, sinon sa version la plus récente en base. La [réconciliation](07-publications.md) lit la cible à la place du DOI : les formes d'une œuvre rejoignent sa publication.
@@ -18,4 +16,4 @@ Les corrections sont écrites sur les colonnes des `source_records` ; la valeur 
    - **Documents distincts** — un chapitre d'un autre titre a le DOI de son ouvrage, une communication celui de son volume d'actes, un article celui de son numéro de revue. Un enregistrement source a parfois celui d'une autre œuvre. Le DOI reste aux seuls documents désignés. Un enregistrement source qui détient le DOI en `primary` ou `derived` le garde toujours. Un enregistrement source désigne une autre œuvre que l'enregistrement source Crossref du DOI s'il a un titre éloigné du sien et aucun nom d'auteur commun.
    - **DOI inexistant** — un DOI inconnu de doi.org (`dois.registered`, posé par la phase [dois](05-publishing.md#référentiel-des-doi-dois)) est retiré de tous les enregistrements sources qui le citent.
 
-- **`matchable`** — calcule `is_matchable` d'après les valeurs corrigées. Un enregistrement source écarté reste hors de la [réconciliation](07-publications.md) : préfixe DOI exclu, titre de paratexte, enregistrement DataCite d'une forme secondaire, doublon retiré par l'éditeur, enregistrement OpenAlex ou ScanR sans DOI, lien ni clé de confirmation.
+- **`decide_matchability`** — calcule `is_matchable` d'après les valeurs corrigées. Un enregistrement source écarté reste hors de la [réconciliation](07-publications.md) : préfixe DOI exclu, titre de paratexte, enregistrement DataCite d'une forme secondaire, doublon retiré par l'éditeur, enregistrement OpenAlex ou ScanR sans DOI, lien ni clé de confirmation.

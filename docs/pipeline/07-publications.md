@@ -1,8 +1,8 @@
 # Création et résolution des publications
 
-*À jour le 2026-11-16.*
+*À jour le 2026-11-20.*
 
-La phase `publications` maintient les [publications](../donnees/03-publications.md) à partir des enregistrements sources. Une publication regroupe tous les enregistrements sources qui décrivent le même document, quelles que soient leurs sources. La phase rattache chaque enregistrement source à sa publication, en crée une au besoin, et fusionne ou scinde les publications existantes quand le regroupement le commande.
+La phase `publications` maintient les [publications](../donnees/03-publications.md) à partir des enregistrements sources. Une publication regroupe tous les enregistrements sources qui décrivent le même document, quelles que soient leurs sources. La tâche `reconcile` rattache chaque enregistrement source à sa publication, en crée une au besoin, et fusionne ou scinde les publications existantes quand le regroupement le commande.
 
 ## Reconnaître la même publication
 
@@ -41,7 +41,7 @@ Après une modification de la logique de résolution, l'option `--rebuild-public
 
 ## Recalcul des métadonnées
 
-La consolidation calcule seule les métadonnées d'une publication, depuis ses enregistrements sources. La réconciliation recalcule les publications qu'elle touche. La tâche `consolidate` recalcule ensuite les publications de la file `publications_queue` : un enregistrement source a changé de pays, ou la réponse de doi.org ou d'Unpaywall sur leur DOI a changé. Le DOI de la publication est l'ancre de ses enregistrements sources, à défaut un DOI de dépôt. Dans une publication qui a une version publiée, les enregistrements sources preprint passent après les autres dans le classement des sources. Une publication a une version publiée quand ses enregistrements sources ont une ancre, ou quand un enregistrement source typé autrement que preprint a une revue ou une monographie. La date de publication est celle du premier enregistrement source selon le classement des sources. Les enregistrements sources suivants la précisent quand ils concordent : même année, et même mois quand la date retenue est au mois. L'éditeur est celui de la date de publication : le titulaire du préfixe du DOI Crossref, à défaut le premier éditeur des enregistrements sources selon le classement des sources. Les indicateurs de citation sont ceux du premier enregistrement source OpenAlex selon le classement des sources. Les pays réunissent ceux des enregistrements sources. Une publication sans enregistrement source est supprimée.
+La consolidation calcule seule les métadonnées d'une publication, depuis ses enregistrements sources. La réconciliation recalcule les publications qu'elle touche. La tâche `consolidate_publications` recalcule ensuite les publications de la file `publications_queue` : un enregistrement source a changé de pays, ou la réponse de doi.org ou d'Unpaywall sur leur DOI a changé. Le DOI de la publication est l'ancre de ses enregistrements sources, à défaut un DOI de dépôt. Dans une publication qui a une version publiée, les enregistrements sources preprint passent après les autres dans le classement des sources. Une publication a une version publiée quand ses enregistrements sources ont une ancre, ou quand un enregistrement source typé autrement que preprint a une revue ou une monographie. La date de publication est celle du premier enregistrement source selon le classement des sources. Les enregistrements sources suivants la précisent quand ils concordent : même année, et même mois quand la date retenue est au mois. L'éditeur est celui de la date de publication : le titulaire du préfixe du DOI Crossref, à défaut le premier éditeur des enregistrements sources selon le classement des sources. Les indicateurs de citation sont ceux du premier enregistrement source OpenAlex selon le classement des sources. Les pays réunissent ceux des enregistrements sources. Une publication sans enregistrement source est supprimée.
 
 **Statut open access.** Une URL de résolution du DOI donne une copie ouverte de la publication dans deux cas : elle mène à une plateforme en accès libre intégral (arXiv, bioRxiv, medRxiv, PubMed Central), ou son chemin finit par `.pdf`. Le statut se déduit des copies, du modèle de la revue et du verdict d'Unpaywall (`domain/publications/open_access.py`) :
 
@@ -49,5 +49,7 @@ La consolidation calcule seule les métadonnées d'une publication, depuis ses e
 2. Sinon, copie ouverte dans une archive ou sur un serveur de preprints : `green`.
 3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
 4. Sinon : `embargoed` avec un enregistrement source sous embargo actif (`embargoes`), `closed` avec une copie déclarée fermée, un verdict, ou pour une thèse en cours ou réservée à l'intranet de son établissement, `unknown` sans aucune information.
+
+Le modèle de la revue est celui de l'année de parution. Une revue entièrement en open access ou diamant est sur abonnement avant l'année de son passage à l'open access intégral, donnée par OpenAlex, sinon par le DOAJ. Sans cette année, son modèle est inconnu, sauf pour une revue née en open access intégral d'après OpenAlex.
 
 Le verdict d'Unpaywall relève ces accès, sans les abaisser : `gold`, `hybrid` ou `diamond` vaut une copie ouverte chez l'éditeur sous licence, `bronze` sans licence, `green` une copie d'archive ouverte. Un brevet a le statut `unknown`.

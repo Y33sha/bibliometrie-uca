@@ -5,6 +5,7 @@ from __future__ import annotations
 import httpx2
 
 from domain.sources.staging import StagingEntryMode
+from pipeline.ingestion.common import person_search
 from pipeline.ingestion.crossref import api as crossref_api
 from pipeline.ingestion.crossref.api import CrossrefClient
 from pipeline.ingestion.crossref.person_search import (
@@ -48,3 +49,18 @@ def test_suit_le_curseur_jusqu_a_la_page_incomplete(
     assert [e.source_id for e in ecritures] == ["10.1/a", "10.1/b", "10.1/c"]
     assert {e.entry_mode for e in ecritures} == {StagingEntryMode.PERSON_IDENTIFIER}
     assert metrics.new == 3
+
+
+def test_un_lot_a_la_fois(http_mock, identifiants_rh, ecritures, monkeypatch):
+    """Crossref répond 429 dès 2 recherches simultanées."""
+    identifiants_rh(["0000-0001-2345-6789"])
+    plafonds: list[int] = []
+    monkeypatch.setattr(
+        person_search,
+        "paginate_concurrently",
+        lambda *args, max_concurrent, **kwargs: plafonds.append(max_concurrent),
+    )
+
+    moissonneur(CrossrefPersonHarvester, CrossrefClient()).run(arguments_du_run())
+
+    assert plafonds == [1]

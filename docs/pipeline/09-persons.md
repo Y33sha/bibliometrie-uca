@@ -1,10 +1,14 @@
 # Résolution et création des personnes
 
-*À jour le 2026-10-26.*
+*À jour le 2026-11-20.*
 
 La phase `persons` rattache chaque [contribution](../donnees/04-contributions.md) à une [personne](../donnees/05-persons.md). Elle décide la personne à partir de toutes les contributions sources alignées dans la contribution.
 
 Une contribution du périmètre au nom inconnu fonde une personne, d'après le nom d'une de ses contributions sources. Les contributions au même nom, dans d'autres publications, la rejoignent dans le même passage.
+
+- **`resolve_contributions`** — rattache les contributions à une personne, et crée les personnes des noms inconnus.
+- **`populate_person_name_forms`** — régénère les formes de nom des personnes, à partir du nom de chaque personne et du nom des contributions sources de ses contributions.
+- **`purge_persons`** — met en file de redécision les contributions rattachées par une forme de nom devenue ambiguë, puis supprime les personnes sans contribution du périmètre.
 
 ## Rattacher une contribution à une personne
 
@@ -18,7 +22,7 @@ Les critères sont interrogés dans l'ordre, du plus fiable au moins fiable. Le 
 
 - **Identifiant IdRef** : PPN SUDOC (HAL TEI, ScanR, theses.fr), référentiel personnes de l'ESR.
 
-- **Forme de nom** : le nom normalisé d'une contribution source désigne une seule personne dans `person_name_forms`, ou, à défaut, une seule personne aux initiales compatibles. Les formes de nom sont régénérées à chaque exécution, à partir du nom de chaque personne et du nom des contributions sources de ses contributions. Un nom qui désigne plusieurs personnes laisse la contribution sans personne.
+- **Forme de nom** : le nom normalisé d'une contribution source désigne une seule personne dans `person_name_forms`, ou, à défaut, une seule personne aux initiales compatibles. Un nom qui désigne plusieurs personnes laisse la contribution sans personne.
 
 Dans une publication, une personne revient à une seule contribution : la mieux appuyée (épinglage, puis identifiant, puis nom).
 
@@ -35,7 +39,7 @@ Une contribution sans contribution source du périmètre est rattachée seulemen
 La phase décide les contributions sans personne. Une contribution rattachée garde sa personne d'un run à l'autre. Elle entre dans une file de redécision dans quatre cas :
 
 - ses contributions sources alignées changent (phase `author_grouping`) ;
-- l'arbitrage des identifiants neutralise l'identifiant qui l'a rattachée, ou le transfère à une autre personne ;
+- l'arbitrage des identifiants neutralise l'identifiant qui l'a rattachée ;
 - l'administration rejette l'identifiant ou la forme de nom qui l'a rattachée ;
 - la forme de nom qui fonde un rattachement par nom désigne plusieurs personnes (purge).
 
@@ -46,3 +50,7 @@ La phase redécide les contributions de la file, sauf les contributions épingl�
 Les saisies manuelles (épinglage d'une contribution source, formes de nom confirmées ou rejetées, personnes déclarées distinctes) et les données importées (fiches du référentiel RH) sont des entrées fixes, jamais réinitialisées.
 
 Une personne sans contribution du périmètre est supprimée, sauf si elle est présente dans le référentiel RH ou fait l'objet d'une décision humaine. Ses contributions perdent leur personne.
+
+## Arbitrage des identifiants (`normalize.arbitrate_identifiers`)
+
+La tâche clôt la normalisation, avant le périmètre et l'alignement des auteurs. Une valeur d'identifiant (ORCID, IdRef, `hal_person_id`) contenue dans des contributions sources sous des noms différents va au nom majoritaire. Les contributions sources qui la contiennent sous un autre nom la neutralisent : la valeur ne rattache plus la contribution à une personne, et ne la fait plus entrer dans le périmètre. Les collectifs et les doublons d'auteur ne votent pas.

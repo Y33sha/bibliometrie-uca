@@ -32,6 +32,13 @@ def test_lit_une_source(monkeypatch):
     assert calls[0]["filter"] == "issn:0028-0836"
 
 
+def test_lit_le_passage_a_l_open_access_integral(monkeypatch):
+    plos_one = {"id": "https://openalex.org/S202381698", "is_oa": True, "oa_flip_year": 2005}
+    monkeypatch.setattr(mod, "http_request_with_retry", lambda *_a, **_k: {"results": [plos_one]})
+    [source] = mod.fetch_sources("issn", ["1932-6203"], sources_api="x") or []
+    assert (source.is_oa, source.oa_flip_year) == (True, 2005)
+
+
 def test_filtre_par_identifiant_en_forme_url(monkeypatch):
     calls = []
 

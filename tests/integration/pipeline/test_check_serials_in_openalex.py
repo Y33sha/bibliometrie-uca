@@ -98,6 +98,22 @@ def test_la_revue_recoit_sa_source_son_type_et_ses_listes_retenues(conn):
     assert state.lists == ["cwts-core", "doyens"]
 
 
+def test_la_revue_recoit_son_passage_a_l_open_access_integral(conn):
+    plos_one = OpenAlexSource("S202381698", ("1932-6203",), "journal", (), 300000, True, 2005)
+    serial = _serial(conn, "PLoS ONE", "1932-6203")
+    absent = _serial(conn, "Revue absente d'OpenAlex", "1234-5679")
+    conn.execute(text("UPDATE serials SET openalex_is_oa = true WHERE id = :id"), {"id": absent})
+    _run(conn, _OpenAlex(plos_one))
+    rows = conn.execute(
+        text(
+            "SELECT id, openalex_is_oa, openalex_oa_flip_year FROM serials"
+            " WHERE id = ANY(:ids) ORDER BY id"
+        ),
+        {"ids": [serial, absent]},
+    ).all()
+    assert [tuple(r) for r in rows] == [(serial, True, 2005), (absent, None, None)]
+
+
 def test_l_identifiant_partage_va_a_la_revue_la_plus_publiee_et_les_listes_aux_deux(conn):
     """Cas réel : OpenAlex réunit *JAMA* et son ancien titre, « Journal of the American Medical Association »."""
     old_title = _serial(conn, "Journal of the American Medical Association", "0002-9955")

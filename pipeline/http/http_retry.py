@@ -1,6 +1,6 @@
 """Requêtes HTTP avec nouvelles tentatives, backoff exponentiel et circuit-breaker, en versions synchrone et asynchrone.
 
-- 429, 5xx, erreur réseau, corps vide (si `retry_on_empty_body`) ou corps illisible : pause de `initial_backoff * 2^attempt`, puis nouvelle tentative, jusqu'à `max_retries` tentatives. L'épuisement compte un échec au circuit-breaker et lève `SourceUnavailableError`.
+- 429, 5xx, erreur réseau, corps vide (si `retry_on_empty_body`) ou corps illisible : pause de `initial_backoff * 2^attempt`, puis nouvelle tentative, jusqu'à `max_retries` tentatives. L'épuisement compte un échec au circuit-breaker et lève `SourceUnavailableError`. Le journal d'un 429 relève les en-têtes de débit et le début du corps.
 - Refus temporaire reconnu par la règle de la source (`temporary_refusal`) : pause donnée par la règle, puis nouvelle tentative, sur le même budget de `max_retries` tentatives.
 - Autre 4xx (404…) : `httpx2.HTTPStatusError` immédiate, réponse définitive de la source.
 
@@ -93,6 +93,24 @@ def _source_breaker(label: str) -> tuple[SourceCircuitBreaker, str]:
     return breaker, f"{breaker.source} {label}".rstrip()
 
 
+_RATE_LIMIT_HEADERS = ("retry-after", "x-rate-limit", "x-ratelimit", "ratelimit", "x-concurrency")
+"""Préfixes des en-têtes de débit relevés dans une réponse 429."""
+
+_BODY_EXCERPT = 200
+"""Caractères du corps relevés dans une réponse 429."""
+
+
+def _rate_limit_details(response: httpx2.Response) -> str:
+    """Renvoie les en-têtes de débit et le début du corps d'une réponse 429, entre parenthèses."""
+    headers = [
+        f"{name}={value}"
+        for name, value in response.headers.items()
+        if name.lower().startswith(_RATE_LIMIT_HEADERS)
+    ]
+    body = " ".join(response.text.split())[:_BODY_EXCERPT]
+    return f"({', '.join(headers) or 'sans en-tête de débit'} ; corps : {body or 'vide'})"
+
+
 def _classify[T](
     result: httpx2.Response | httpx2.RequestError,
     decode: Callable[[httpx2.Response], T],
@@ -109,7 +127,9 @@ def _classify[T](
     if temporary_refusal is not None and (refusal := temporary_refusal(result)) is not None:
         pause, reason = refusal
         return _Refusal(reason, pause)
-    if result.status_code == 429 or 500 <= result.status_code < 600:
+    if result.status_code == 429:
+        return f"HTTP 429 {_rate_limit_details(result)}"
+    if 500 <= result.status_code < 600:
         return f"HTTP {result.status_code}"
     raise_for_status(result)
     if retry_on_empty_body and not result.text.strip():

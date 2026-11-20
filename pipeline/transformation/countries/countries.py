@@ -1,4 +1,4 @@
-"""Étape des pays de la phase `affiliations` : pays candidats des adresses en file, pays retenus, puis pays des contributions sources, des enregistrements sources et des publications. Chaque tâche a sa transaction."""
+"""Phase `countries` : pays candidats des adresses en file, pays retenus, puis pays des contributions sources et des enregistrements sources. Les publications dont un enregistrement source change de pays entrent dans la file de consolidation. Chaque tâche a sa transaction."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from pipeline.graph import Step, Task, in_transaction
+from pipeline.graph import Block, Phase, Task, in_transaction
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -87,7 +87,11 @@ _DETECT_BY_COUNTRY_NAME = Task(
     reads=(*_DETECTION_READS, "addresses.countries", "addresses.publication_count"),
     writes=("address_country_candidates",),
     # Adresses marquées depuis la dernière résolution, retirées de la file par `resolve_countries` ; pays des adresses écrits par `resolve_countries` ; nombre de publications des adresses, recompté par `finalize`.
-    previous_run=("address_candidates_queue", "addresses.countries", "addresses.publication_count"),
+    previous_runs=(
+        "address_candidates_queue",
+        "addresses.countries",
+        "addresses.publication_count",
+    ),
     run=_detect_by_country_name,
     section="Pays des adresses d'après le nom de pays qui les termine",
 )
@@ -98,7 +102,7 @@ _DETECT_BY_PLACE_NAME = Task(
     reads=_DETECTION_READS,
     writes=("address_country_candidates",),
     # Adresses marquées depuis la dernière résolution, retirées de la file par `resolve_countries`.
-    previous_run=("address_candidates_queue",),
+    previous_runs=("address_candidates_queue",),
     run=in_transaction(detect_by_place_name.run),
     section="Pays des adresses d'après les noms de villes et d'institutions",
 )
@@ -119,7 +123,7 @@ _RESOLVE_COUNTRIES = Task(
         "address_candidates_queue",
     ),
     # Nombre de publications des adresses, recompté par `finalize`.
-    previous_run=("addresses.publication_count",),
+    previous_runs=("addresses.publication_count",),
     run=_resolve,
     section="Choix du pays des adresses parmi les pays trouvés",
 )
@@ -150,21 +154,17 @@ _REFRESH_SOURCE_RECORD_COUNTRIES = Task(
         "publications_queue",
     ),
     # Rattachements des enregistrements sources, écrits par `publications.reconcile` et `finalize.purge_publications`.
-    previous_run=("source_records.publication_id",),
+    previous_runs=("source_records.publication_id",),
     run=_refresh,
     section="Rafraîchissement des pays des enregistrements sources",
 )
 
 
-STEP = Step(
-    "countries",
-    "adresses → pays des adresses, des contributions sources et des enregistrements sources ; publications à recalculer",
-    (
-        _DETECT_BY_COUNTRY_NAME,
-        _DETECT_BY_PLACE_NAME,
-        _RESOLVE_COUNTRIES,
-        _REFRESH_SOURCE_RECORD_COUNTRIES,
-    ),
+_TASKS = (
+    _DETECT_BY_COUNTRY_NAME,
+    _DETECT_BY_PLACE_NAME,
+    _RESOLVE_COUNTRIES,
+    _REFRESH_SOURCE_RECORD_COUNTRIES,
 )
 
 
@@ -182,3 +182,21 @@ def funnel(by_task: Mapping[str, PhaseMetrics]) -> dict[str, float]:
         "country_newly_attached": final.with_country - initial.with_country,
         "without_country_remaining": total - final.with_country,
     }
+
+
+def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
+    """Renvoie les métriques de la phase : l'entonnoir des pays des adresses citées (`funnel`), et les signaux des tâches."""
+    metrics = PhaseMetrics()
+    for task_metrics in by_task.values():
+        metrics.signals.extend(task_metrics.signals)
+    metrics.details["summary"] = funnel(by_task)
+    return metrics
+
+
+PHASE = Phase(
+    "countries",
+    "Pays des adresses et des enregistrements sources",
+    _TASKS,
+    Block.SOURCE_RECORDS,
+    assemble=assemble,
+)

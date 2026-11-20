@@ -1,4 +1,6 @@
-"""L'arbitrage des identifiants ignore les contributions sources collectives."""
+"""L'arbitrage des identifiants ignore les contributions sources collectives et les doublons d'auteur, et compte les contributions sources hors contribution."""
+
+from sqlalchemy import text
 
 from pipeline.transformation.persons.identifier_arbitration import fetch_identifier_votes
 from tests.integration.helpers.alignment import align_unaligned
@@ -37,3 +39,30 @@ def test_contribution_source_collective_ne_vote_pas(sa_sync_conn):
     votes = fetch_identifier_votes(sa_sync_conn)
 
     assert votes[("orcid", _ORCID)] == {"jean zetaindividu": 1}
+
+
+def test_contribution_source_hors_contribution_vote_doublon_non(sa_sync_conn):
+    conn = sa_sync_conn
+    orphan_record = insert_source_record(conn, source="crossref", source_id="c-orph-1")
+    insert_source_contribution(
+        conn,
+        orphan_record,
+        source="crossref",
+        raw_author_name="Jean Zetaorphelin",
+        author_name_normalized="jean zetaorphelin",
+        identifiers={"orcid": _ORCID},
+    )
+    kept = _source_contribution(
+        conn, "Jean Zetaindividu", collective=False, source_id="c-dup-1", orcid=_ORCID
+    )
+    duplicate = _source_contribution(
+        conn, "Jean Zetadoublon", collective=False, source_id="c-dup-2", orcid=_ORCID
+    )
+    conn.execute(
+        text("UPDATE source_contributions SET duplicate_of = :kept WHERE id = :duplicate"),
+        {"kept": kept, "duplicate": duplicate},
+    )
+
+    votes = fetch_identifier_votes(conn)
+
+    assert votes[("orcid", _ORCID)] == {"jean zetaorphelin": 1, "jean zetaindividu": 1}

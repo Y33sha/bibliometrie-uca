@@ -1,6 +1,6 @@
 """Tâche de la phase `publishing` : métadonnées des revues dans OpenAlex.
 
-Sont cherchées les métadonnées des revues jamais cherchées, ou cherchées depuis plus de `serial_openalex_recheck_after_days` jours. Une revue à ISSN prend la source OpenAlex de ses ISSN, celle qui a le plus de works quand ses ISSN en désignent plusieurs. Une revue sans ISSN prend la source la plus fréquente parmi ses enregistrements sources OpenAlex sans ISSN. La recherche pose l'identifiant OpenAlex de la revue et son type s'il est inconnu. Elle réécrit ses appartenances aux listes de `serial_lists`. Une source retenue par plusieurs revues donne son identifiant à celle qui a le plus de publications, et ses listes à toutes.
+Sont cherchées les métadonnées des revues jamais cherchées, ou cherchées depuis plus de `serial_openalex_recheck_after_days` jours. Une revue à ISSN prend la source OpenAlex de ses ISSN, celle qui a le plus de works quand ses ISSN en désignent plusieurs. Une revue sans ISSN prend la source la plus fréquente parmi ses enregistrements sources OpenAlex sans ISSN. La recherche pose l'identifiant OpenAlex de la revue, son type s'il est inconnu, et son open access intégral avec l'année de son passage à l'open access intégral. Elle réécrit ses appartenances aux listes de `serial_lists`. Une source retenue par plusieurs revues donne son identifiant à celle qui a le plus de publications, et ses listes à toutes.
 
 Les requêtes à OpenAlex sont injectées (`pipeline/ingestion/openalex/sources.py`). Les revues d'un lot en échec restent à chercher, comme celles des lots suivants quand le circuit-breaker de la source coupe.
 """
@@ -83,6 +83,12 @@ _WRITE_TYPES = text(f"""
     FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS t(id integer, serial_type text)
     WHERE s.id = t.id AND s.serial_type = '{SerialType.UNKNOWN.value}'
       AND NOT '{ManualField.SERIAL_TYPE.value}' = ANY(s.manual_fields)
+""")
+
+_WRITE_OPEN_ACCESS = text("""
+    UPDATE serials s SET openalex_is_oa = t.is_oa, openalex_oa_flip_year = t.flip_year
+    FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS t(id integer, is_oa boolean, flip_year smallint)
+    WHERE s.id = t.id
 """)
 
 _DELETE_ENTRIES = text("DELETE FROM serial_list_entries WHERE serial_id = ANY(:ids)")
@@ -226,7 +232,7 @@ def _search_by_issns(issns: tuple[str, ...], by_issn: dict[str, list[OpenAlexSou
 def _write(
     conn: Connection, serials: list[_Serial], searches: dict[int, _Search], list_codes: set[str]
 ) -> None:
-    """Écrit l'identifiant OpenAlex, le type et les appartenances des revues cherchées, et la date de leur recherche."""
+    """Écrit l'identifiant OpenAlex, le type, l'open access intégral et les appartenances des revues cherchées, et la date de leur recherche."""
     searched_ids = sorted(searches)
     if not searched_ids:
         return
@@ -266,6 +272,15 @@ def _write(
     ]
     if types:
         conn.execute(_WRITE_TYPES, {"rows": json.dumps(types)})
+    open_access = [
+        {
+            "id": serial_id,
+            "is_oa": search.source.is_oa if search.source else None,
+            "flip_year": search.source.oa_flip_year if search.source else None,
+        }
+        for serial_id, search in sorted(searches.items())
+    ]
+    conn.execute(_WRITE_OPEN_ACCESS, {"rows": json.dumps(open_access)})
     conn.execute(_DELETE_ENTRIES, {"ids": searched_ids})
     entries = [
         {"serial_id": serial_id, "list_code": code}

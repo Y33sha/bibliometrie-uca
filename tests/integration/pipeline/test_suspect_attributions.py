@@ -1,0 +1,113 @@
+"""Phase `suspect_attributions` : clusters isolés des personnes à fiche RH, publications proches des publications rejetées, sur vraie base."""
+
+import logging
+
+from sqlalchemy import text
+
+from pipeline.transformation.persons.suspect_attributions import detect
+from tests.integration.helpers.alignment import align_source_contributions
+from tests.integration.helpers.contributions import (
+    insert_contribution,
+    upsert_split_contributor_information,
+)
+from tests.integration.helpers.persons import (
+    insert_hr_record,
+    insert_person,
+    insert_rejected_contribution,
+)
+from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.serials import insert_serial
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def _contribution(conn, publication_id, person_id, mode="manual"):
+    contribution_id = insert_contribution(conn, publication_id, person_id=person_id)
+    conn.execute(
+        text(
+            "UPDATE contributions SET resolution_mode = CAST(:m AS resolution_mode) WHERE id = :g"
+        ),
+        {"m": mode, "g": contribution_id},
+    )
+    return contribution_id
+
+
+def _suspects(conn):
+    return conn.execute(
+        text(
+            "SELECT contribution_id, person_id, reason::text, cluster FROM suspect_contributions ORDER BY 1"
+        )
+    ).all()
+
+
+def test_un_cluster_isole_d_une_personne_a_fiche_rh_est_signale(sa_sync_conn):
+    person = insert_person(sa_sync_conn, "Morel", first_name="Laurent")
+    insert_hr_record(sa_sync_conn, person)
+    own_serial = insert_serial(sa_sync_conn, "Biologie cellulaire")
+    other_serial = insert_serial(sa_sync_conn, "Électrotechnique")
+    for _ in range(3):
+        _contribution(
+            sa_sync_conn, insert_publication(sa_sync_conn, serial_id=own_serial), person, "orcid"
+        )
+    isolated = [
+        _contribution(
+            sa_sync_conn, insert_publication(sa_sync_conn, serial_id=other_serial), person, "idref"
+        )
+        for _ in range(3)
+    ]
+
+    metrics = detect(sa_sync_conn, _LOGGER)
+
+    assert _suspects(sa_sync_conn) == [(c, person, "cluster", 1) for c in isolated]
+    assert metrics.extras["suspect_in_clusters"] == 3
+
+
+def test_une_publication_proche_des_publications_rejetees_est_signalee(sa_sync_conn):
+    person = insert_person(sa_sync_conn, "Durand", first_name="Marie")
+    colleague, other_colleague, namesake_coauthor = (
+        insert_person(sa_sync_conn, name) for name in ("Collègue", "Autre", "Coauteur")
+    )
+    for coauthor in (colleague, other_colleague):
+        publication = insert_publication(sa_sync_conn)
+        _contribution(sa_sync_conn, publication, person, "orcid")
+        _contribution(sa_sync_conn, publication, coauthor)
+
+    rejected = insert_publication(sa_sync_conn)
+    source_record = insert_source_record(sa_sync_conn, rejected, source_id="hal-rejet")
+    namesake = insert_source_contribution(
+        sa_sync_conn,
+        source_record,
+        raw_last_name="Durand",
+        raw_first_name="Marie",
+        contributor_information_id=upsert_split_contributor_information(
+            sa_sync_conn, "durand", "marie"
+        ),
+    )
+    align_source_contributions(sa_sync_conn, rejected, [(namesake, source_record)])
+    _contribution(sa_sync_conn, rejected, namesake_coauthor)
+    insert_rejected_contribution(sa_sync_conn, rejected, person_id=person)
+
+    resembling = insert_publication(sa_sync_conn)
+    suspect = _contribution(sa_sync_conn, resembling, person, "name")
+    _contribution(sa_sync_conn, resembling, namesake_coauthor)
+    genuine = insert_publication(sa_sync_conn)
+    _contribution(sa_sync_conn, genuine, person, "name")
+    _contribution(sa_sync_conn, genuine, colleague)
+
+    detect(sa_sync_conn, _LOGGER)
+
+    assert _suspects(sa_sync_conn) == [(suspect, person, "rejected_publications", None)]
+
+
+def test_le_calcul_remplace_les_signalements_precedents(sa_sync_conn):
+    person = insert_person(sa_sync_conn, "Robin", first_name="Frédéric")
+    contribution = _contribution(sa_sync_conn, insert_publication(sa_sync_conn), person, "idref")
+    sa_sync_conn.execute(
+        text("INSERT INTO suspect_contributions VALUES (:c, :p, 'rejected_publications', NULL)"),
+        {"c": contribution, "p": person},
+    )
+
+    detect(sa_sync_conn, _LOGGER)
+
+    assert _suspects(sa_sync_conn) == []

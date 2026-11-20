@@ -1,6 +1,6 @@
 # Alignement des auteurs
 
-*À jour le 2026-11-04.*
+*À jour le 2026-11-20.*
 
 La phase `author_grouping` réunit dans une [contribution](../donnees/04-contributions.md) les contributions sources d'un même auteur dans une publication, une par enregistrement source au plus (`aligned_source_contributions`). Elle vient après la phase `publications`, qui réunit les enregistrements sources d'un même document, et avant la phase [`persons`](09-persons.md), qui décide la personne de chaque contribution.
 
@@ -16,7 +16,7 @@ Les contributions d'une publication se recalculent entièrement, donc le résult
 
 Ces contributions sources ne sont dans aucune contribution et n'ont pas de personne.
 
-## Alignement
+## Alignement (`align_source_contributions`)
 
 Les enregistrements sources se traitent de la liste d'auteurs la plus longue à la plus courte, chacun face aux contributions déjà formées. Une contribution source rejoint une contribution :
 
@@ -33,6 +33,6 @@ La ressemblance compare les noms complets, quel que soit leur découpage entre n
 
 Chaque contribution reprend l'identifiant de la contribution en base avec laquelle elle partage le plus de contributions sources. La personne suit l'identifiant. Une contribution en base sans correspondant est supprimée. Une contribution rattachée entre dans la file de redécision de sa personne (`contribution_resolution_queue`) quand ses contributions sources changent.
 
-La tâche `author_grouping.attributes` recompose les attributs des contributions de la file `contribution_attributes_queue`. `roles` et `perimeter_evidence` sont l'union de ceux des contributions sources alignées. `author_positions` réunit les positions d'auteur. Une contribution est correspondante si une de ses contributions sources l'est. Les listes d'auteurs de la publication votent pour le premier et le dernier auteur, à la majorité. Les listes tronquées votent seulement pour le premier auteur.
+La tâche `author_grouping.recompute_contribution_attributes` recompose les attributs des contributions de la file `contribution_attributes_queue`. `roles` et `perimeter_evidence` sont l'union de ceux des contributions sources alignées. `author_positions` réunit les positions d'auteur. Une contribution est correspondante si une de ses contributions sources l'est. Les listes d'auteurs de la publication votent pour le premier et le dernier auteur, à la majorité. Les listes tronquées votent seulement pour le premier auteur.
 
 La vue matérialisée `publication_author_alignment` mesure le recouvrement des listes d'auteurs de chaque publication. Elle sert l'onglet des fusions suspectes de l'administration.

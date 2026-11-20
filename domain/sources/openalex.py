@@ -16,6 +16,10 @@ class OpenAlexSource:
     listed_in: tuple[str, ...]
     """Codes des listes de revues où figure la source."""
     works_count: int
+    is_oa: bool = False
+    """La source est en open access intégral."""
+    oa_flip_year: int | None = None
+    """Année du passage de la source à l'open access intégral, `None` pour une source née en open access intégral."""
 
 
 @dataclass(frozen=True, slots=True)

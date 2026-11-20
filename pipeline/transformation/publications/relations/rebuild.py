@@ -1,4 +1,4 @@
-"""Phase `relations`, tâche `rebuild` : reconstruction à chaque run des relations entre publications, hors relations avec un erratum ou un avis (tâche `notices`).
+"""Phase `relations`, tâche `rebuild_publication_relations` : reconstruction à chaque run des relations entre publications, hors relations avec un erratum ou un avis (tâche `link_notices`).
 
 La phase suit `publications` : les enregistrements sources sont rattachés à leur publication, et un DOI cible se résout en publication quand elle est en base. Les relations viennent de trois signaux :
 
@@ -491,7 +491,7 @@ def _build_title_match_edges(
 
 
 REBUILT_RELATION_TYPES = frozenset(RelationType) - NOTICE_RELATION_TYPES
-"""Types de relation écrits par la tâche `rebuild`."""
+"""Types de relation écrits par la tâche `rebuild_publication_relations`."""
 
 
 def rebuild(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
@@ -570,7 +570,7 @@ def _count_by_pair_label(added_by_type: list[tuple[str, int]]) -> dict[str, int]
 
 TASKS = (
     Task(
-        "rebuild",
+        "rebuild_publication_relations",
         reads=(
             *(
                 f"source_records.{column}"
@@ -592,8 +592,17 @@ TASKS = (
             "publication_relations",
         ),
         writes=("publication_relations",),
-        # Lecture de la table avant sa reconstruction, pour compter les arêtes ajoutées et disparues.
-        previous_run=("publication_relations",),
+        previous_runs=(
+            # Lecture de la table avant sa reconstruction, pour compter les arêtes ajoutées et disparues.
+            "publication_relations",
+            # Publications supprimées, enregistrements sources détachés par `finalize.purge_publications`.
+            "publications.id",
+            "publications.doc_type",
+            "publications.doi",
+            "publications.title_normalized",
+            "publications.publication_year",
+            "source_records.publication_id",
+        ),
         run=in_transaction(rebuild),
         section="Relations entre publications",
     ),

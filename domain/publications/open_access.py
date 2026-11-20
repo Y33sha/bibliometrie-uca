@@ -1,6 +1,6 @@
 """Statut open access d'une publication, déduit des accès constatés sur ses copies, du modèle de sa revue et du verdict d'Unpaywall.
 
-1. Copie ouverte chez l'éditeur, sous licence ouverte : le modèle de la revue décide. `subscription` ou inconnu donne `hybrid`, `full_oa` donne `gold`, `diamond` donne `diamond`. Sans revue, `gold`.
+1. Copie ouverte chez l'éditeur, sous licence ouverte : le modèle de la revue l'année de parution décide (`OaModelHistory`). `subscription` ou inconnu donne `hybrid`, `full_oa` donne `gold`, `diamond` donne `diamond`. Sans revue, `gold`.
 2. Sinon, copie d'archive ou de serveur de preprints ouverte : `green`.
 3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
 4. Sinon : `embargoed` sous embargo ; `closed` avec une copie déclarée fermée, un verdict, ou pour une publication fermée par nature (`is_restricted`) ; `unknown` sans aucune information.
@@ -108,7 +108,7 @@ def decide_oa_status(
 
     Args:
         has_serial: la publication est rattachée à une revue.
-        serial_oa_model: modèle open access de cette revue (`OaModel`), `None` s'il est inconnu.
+        serial_oa_model: modèle open access de cette revue l'année de parution (`OaModel`), `None` s'il est inconnu.
     """
     if facts.publisher_open and facts.publisher_licensed:
         if not has_serial or serial_oa_model == OaModel.FULL_OA:

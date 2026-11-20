@@ -146,6 +146,67 @@ class TestCreation:
 
         assert _person_name(conn, _person(conn, contribution)[0]) == ("Durand", "Claire")
 
+    def test_une_graphie_rattachee_dans_le_meme_run_evite_la_creation(self, sa_sync_conn):
+        conn = sa_sync_conn
+        person = insert_person(conn, "Martin", first_name="Jean")
+        insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="confirmed")
+        _contribution(
+            conn,
+            insert_publication(conn),
+            [
+                ("crossref", "Jean Martin", {"orcid": _ORCID}, True),
+                ("wos", "Jean Martinez", None, True),
+            ],
+        )
+        variant = _contribution(
+            conn, insert_publication(conn), [("hal", "Jean Martinez", None, True)]
+        )
+
+        counts = resolve_contributions(conn, logging.getLogger("test"))
+
+        assert _person(conn, variant) == (person, "name")
+        assert counts["created"] == 0
+
+    def test_une_graphie_de_la_contribution_fondatrice_evite_une_seconde_creation(
+        self, sa_sync_conn
+    ):
+        conn = sa_sync_conn
+        founding = _contribution(
+            conn,
+            insert_publication(conn),
+            [("crossref", "Claire Durand", None, True), ("wos", "Claire Lefort", None, True)],
+        )
+        variant = _contribution(
+            conn, insert_publication(conn), [("hal", "Claire Lefort", None, True)]
+        )
+
+        counts = resolve_contributions(conn, logging.getLogger("test"))
+
+        assert counts["created"] == 1
+        assert _person(conn, variant)[0] == _person(conn, founding)[0] is not None
+
+    def test_une_graphie_d_une_contribution_qui_rejoint_la_personne_evite_une_seconde_creation(
+        self, sa_sync_conn
+    ):
+        conn = sa_sync_conn
+        founding = _contribution(
+            conn, insert_publication(conn), [("crossref", "Claire Durand", None, True)]
+        )
+        joining = _contribution(
+            conn,
+            insert_publication(conn),
+            [("hal", "Claire Durand", None, True), ("wos", "Claire Lefort", None, True)],
+        )
+        variant = _contribution(
+            conn, insert_publication(conn), [("openalex", "Claire Lefort", None, True)]
+        )
+
+        counts = resolve_contributions(conn, logging.getLogger("test"))
+
+        assert counts["created"] == 1
+        person = _person(conn, founding)[0]
+        assert _person(conn, joining)[0] == _person(conn, variant)[0] == person is not None
+
 
 def test_une_personne_deja_rattachee_dans_la_publication_n_est_pas_reprise(sa_sync_conn):
     conn = sa_sync_conn
@@ -452,6 +513,34 @@ class TestPersonIndex:
         resolve_contributions(conn, logging.getLogger("test"))
 
         assert _person(conn, contribution) == (kept, "name")
+
+
+def test_un_coauteur_habituel_departage_une_forme_de_nom_ambigue(sa_sync_conn):
+    """« J Dupont » désigne Jean et Jacques Dupont. Claire Bernard, coauteur de Jean dans une autre publication, figure dans la publication : la contribution revient à Jean."""
+    conn = sa_sync_conn
+    jean = person_repository(conn).create("Dupont", "Jean")
+    person_repository(conn).create("Dupont", "Jacques")
+    claire = person_repository(conn).create("Bernard", "Claire")
+    earlier = insert_publication(conn)
+    _attach(conn, _contribution(conn, earlier, [("hal", "Jean Dupont", None, True)]), jean, "name")
+    _attach(
+        conn,
+        _contribution(conn, earlier, [("openalex", "Claire Bernard", None, True)]),
+        claire,
+        "name",
+    )
+    publication = insert_publication(conn)
+    _attach(
+        conn,
+        _contribution(conn, publication, [("hal", "Claire Bernard", None, True)]),
+        claire,
+        "name",
+    )
+    contribution = _contribution(conn, publication, [("openalex", "J Dupont", None, True)])
+
+    resolve_contributions(conn, logging.getLogger("test"))
+
+    assert _person(conn, contribution) == (jean, "coauthors")
 
 
 def test_un_membre_du_jury_au_nom_inconnu_reste_sans_personne(sa_sync_conn):

@@ -19,7 +19,7 @@ from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.queues import Queue, enqueue, enqueue_sql
 from infrastructure.sql_fragments import (
     identifier_neutralized,
-    person_source_contribution,
+    individual_source_contribution,
     trusted_identifier_sql,
 )
 
@@ -65,7 +65,7 @@ _MISPLACED = IdentifierNeutralization.MISPLACED.value
 def fetch_identifier_votes(conn: Connection) -> dict[IdentifierKey, dict[str, int]]:
     """Renvoie, pour chaque valeur d'identifiant, le nombre de contributions sources contenant la valeur, par `author_name_normalized`.
 
-    Votent les contributions sources rattachées à une contribution, de source fiable pour l'identifiant (`trusted_identifier`), et sans neutralisation de la valeur pour partage. Une contribution source neutralisant la valeur comme mal placée vote : le consensus dépend seulement des données.
+    Votent les contributions sources d'un auteur individuel (`individual_source_contribution`), de source fiable pour l'identifiant (`trusted_identifier`), et sans neutralisation de la valeur pour partage. Une contribution source neutralisant la valeur comme mal placée vote : le consensus dépend seulement des données.
     """
     shared = identifier_neutralized("k.id_type", reason=IdentifierNeutralization.SHARED.value)
     rows = conn.execute(
@@ -78,7 +78,7 @@ def fetch_identifier_votes(conn: Connection) -> dict[IdentifierKey, dict[str, in
             JOIN source_contributions sc ON sc.contributor_information_id = ci.id
             WHERE ci.author_name_normalized IS NOT NULL
               AND {_trusted_identifier_of_types(tuple(PersonIdentifierType))}
-              AND {person_source_contribution("sc")}
+              AND {individual_source_contribution("sc")}
               AND NOT {shared}
             GROUP BY 1, 2, 3
         """)

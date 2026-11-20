@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from infrastructure.db.queues import Queue, enqueue
 from pipeline.transformation.publications.author_grouping.store import AuthorGroupingStore
+from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.alignment import align_source_contributions
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
@@ -33,8 +34,8 @@ def _member(conn, publication, source, *, corresponding, roles, evidence):
     return source_contribution, source_record
 
 
-def _contribution_of_two(conn) -> int:
-    publication = insert_publication(conn)
+def _contribution_of_two(conn, doc_type="article") -> int:
+    publication = insert_publication(conn, doc_type=doc_type)
     return align_source_contributions(
         conn,
         publication,
@@ -89,6 +90,35 @@ def test_les_attributs_de_la_contribution_reunissent_ceux_de_ses_contributions_s
     )
     assert queued(conn, Queue.CONTRIBUTION_ATTRIBUTES) == set()
     assert store.propagate_attributes() == (0, 0)
+
+
+def test_une_contribution_de_brevet_a_le_seul_role_inventeur(sa_sync_conn):
+    """HAL donne par défaut le rôle d'auteur aux inventeurs : la contribution d'un brevet a le seul rôle inventeur, et ne fonde pas de personne."""
+    conn = sa_sync_conn
+    contribution = _contribution_of_two(conn, doc_type="patent")
+
+    AuthorGroupingStore(conn).propagate_attributes()
+
+    assert _attributes(conn, contribution).roles == ["inventor"]
+
+
+def test_une_publication_devenue_brevet_change_le_role_de_ses_contributions(sa_sync_conn):
+    conn = sa_sync_conn
+    contribution = _contribution_of_two(conn)
+    AuthorGroupingStore(conn).propagate_attributes()
+    store = PublicationStore(conn)
+    publication = store.find_by_id(
+        conn.execute(
+            text("SELECT publication_id FROM contributions WHERE id = :g"), {"g": contribution}
+        ).scalar_one()
+    )
+    assert publication is not None
+    publication.doc_type = "patent"
+
+    store.save([publication])
+    AuthorGroupingStore(conn).propagate_attributes()
+
+    assert _attributes(conn, contribution).roles == ["inventor"]
 
 
 def _leave_perimeter(conn, contribution, mode):

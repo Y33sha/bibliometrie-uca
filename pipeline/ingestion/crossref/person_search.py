@@ -6,6 +6,7 @@ La requête `GET /works` reçoit le filtre `orcid` une fois par ORCID du lot : C
 from __future__ import annotations
 
 from domain.persons.identifiers import PersonIdentifierType
+from pipeline.ingestion.api_params import CROSSREF_SEARCH_MAX_CONCURRENT
 from pipeline.ingestion.common.pages import Page
 from pipeline.ingestion.common.person_search import (
     Identifiers,
@@ -29,6 +30,10 @@ class CrossrefPersonHarvester(PersonSearchHarvester[CrossrefClient]):
     """Œuvres Crossref des personnes RH, cherchées par ORCID."""
 
     SOURCE = "crossref"
+
+    @property
+    def max_concurrent(self) -> int:
+        return CROSSREF_SEARCH_MAX_CONCURRENT
 
     def fetch_page(
         self,

@@ -7,7 +7,7 @@ Sont décidées :
 - les contributions sans personne du périmètre, ou ayant une contribution source épinglée, ou une contribution source à identifiant fiable d'attribution confirmée ou authentifiée, à une personne non marquée hors périmètre ;
 - les contributions non manuelles de la file.
 
-Une contribution de la file garde sa personne si sa décision la désigne encore, et la perd sinon. `--rebuild-persons` met en file toutes les contributions rattachées hors épinglage. Les contributions se décident par lots de publications, contre l'index chargé en début de tâche. Les contributions du périmètre au nom inconnu sont traitées ensuite, une à une, contre l'index tenu à jour. Chacune rejoint une personne créée dans le même passage, ou fonde la sienne (`create_persons`).
+Une contribution de la file garde sa personne si sa décision la désigne encore, et la perd sinon. `--rebuild-persons` met en file toutes les contributions rattachées hors épinglage. Les contributions se décident par lots de publications, contre l'index chargé en début de tâche. Le contexte d'une contribution départage les personnes candidates d'une forme de nom ambiguë (`decide_with_tie_break`). Les contributions du périmètre au nom inconnu sont traitées ensuite, une à une, contre l'index tenu à jour. Chacune rejoint une personne créée dans le même passage, ou fonde la sienne (`create_persons`).
 """
 
 from collections import Counter, defaultdict
@@ -37,6 +37,7 @@ from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import HUMAN_ATTRIBUTION_STATUSES, PersonIdentifierType
 from domain.persons.person import PersonExclusion, validated_name
 from domain.persons.source_contribution_matching import Namesake
+from domain.persons.tie_break import break_tie
 from infrastructure.db.queues import Queue, delete_processed, enqueue, snapshot
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
@@ -59,11 +60,16 @@ from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger
 from pipeline.runtime.observability.progress import Progress, track_progress, waiting
 from pipeline.transformation.persons.first_names import complete_reduced_first_names
 from pipeline.transformation.persons.person_writes import add_identifiers_from_contributions
+from pipeline.transformation.persons.populate_person_name_forms import (
+    populate as populate_person_name_forms,
+)
 from pipeline.transformation.persons.store import (
+    fetch_contribution_contexts,
     fetch_identifier_to_person_map,
     fetch_name_form_map,
     fetch_name_form_status_map,
     fetch_namesakes,
+    fetch_person_profiles,
     fetch_rejected_person_ids_by_publication,
 )
 
@@ -130,10 +136,9 @@ _IDENTIFIERS_OBJECT = ", ".join(
 def _members_sql(restriction: str) -> str:
     """Renvoie la requête des contributions sources des contributions retenues par `restriction` (jointures et clause `WHERE` sur `g`)."""
     return f"""
-        SELECT g.id AS contribution_id, g.publication_id, g.in_perimeter, sc.source::text AS source,
-               sc.raw_author_name, sc.raw_last_name, sc.raw_first_name,
+        SELECT g.id AS contribution_id, g.publication_id, g.in_perimeter, g.roles,
+               sc.source::text AS source, sc.raw_author_name, sc.raw_last_name, sc.raw_first_name,
                jsonb_strip_nulls(jsonb_build_object({_IDENTIFIERS_OBJECT})) AS identifiers,
-               sc.roles,
                (SELECT ca.person_id FROM confirmed_source_contributions ca
                 WHERE ca.source_contribution_id = sc.id) AS pinned_person_id
         FROM {CONTRIBUTIONS_AND_SOURCES}
@@ -259,9 +264,9 @@ def _aligned_contributions(rows: Iterable[Row[tuple[object, ...]]]) -> Candidate
     members: dict[int, dict[int, list[AlignedSourceContribution]]] = defaultdict(
         lambda: defaultdict(list)
     )
-    in_perimeter: dict[int, bool] = {}
+    attributes: dict[int, tuple[bool, tuple[str, ...]]] = {}
     for r in rows:
-        in_perimeter[r.contribution_id] = r.in_perimeter
+        attributes[r.contribution_id] = (r.in_perimeter, tuple(r.roles or ()))
         members[r.publication_id][r.contribution_id].append(
             AlignedSourceContribution(
                 source=r.source,
@@ -269,14 +274,13 @@ def _aligned_contributions(rows: Iterable[Row[tuple[object, ...]]]) -> Candidate
                     r.raw_author_name, r.raw_last_name, r.raw_first_name
                 ),
                 identifiers=r.identifiers,
-                roles=r.roles or (),
                 pinned_person_id=r.pinned_person_id,
             )
         )
     return {
         publication_id: {
             contribution_id: AlignedContribution(
-                tuple(contribution_members), in_perimeter[contribution_id]
+                tuple(contribution_members), *attributes[contribution_id]
             )
             for contribution_id, contribution_members in by_contribution.items()
         }
@@ -300,26 +304,53 @@ def taken_persons(conn: Connection, candidates: Candidates) -> dict[int, frozens
     return {r.publication_id: frozenset(r.person_ids) for r in rows}
 
 
-def decide_contributions(
+def decide_with_tie_break(
+    conn: Connection,
     candidates: Candidates,
     index: PersonIndex,
     rejected: dict[int, frozenset[int]],
+) -> dict[int, ContributionDecision]:
+    """Renvoie la décision de chaque contribution (`decide_contribution`), avant l'arbitrage entre les contributions d'une publication. Le contexte de la contribution départage les personnes candidates d'une forme de nom ambiguë (`break_tie`)."""
+    decisions = {
+        contribution_id: decide_contribution(
+            contribution, index, rejected.get(publication_id, frozenset())
+        )
+        for publication_id, by_contribution in candidates.items()
+        for contribution_id, contribution in by_contribution.items()
+    }
+    ambiguous = [
+        contribution_id
+        for contribution_id, decision in decisions.items()
+        if decision.reason == ContributionSkipReason.AMBIGUOUS_NAME_FORM
+    ]
+    if ambiguous:
+        contexts = fetch_contribution_contexts(conn, ambiguous)
+        profiles = fetch_person_profiles(
+            conn,
+            {p for contribution_id in ambiguous for p in decisions[contribution_id].candidates},
+        )
+        for contribution_id in ambiguous:
+            decisions[contribution_id] = break_tie(
+                decisions[contribution_id], contexts[contribution_id], profiles
+            )
+    return decisions
+
+
+def settle_contributions(
+    candidates: Candidates,
+    decisions: dict[int, ContributionDecision],
     taken: dict[int, frozenset[int]],
     progress: Progress | None = None,
 ) -> dict[int, ContributionDecision]:
-    """Renvoie la décision de chaque contribution, avec au maximum une personne par publication.
+    """Renvoie la décision de chaque contribution, avec au maximum une personne par publication (`settle_publication`).
 
     Args:
         progress: avance d'une contribution décidée ; retient les contributions rattachées.
     """
-    decisions: dict[int, ContributionDecision] = {}
+    settled_decisions: dict[int, ContributionDecision] = {}
     for publication_id, by_contribution in candidates.items():
-        rejected_here = rejected.get(publication_id, frozenset())
         decided = {
-            contribution_id: (
-                decide_contribution(contribution, index, rejected_here),
-                len(contribution.members),
-            )
+            contribution_id: (decisions[contribution_id], len(contribution.members))
             for contribution_id, contribution in by_contribution.items()
         }
         settled = settle_publication(decided, taken.get(publication_id, frozenset()))
@@ -328,8 +359,8 @@ def decide_contributions(
                 progress.advance()
                 if decision.outcome == ContributionOutcome.MATCH:
                     progress.keep()
-        decisions |= settled
-    return decisions
+        settled_decisions |= settled
+    return settled_decisions
 
 
 def release_contributions(conn: Connection, decisions: dict[int, ContributionDecision]) -> int:
@@ -396,7 +427,7 @@ def create_persons(
 ) -> int:
     """Traite une à une les contributions à décision de création, contre l'index tenu à jour. Met `decisions` à jour et renvoie le nombre de personnes créées.
 
-    Une contribution désignée par une personne créée dans le même passage rejoint cette personne. Sinon, une personne est créée depuis son nom (`founding_name`) et enregistrée dans l'index. Une personne déjà rattachée à une autre contribution de la publication reste à cette autre contribution.
+    Une contribution désignée par une personne créée dans le même passage rejoint cette personne. Sinon, une personne est créée depuis son nom (`founding_name`) et enregistrée dans l'index. Une personne déjà rattachée à une autre contribution de la publication reste à cette autre contribution. Les noms des contributions sources d'une contribution rattachée deviennent des formes de nom de sa personne dans l'index, comme le fait `populate_person_name_forms` en base.
 
     Args:
         progress: avance d'une contribution traitée ; retient les personnes créées.
@@ -417,9 +448,9 @@ def create_persons(
             members = contribution.members
             if progress is not None:
                 progress.advance()
-            decision = decide_contribution(
-                contribution, index, rejected.get(publication_id, frozenset())
-            )
+            decision = decide_with_tie_break(
+                conn, {publication_id: {contribution_id: contribution}}, index, rejected
+            )[contribution_id]
             if decision.outcome == ContributionOutcome.CREATE:
                 try:
                     last_name, first_name = validated_name(*founding_name(members))
@@ -462,6 +493,9 @@ def create_persons(
             add_identifiers_from_contributions(
                 decision.person_id, identifiers_to_attribute(members, decision), repo=repo
             )
+            index.add_name_forms(
+                decision.person_id, (m.name_forms[0] for m in members if m.name_forms)
+            )
             taken_here.add(decision.person_id)
     return created
 
@@ -480,6 +514,11 @@ _MODE_LABELS: dict[ContributionMatchReason, str] = {
     ContributionMatchReason.IDREF: "par IdRef",
     ContributionMatchReason.NAME: "par nom sans homonymie",
     ContributionMatchReason.COMPATIBLE_NAME: "par initiales compatibles",
+    ContributionMatchReason.COAUTHORS: "par nom ambigu, départagé par les coauteurs",
+    ContributionMatchReason.LABORATORY: "par nom ambigu, départagé par le laboratoire",
+    ContributionMatchReason.HAL_STRUCTURE: "par nom ambigu, départagé par la structure HAL",
+    ContributionMatchReason.SERIAL: "par nom ambigu, départagé par la revue",
+    ContributionMatchReason.ACTIVITY_YEARS: "par nom ambigu, départagé par les années d'activité",
 }
 """Libellés des modes de rattachement dans le journal."""
 
@@ -513,7 +552,7 @@ def unidentified_orphans(
         for contribution_id, contribution in by_contribution.items()
         if decisions[contribution_id].outcome != ContributionOutcome.MATCH
         and contribution.in_perimeter
-        and any(ContributionRole.AUTHOR in m.roles for m in contribution.members)
+        and ContributionRole.AUTHOR in contribution.roles
     ]
 
 
@@ -528,7 +567,8 @@ def resolve_contributions(
     - application des épinglages ;
     - complétion des prénoms réduits (`complete_reduced_first_names`) ;
     - par lot de publications : décision des contributions sans personne et des contributions en file, retrait des personnes non désignées par la décision (`release_contributions`), écriture des rattachements ;
-    - création des personnes des contributions du périmètre au nom inconnu (`create_persons`).
+    - formes de nom tirées des contributions rattachées (`populate_person_name_forms`), puis rechargement de l'index ;
+    - nouvelle décision des contributions du périmètre au nom inconnu, et création des personnes des noms encore inconnus (`create_persons`).
     """
     if rebuild:
         marked = mark_all_for_resolution(conn)
@@ -557,7 +597,12 @@ def resolve_contributions(
         for batch in candidate_batches(publication_ids):
             candidates = load_candidate_contributions(conn, batch)
             taken = taken_persons(conn, candidates)
-            batch_decisions = decide_contributions(candidates, index, rejected, taken, progress)
+            batch_decisions = settle_contributions(
+                candidates,
+                decide_with_tie_break(conn, candidates, index, rejected),
+                taken,
+                progress,
+            )
             released += release_contributions(conn, batch_decisions)
             written += write_decisions(conn, batch_decisions)
             attribute_identifiers(conn, candidates, batch_decisions)
@@ -571,6 +616,12 @@ def resolve_contributions(
                     taken_to_create[publication_id] = taken.get(publication_id, frozenset())
             decisions |= batch_decisions
     _log_identified(logger, decisions, pinned)
+
+    # Les noms des contributions rattachées dans ce passage deviennent des formes de nom de leur personne avant la création.
+    with waiting(f"{BRANCH}formes de nom des contributions rattachées", logger) as line:
+        populate_person_name_forms(conn)
+        index = load_index(conn, completion.conflicting)
+        line.erase()
 
     open_section(logger, "Création de nouvelles personnes")
     undecidable = sum(1 for d in unidentified if d.outcome == ContributionOutcome.SKIP)

@@ -15,16 +15,18 @@
 	import AmbiguousFormsList from './AmbiguousFormsList.svelte';
 	import IdentifierConflictsList from './IdentifierConflictsList.svelte';
 	import NameDuplicatesList from './NameDuplicatesList.svelte';
+	import SuspectAttributionsList from './SuspectAttributionsList.svelte';
 	import { plural } from '#lib/plural.js';
 
 	/* ── Onglets de la session admin : la liste, puis les files de triage ── */
 
-	type TabKey = 'all' | 'ambiguous-forms' | 'identifier-conflicts' | 'name-duplicates';
-	const QUEUES: TabKey[] = ['ambiguous-forms', 'identifier-conflicts', 'name-duplicates'];
+	type TabKey = 'all' | 'ambiguous-forms' | 'identifier-conflicts' | 'name-duplicates' | 'suspect-attributions';
+	const QUEUES: TabKey[] = ['ambiguous-forms', 'identifier-conflicts', 'name-duplicates', 'suspect-attributions'];
 	const tab = useTabParam(QUEUES, isAdmin);
 	let ambiguousCount = $state(0);
 	let identifierConflictCount = $state(0);
 	let nameDuplicateCount = $state(0);
+	let suspectAttributionCount = $state(0);
 	let orphanCount = $state(0);
 	// Incrémenté après chaque action du volet : recharge la file de triage affichée.
 	let reloadFiles = $state(0);
@@ -52,6 +54,10 @@
 		nameDuplicateCount = await queueCount('/api/persons/name-duplicates/count');
 	}
 
+	async function loadSuspectAttributionCount() {
+		suspectAttributionCount = await queueCount('/api/persons/suspect-attributions/count');
+	}
+
 	async function loadOrphanCount() {
 		orphanCount = await queueCount('/api/contributions/orphans/count');
 	}
@@ -70,6 +76,7 @@
 		reloadFiles++;
 		loadAmbiguousCount();
 		loadIdentifierConflictCount();
+		loadSuspectAttributionCount();
 	}
 
 	onMount(() => {
@@ -77,6 +84,7 @@
 		loadOrphanCount();
 		loadAmbiguousCount();
 		loadIdentifierConflictCount();
+		loadSuspectAttributionCount();
 		// Compteur « Doublons par nom » : seulement si l'onglet est l'onglet courant ; sinon il se charge à l'ouverture de l'onglet (cf. `selectTab`).
 		if (tab.current === 'name-duplicates') loadNameDuplicateCount();
 	});
@@ -91,6 +99,7 @@
 			{ key: 'ambiguous-forms', label: 'Formes ambiguës', count: ambiguousCount },
 			{ key: 'identifier-conflicts', label: "Conflits d'identifiant", count: identifierConflictCount },
 			{ key: 'name-duplicates', label: 'Doublons par nom', count: nameDuplicateCount },
+			{ key: 'suspect-attributions', label: 'Attributions suspectes', count: suspectAttributionCount },
 		]}
 		active={tab.current}
 		onselect={(key) => selectTab(key as TabKey)}
@@ -103,6 +112,8 @@
 	<IdentifierConflictsList onopenPerson={drawer.open} onchange={loadIdentifierConflictCount} reloadKey={reloadFiles} />
 {:else if tab.current === 'name-duplicates'}
 	<NameDuplicatesList onopenPerson={drawer.open} onchange={loadNameDuplicateCount} reloadKey={reloadFiles} />
+{:else if tab.current === 'suspect-attributions'}
+	<SuspectAttributionsList onopenPerson={drawer.open} onchange={loadSuspectAttributionCount} reloadKey={reloadFiles} />
 {:else}
 	{#if isAdmin() && orphanCount > 0}
 		<a href={resolve('admin/orphan-contributions')} class="orphan-link">

@@ -21,19 +21,13 @@ Un jeu d'évaluation tiré des verdicts humains existe depuis le 2026-10-19 (`bu
 - [ ] ORCID d'OpenAlex sans DOI : sur des enregistrements sources OpenAlex sans DOI, `raw_orcid` donne deux fois un ORCID faux (Yannick Chevalier, Bruno Pereira). Provenance de `raw_orcid` hors Crossref à vérifier.
 - [ ] Fiabilité des IdRef et des ORCID de ScanR, confrontés aux autres sources de la même contribution. L'IdRef de ScanR sert au rattachement, son ORCID est exclu (`ORCID_MATCH_SOURCES`). La mesure dit aussi si ScanR reste utile comme source.
 
-### Phase 2 — Affiliations
-
-- [ ] Affiliation comme critère de départage des homonymes et des identifiants contradictoires : les structures de la contribution confrontées à celles des autres publications de chaque candidat. Mesure du 2026-10-19 (`measure_affiliation.sql`), sur 2 176 contributions au nom ambigu. Une clé spécifique est un laboratoire ou une équipe du référentiel, ou un laboratoire, une équipe ou un département HAL.
-  - Avec toutes les clés, établissements et ROR compris, plusieurs candidats concordent dans 1 725 cas. Avec les clés spécifiques, un seul candidat concorde dans 1 631 cas, plusieurs dans 392.
-  - Sur ces 1 631 cas, le candidat désigné est la personne rattachée dans 1 151, une autre personne dans 7. 463 contributions sont sans personne.
-  - Échantillon de 97 cas à relire (`build_affiliation_review.py`).
-
-### Phase 3 — Alignement des listes d'auteurs
+### Phase 2 — Alignement des listes d'auteurs
 
 - [ ] Diagnostic de chaque liste d'auteurs avant l'alignement. Il nomme le défaut, écarte les contributions sources concernées et reste stocké pour la relecture et la mesure. Les signaux viennent de l'enregistrement source seul ; la comparaison avec les autres enregistrements sources de la publication sert de confirmation.
+- [ ] Auteurs collectifs non reconnus : « INRAE, France » figure comme auteur dans des listes OpenAlex et scanR, parfois plusieurs fois.
 - [ ] Fusions erronées probables dans l'onglet Fusions suspectes. L'onglet retient une publication dont moins de la moitié des contributions sources ont un correspondant : un enregistrement source étranger minoritaire lui échappe (12 des 20 fusions erronées probables de l'échantillon du 2026-10-18). Critère à ajouter : un enregistrement source dont presque aucune contribution source n'a de correspondant.
 
-### Phase 4 — Rattachements et corrections
+### Phase 3 — Rattachements et corrections
 
 - [ ] Précision et rappel de la résolution par contribution sur le jeu d'évaluation.
 - [ ] Relecture des personnes supprimées par la purge, et des contributions laissées sans personne parce que leur personne est déjà dans la publication, au regard du gel du 2026-10-24.
@@ -54,4 +48,4 @@ Un jeu d'évaluation tiré des verdicts humains existe depuis le 2026-10-19 (`bu
 
 - Périmètre des publications : il réunit les indices des seules contributions rattachées à une personne non exclue. Une erreur d'affiliation relève de la contribution source, pas de la personne.
 - Recalcul immédiat des contributions invalidées par une décision de l'administration, exposé par le pipeline (`pipeline/public.py`) sur un index réduit aux valeurs de leurs contributions sources.
-- Deux idées de ReCiter : enregistrer ce qui a concordé et pas seulement la règle ; réutiliser les confirmations et les rejets d'une personne comme indices pour ses autres contributions.
+- Idée de ReCiter : enregistrer ce qui a concordé, en plus de la règle.

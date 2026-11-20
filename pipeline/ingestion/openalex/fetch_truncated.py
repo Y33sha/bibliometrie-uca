@@ -85,7 +85,7 @@ _CHILDREN = (
         "refetch_openalex",
         reads=("staging",),
         writes=("staging", "staging_normalization_queue"),
-        previous_run=("staging",),
+        previous_runs=("staging",),
         network="openalex",
         run=_refetch,
         section="Listes d'auteurs tronquées",
@@ -101,4 +101,5 @@ PHASE = Phase(
     "Complétion des listes d'auteurs OpenAlex tronquées",
     _CHILDREN,
     Block.HARVESTING,
+    total_line=True,
 )

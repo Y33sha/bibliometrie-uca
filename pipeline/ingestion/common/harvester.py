@@ -257,15 +257,14 @@ class SourceHarvester[ClientT](ABC):
         self,
         metrics: PhaseMetrics,
         *,
-        found: int | None = None,
         by: str | None = None,
     ) -> None:
         """Écrit sous la barre le nombre de documents trouvés, ventilé en nouveaux, mis à jour et inchangés.
 
-        `found` donne le nombre du bilan quand un filtre retient une partie des documents parcourus. `by` nomme le critère de recherche : « trouvés par ORCID ».
+        `by` nomme le critère de recherche : « trouvés par ORCID ».
         """
         found_form, new_form, updated_form, unchanged_form = _SUMMARY_FORMS[self.FEMININE]
-        n = metrics.total if found is None else found
+        n = metrics.total
         self.logger.info(
             "%s%s %s%s : %s, %s, %s",
             BRANCH_CONTINUATION,

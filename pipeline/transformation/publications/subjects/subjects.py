@@ -1,6 +1,6 @@
-"""Phase `subjects` : sujets des publications (`subject_ingestion`), puis usage des sujets et cooccurrences (`subject_cooccurrences`). Chaque tâche a sa transaction. La phase est idempotente.
+"""Phase `subjects` : sujets des publications (`subject_ingestion`). La phase est idempotente.
 
-La phase `finalize` supprime au préalable les publications sans contribution rattachée à une personne. `publication_subjects` et ses compteurs dérivés couvrent donc le périmètre.
+La tâche `count_subject_usage` recalcule l'usage des sujets et leurs cooccurrences (`subject_cooccurrences`). La phase `finalize` l'exécute après la purge des publications, donc ses décomptes couvrent le périmètre.
 """
 
 from __future__ import annotations
@@ -20,42 +20,49 @@ def _ingest(ctx: PhaseContext) -> PhaseMetrics:
         return run_ingest(conn, ctx.logger, rebuild=ctx.options.rebuild_subjects)
 
 
-_CHILDREN = (
-    Task(
-        "ingest",
-        reads=(
-            "publications.id",
-            "publications.subjects_ingested_at",
-            "source_records.publication_id",
-            "source_records.source",
-            "source_record_subjects",
-            "subjects",
-            "publication_subjects",
-        ),
-        writes=("publication_subjects", "subjects.id", "publications.subjects_ingested_at"),
-        previous_run=("publications.subjects_ingested_at", "subjects"),
-        run=_ingest,
-        section="Liens publications-sujets",
+_DERIVE_PUBLICATION_SUBJECTS = Task(
+    "derive_publication_subjects",
+    reads=(
+        "publications.id",
+        "publications.subjects_ingested_at",
+        "source_records.publication_id",
+        "source_records.source",
+        "source_record_subjects",
+        "subjects",
+        "publication_subjects",
     ),
-    Task(
-        "usage",
-        reads=(
-            "publication_subjects",
-            "subjects.id",
-            "subjects.label",
-            "subjects.label_normalized",
-        ),
-        writes=("subjects.usage_count", "subject_labels", "subject_cooccurrences"),
-        previous_run=("subjects",),
-        run=in_transaction(run_cooccurrences),
-        section="Rafraîchissement des décomptes",
+    writes=("publication_subjects", "subjects.id", "publications.subjects_ingested_at"),
+    previous_runs=(
+        "publications.subjects_ingested_at",
+        "subjects",
+        # Publications et liens supprimés, enregistrements sources détachés par `finalize.purge_publications`.
+        "publications.id",
+        "publication_subjects",
+        "source_records.publication_id",
     ),
+    run=_ingest,
+    section="Liens publications-sujets",
 )
+
+COUNT_SUBJECT_USAGE = Task(
+    "count_subject_usage",
+    reads=(
+        "publication_subjects",
+        "subjects.id",
+        "subjects.label",
+        "subjects.label_normalized",
+    ),
+    writes=("subjects.usage_count", "subject_labels", "subject_cooccurrences"),
+    previous_runs=("subjects",),
+    run=in_transaction(run_cooccurrences),
+    section="Rafraîchissement des décomptes de sujets",
+)
+"""Usage des sujets et cooccurrences, exécutés par la phase `finalize`."""
 
 
 PHASE = Phase(
     "subjects",
     "Sujets des publications",
-    _CHILDREN,
-    Block.ENRICHMENTS,
+    (_DERIVE_PUBLICATION_SUBJECTS,),
+    Block.ENTITIES,
 )

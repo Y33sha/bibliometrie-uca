@@ -15,6 +15,12 @@ from domain.publications.open_access import (
     is_restricted,
     publication_oa_status,
 )
+from domain.serials.oa_model_history import (
+    DOAJ_OPEN_LICENSE_SINCE_KEY,
+    OaModelHistory,
+    doaj_year,
+)
+from domain.serials.serial import OaModel
 from domain.types import JsonValue
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.sql_fragments import under_active_embargo
@@ -29,6 +35,7 @@ class OaFacts(NamedTuple):
     serial_id: int | None
     doc_type: str | None
     source_extras: Mapping[str, JsonValue] | None
+    publication_year: int | None
 
 
 class OaInputs(NamedTuple):
@@ -38,6 +45,7 @@ class OaInputs(NamedTuple):
     """Le statut open access s'applique au type de la publication (`has_oa_status`)."""
     has_serial: bool
     serial_oa_model: str | None
+    """Modèle open access de la revue l'année de parution de la publication (`OaModelHistory.model_at`)."""
     embargoed: bool
     """Un enregistrement source de la publication est sous embargo actif."""
     restricted: bool
@@ -64,7 +72,7 @@ def oa_inputs(conn: Connection, publications: Sequence[OaFacts]) -> dict[int, Oa
     ids = [p.id for p in publications]
     serial_ids = sorted({p.serial_id for p in publications if p.serial_id is not None})
     dois = sorted({p.doi for p in publications if p.doi})
-    oa_models = _serial_oa_models(conn, serial_ids) if serial_ids else {}
+    histories = _serial_oa_histories(conn, serial_ids) if serial_ids else {}
     unpaywall = _unpaywall_verdicts(conn, dois) if dois else {}
     embargoed = _embargoed_publications(conn, ids)
     copies = publication_copies(conn, ids)
@@ -72,7 +80,11 @@ def oa_inputs(conn: Connection, publications: Sequence[OaFacts]) -> dict[int, Oa
         p.id: OaInputs(
             applicable=has_oa_status(p.doc_type),
             has_serial=p.serial_id is not None,
-            serial_oa_model=oa_models.get(p.serial_id) if p.serial_id is not None else None,
+            serial_oa_model=(
+                history.model_at(p.publication_year)
+                if p.serial_id is not None and (history := histories.get(p.serial_id))
+                else None
+            ),
             embargoed=p.id in embargoed,
             restricted=is_restricted(p.doc_type, p.source_extras),
             unpaywall=unpaywall.get(p.doi) if p.doi else None,
@@ -82,12 +94,23 @@ def oa_inputs(conn: Connection, publications: Sequence[OaFacts]) -> dict[int, Oa
     }
 
 
-def _serial_oa_models(conn: Connection, serial_ids: Sequence[int]) -> dict[int, str | None]:
+def _serial_oa_histories(conn: Connection, serial_ids: Sequence[int]) -> dict[int, OaModelHistory]:
     rows = conn.execute(
-        text("SELECT id, oa_model::text AS oa_model FROM serials WHERE id = ANY(:ids)"),
-        {"ids": list(serial_ids)},
+        text(
+            "SELECT id, oa_model::text AS oa_model, openalex_is_oa, openalex_oa_flip_year,"
+            " doaj_payload->>:doaj_key AS doaj_since FROM serials WHERE id = ANY(:ids)"
+        ),
+        {"ids": list(serial_ids), "doaj_key": DOAJ_OPEN_LICENSE_SINCE_KEY},
     )
-    return {r.id: r.oa_model for r in rows}
+    return {
+        r.id: OaModelHistory(
+            model=OaModel(r.oa_model) if r.oa_model else None,
+            openalex_is_oa=r.openalex_is_oa,
+            openalex_flip_year=r.openalex_oa_flip_year,
+            doaj_since_year=doaj_year(r.doaj_since),
+        )
+        for r in rows
+    }
 
 
 def _unpaywall_verdicts(conn: Connection, dois: Sequence[str]) -> dict[str, str | None]:

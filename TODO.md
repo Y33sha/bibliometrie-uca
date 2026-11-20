@@ -27,6 +27,7 @@
 * [ ] taux de collaboration
 * [ ] évolution des collaborations dans le temps (graphes de collaboration par labo, avec visualisation animée par année)
 * [ ] visualisation des collab avec carte (monde, Europe, France) qui les localise au niveau de leur ville
+* [ ] diagramme par année: afficher les années vides
 
 # Cas particuliers, bizarreries à élucider
 * "How Self-Location Predicts the Degree and Quality of the Felt Sense of Connection" => preprint de ... (DOI non résolu) + lien open access renvoie sur la v1

@@ -242,7 +242,7 @@ def normalized_identifiers(row: SourceRecordUpsert) -> tuple[SourceIdentifier, .
 def _delete_source_records(conn: Connection, staging_filter: str, params: dict[str, object]) -> int:
     """Supprime les enregistrements sources à ligne de `staging` (alias `s`) conforme au filtre, et renvoie leur nombre.
 
-    Les autres enregistrements sources de leur publication sont d'abord marqués pour la réconciliation : la phase `publications` recalcule la publication sans les enregistrements sources supprimés. La publication est marquée pour le groupement des auteurs. Une publication vidée de tous ses enregistrements sources est supprimée en fin de phase `publications`. Les contributions sources suivent par cascade.
+    Les autres enregistrements sources de leur publication sont d'abord marqués pour la réconciliation : la phase `publications` recalcule la publication sans les enregistrements sources supprimés. La publication est marquée pour le groupement des auteurs. Une publication vidée de tous ses enregistrements sources est supprimée par `finalize.purge_publications`. Les contributions sources suivent par cascade.
     """
     enqueue(
         conn,

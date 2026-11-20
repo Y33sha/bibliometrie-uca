@@ -6,7 +6,7 @@ Contraintes d'ordre :
 - La fusion des autres noms des éditeurs suit la résolution des préfixes, qui pose leurs titulaires, et le rattachement des enregistrements sources aux éditeurs.
 - Les ISSN des séries précèdent leur vérification Sudoc et l'import de la table ISSN-L, qui précèdent le rattachement des enregistrements sources aux revues : le rattachement lit l'ISSN-L et le titre Sudoc de chaque ISSN.
 - La recherche des métadonnées des revues dans OpenAlex suit le rattachement, qui donne à chaque revue ses ISSN et ses enregistrements sources. Elle précède le typage en recueil d'actes, qui vise aussi les revues `unknown`.
-- Les espaces de noms DOI suivent le rattachement et le typage des revues.
+- Les espaces de noms DOI suivent le rattachement et le typage des revues, et le rattachement des monographies à leur collection : une collection de livres est sans espace de noms. Le rattachement de la revue manquante par le DOI (`serial_by_doi`) suit les espaces de noms.
 - Le rattachement des enregistrements sources aux monographies suit la fusion des autres noms des éditeurs : l'éditeur départage les volumes de même titre.
 - Le rattachement des monographies à leur collection suit le rattachement des enregistrements sources. La nature des monographies lit le type de la collection posé par le rattachement.
 
@@ -36,6 +36,7 @@ from pipeline.ingestion.openalex.sources import fetch_source_lists, fetch_source
 from pipeline.runtime.config import cap, delay
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.transformation.publications.correction import serial_by_doi
 from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
 from pipeline.transformation.publishing.monographs import (
     attach_monographs,
@@ -55,6 +56,7 @@ from pipeline.transformation.publishing.serials import (
     enrich_serials_from_doaj,
     import_issnl_table,
     learn_serial_doi_namespaces,
+    model_serials,
     type_journal_serials,
     type_proceedings_serials,
 )
@@ -71,10 +73,12 @@ _IDENTIFIED: dict[str, Callable[[PhaseMetrics], int]] = {
     "check_serials_in_openalex": lambda m: m.extras.get("openalex_found", 0),
     "type_proceedings_serials": lambda m: m.extras.get("serials_typed_proceedings", 0),
     "type_journal_serials": lambda m: m.extras.get("serials_typed_journal", 0),
-    "learn_serial_doi_namespaces": lambda m: m.extras.get("serial_doi_namespaces", 0),
+    "model_serials": lambda m: m.updated,
     "attach_monographs": lambda m: m.updated,
     "link_monographs_to_collections": lambda m: m.extras.get("monographs_linked", 0),
     "type_proceedings_volumes": lambda m: m.extras.get("monographs_to_proceedings", 0),
+    "learn_serial_doi_namespaces": lambda m: m.extras.get("serial_doi_namespaces", 0),
+    "serial_by_doi": lambda m: m.updated,
 }
 """Tâches de la table d'observabilité, dans l'ordre d'exécution, avec ce qui compte comme identifié pour chacune."""
 
@@ -209,7 +213,7 @@ _RESOLVE_CROSSREF_PUBLISHERS = Task(
         "publisher_name_forms",
     ),
     # L'agence et l'éditeur posés par `resolve_datacite_publishers` retirent un préfixe de la sélection.
-    previous_run=(
+    previous_runs=(
         "source_record_identifiers",
         "publishers",
         "publisher_name_forms",
@@ -250,7 +254,7 @@ _RESOLVE_DATACITE_PUBLISHERS = Task(
         "publishers.id",
         "publisher_name_forms",
     ),
-    previous_run=("publishers", "publisher_name_forms"),
+    previous_runs=("publishers", "publisher_name_forms"),
     network="datacite",
     run=_resolve_publishers(
         partial(
@@ -281,7 +285,7 @@ _ATTACH_PUBLISHERS = Task(
         "source_record_keys_queue",
     ),
     # Éditeurs et formes de nom des runs précédents ; types corrigés par `metadata_correction`, lus sous leur valeur d'avant correction.
-    previous_run=(
+    previous_runs=(
         "publishers",
         "publisher_name_forms",
         "source_records.publisher_id",
@@ -314,7 +318,7 @@ _MERGE_DUPLICATE_PUBLISHERS = Task(
         "merge_redirects",
     ),
     # Un autre nom ne détient aucun préfixe DOI : la fusion laisse `doi_prefixes` en l'état.
-    previous_run=("source_records", "publications", "publishers"),
+    previous_runs=("source_records", "publications", "publishers"),
     run=_run_merge_duplicate_publishers,
     label=merge_duplicate_publishers.LABEL,
 )
@@ -325,7 +329,7 @@ _SYNC_ISSNS = Task(
     reads=("source_records.biblio", "serial_issns"),
     writes=("serial_issns",),
     # Lignes vérifiées par `check_issns_in_sudoc`, revues posées par `attach_serials`, revues supprimées par `finalize.delete_empty_serials`.
-    previous_run=("serial_issns",),
+    previous_runs=("serial_issns",),
     run=in_transaction(attach_serials.run_sync_issns),
     label=attach_serials.SYNC_LABEL,
 )
@@ -347,7 +351,7 @@ _CHECK_ISSNS_IN_SUDOC = Task(
         "serials.title",
         "serials.title_normalized",
     ),
-    previous_run=("serial_issns", "serials"),
+    previous_runs=("serial_issns", "serials"),
     network="sudoc",
     run=_run_check_issns_in_sudoc,
     label=check_issns_in_sudoc.LABEL,
@@ -360,7 +364,7 @@ _IMPORT_ISSNL_TABLE = Task(
     reads=("serial_issns", "config"),
     writes=("serial_issns.issnl", "serial_issns.issnl_checked_at"),
     # Date du dernier import, posée par la tâche elle-même.
-    previous_run=("serial_issns",),
+    previous_runs=("serial_issns",),
     network="issn",
     run=_run_import_issnl_table,
     label=import_issnl_table.LABEL,
@@ -399,7 +403,7 @@ _ATTACH_SERIALS = Task(
         "merge_redirects",
     ),
     # Revues corrigées par `metadata_correction`, collections posées par `link_monographs_to_collections`, publications recalculées par la phase `publications`, décisions de titre supprimées avec leur revue par `finalize.delete_empty_serials`.
-    previous_run=(
+    previous_runs=(
         "source_records.serial_id",
         "source_records.corrections",
         "serial_issns",
@@ -432,12 +436,14 @@ _CHECK_SERIALS_IN_OPENALEX = Task(
     writes=(
         "serials.openalex_id",
         "serials.openalex_checked_at",
+        "serials.openalex_is_oa",
+        "serials.openalex_oa_flip_year",
         "serials.serial_type",
         "serial_list_entries",
         "serial_lists",
     ),
     # Nombre de publications recalculé par `finalize`, date de recherche posée par la tâche elle-même, revues corrigées par `metadata_correction`, ISSN libérés par `finalize.delete_empty_serials`.
-    previous_run=("serials", "source_records.serial_id", "serial_issns"),
+    previous_runs=("serials", "source_records.serial_id", "serial_issns"),
     network="openalex",
     run=_run_check_serials_in_openalex,
     label=check_serials_in_openalex.LABEL,
@@ -459,7 +465,7 @@ _TYPE_PROCEEDINGS_SERIALS = Task(
         "source_records.serial_id",
     ),
     writes=("serials.serial_type",),
-    previous_run=("serials", "serial_issns", "source_records.serial_id"),
+    previous_runs=("serials", "serial_issns", "source_records.serial_id"),
     run=in_transaction(type_proceedings_serials.run_type_proceedings_serials),
     label=type_proceedings_serials.LABEL,
 )
@@ -478,7 +484,7 @@ _TYPE_JOURNAL_SERIALS = Task(
         "source_records.serial_id",
     ),
     writes=("serials.serial_type",),
-    previous_run=("serials", "serial_issns", "source_records.serial_id"),
+    previous_runs=("serials", "serial_issns", "source_records.serial_id"),
     run=in_transaction(type_journal_serials.run_type_journal_serials),
     label=type_journal_serials.LABEL,
 )
@@ -494,9 +500,34 @@ _LEARN_SERIAL_DOI_NAMESPACES = Task(
     ),
     writes=("serial_doi_namespaces",),
     # Statuts posés par la correction de `metadata_correction`.
-    previous_run=("source_records", "serials", "source_record_identifiers.removed_by"),
+    previous_runs=("source_records", "serials", "source_record_identifiers.removed_by"),
     run=in_transaction(learn_serial_doi_namespaces.run_learn_serial_doi_namespaces),
     label=learn_serial_doi_namespaces.LABEL,
+)
+
+
+_SERIAL_BY_DOI = Task(
+    "serial_by_doi",
+    reads=(
+        "serial_doi_namespaces",
+        "source_record_identifiers",
+        "source_records.serial_id",
+        "source_records.corrections",
+        "source_records.doc_type",
+    ),
+    writes=(
+        "source_records.serial_id",
+        "source_records.corrections",
+        "source_record_keys_queue",
+    ),
+    # Types et identifiants corrigés par `metadata_correction` ; espaces de noms des revues vides, supprimés avec elles par `finalize.delete_empty_serials`.
+    previous_runs=(
+        "source_records",
+        "source_record_identifiers.removed_by",
+        "serial_doi_namespaces",
+    ),
+    label="Revues manquantes désignées par le DOI",
+    run=in_transaction(serial_by_doi.run),
 )
 
 
@@ -507,8 +538,6 @@ _ENRICH_SERIALS_FROM_DOAJ = Task(
         "serial_list_entries",
         "serials.doaj_imported_at",
         "serials.serial_type",
-        "serials.oa_model",
-        "serials.doaj_payload",
         "serials.manual_fields",
         "config",
     ),
@@ -516,12 +545,28 @@ _ENRICH_SERIALS_FROM_DOAJ = Task(
         "serials.doaj_payload",
         "serials.doaj_imported_at",
         "serials.serial_type",
-        "serials.oa_model",
     ),
-    previous_run=("serial_issns", "serials"),
+    previous_runs=("serial_issns", "serials"),
     network="doaj",
     run=_run_enrich_serials_from_doaj,
     label=enrich_serials_from_doaj.LABEL,
+)
+
+
+_MODEL_SERIALS = Task(
+    "model_serials",
+    reads=(
+        "serial_list_entries",
+        "serials.doaj_payload",
+        "serials.openalex_is_oa",
+        "serials.oa_model",
+        "serials.manual_fields",
+    ),
+    writes=("serials.oa_model",),
+    # Collections créées par `link_monographs_to_collections`, revues vides supprimées par `finalize.delete_empty_serials`.
+    previous_runs=("serials",),
+    run=in_transaction(model_serials.run_model_serials),
+    label=model_serials.LABEL,
 )
 
 
@@ -541,7 +586,7 @@ _ATTACH_MONOGRAPHS = Task(
         "merge_redirects",
     ),
     # Monographies créées ou fusionnées aux runs précédents, reprises par les volumes.
-    previous_run=("monographs", "source_records.monograph_id"),
+    previous_runs=("monographs", "source_records.monograph_id"),
     run=in_transaction(attach_monographs.run_attach_monographs),
     label=attach_monographs.LABEL,
 )
@@ -565,7 +610,7 @@ _LINK_MONOGRAPHS_TO_COLLECTIONS = Task(
         "serials.serial_type",
         "monographs.serial_id",
     ),
-    previous_run=("monographs", "source_records.serial_id", "serial_issns", "serials"),
+    previous_runs=("monographs", "source_records.serial_id", "serial_issns", "serials"),
     run=in_transaction(link_monographs_to_collections.run_link_monographs_to_collections),
     label=link_monographs_to_collections.LABEL,
 )
@@ -583,7 +628,7 @@ _TYPE_PROCEEDINGS_VOLUMES = Task(
         "source_records.monograph_id",
     ),
     writes=("monographs.proceedings",),
-    previous_run=("monographs", "serials"),
+    previous_runs=("monographs", "serials"),
     run=in_transaction(type_proceedings_volumes.run_type_proceedings_volumes),
     label=type_proceedings_volumes.LABEL,
 )
@@ -614,15 +659,15 @@ _CHILDREN = (
             _ATTACH_SERIALS,
             Step(
                 "qualification",
-                "revues → identifiant OpenAlex, listes de revues, type, fiche DOAJ",
+                "revues → identifiant OpenAlex, listes de revues, type, fiche DOAJ, modèle open access",
                 (
                     _CHECK_SERIALS_IN_OPENALEX,
                     _TYPE_PROCEEDINGS_SERIALS,
                     _TYPE_JOURNAL_SERIALS,
                     _ENRICH_SERIALS_FROM_DOAJ,
+                    _MODEL_SERIALS,
                 ),
             ),
-            _LEARN_SERIAL_DOI_NAMESPACES,
         ),
         section="Publications en série",
     ),
@@ -632,6 +677,12 @@ _CHILDREN = (
         (_ATTACH_MONOGRAPHS, _LINK_MONOGRAPHS_TO_COLLECTIONS, _TYPE_PROCEEDINGS_VOLUMES),
         section="Monographies",
     ),
+    Step(
+        "doi_namespaces",
+        "DOI des enregistrements sources et revues typées → espaces de noms DOI des revues, revue manquante désignée par le DOI",
+        (_LEARN_SERIAL_DOI_NAMESPACES, _SERIAL_BY_DOI),
+        section="Espaces de noms DOI",
+    ),
 )
 
 
@@ -639,6 +690,6 @@ PHASE = Phase(
     "publishing",
     "Référentiels de l'édition",
     _CHILDREN,
-    Block.SOURCE_RECORDS,
+    Block.REFERENTIALS,
     assemble=assemble,
 )

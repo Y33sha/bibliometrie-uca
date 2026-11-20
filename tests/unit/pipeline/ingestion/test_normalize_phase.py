@@ -1,6 +1,6 @@
 """Séquence de la phase `normalize`, exécutée tâche par tâche.
 
-Le retrait des contributions sources OpenAlex au profit d'INSPIRE-HEP, puis celui des enregistrements sources disparus, précèdent le nettoyage des informations du contributeur et des adresses : les lignes ainsi orphelines sont supprimées par le nettoyage. L'exécuteur lance enfin le `VACUUM` du staging, maintenance de la tâche de nettoyage.
+Le retrait des contributions sources OpenAlex au profit d'INSPIRE-HEP, puis celui des enregistrements sources disparus, précèdent le nettoyage des informations du contributeur et des adresses : les lignes ainsi orphelines sont supprimées par le nettoyage. L'exécuteur lance le `VACUUM` du staging, maintenance de la tâche de nettoyage. L'arbitrage des identifiants de personne clôt la phase.
 """
 
 import dataclasses
@@ -45,6 +45,7 @@ def lancer(contexte, monkeypatch):
         nettoyages = {
             "cleanup_orphan_contributor_information": appel("cleanup", PhaseMetrics()),
             "cleanup_orphan_addresses": appel("cleanup_addresses", PhaseMetrics()),
+            "arbitrate_identifiers": appel("arbitrate", PhaseMetrics(extras={"neutralized": 2})),
         }
         phase = dataclasses.replace(
             _NORMALIZE,
@@ -68,6 +69,7 @@ def test_le_retrait_precede_le_nettoyage_des_identites_et_des_adresses(lancer):
         "cleanup",
         "cleanup_addresses",
         "VACUUM staging",
+        "arbitrate",
     ]
 
 
@@ -80,12 +82,17 @@ def test_toutes_les_sources_sont_normalisees_dans_l_ordre(lancer):
 def test_le_mode_full_reecrit_le_staging(lancer):
     appels: list[str] = []
     lancer(appels, mode="full")
-    assert appels[-1] == "VACUUM FULL staging"
+    assert appels[-2:] == ["VACUUM FULL staging", "arbitrate"]
 
 
 def test_le_decompte_des_retraits_part_dans_les_metriques(lancer):
     metrics = lancer([], disparues=7)
     assert metrics.details["disappeared_pruned"] == 7
+
+
+def test_les_identifiants_neutralises_partent_dans_les_metriques(lancer):
+    metrics = lancer([])
+    assert metrics.details["summary"]["identifiers_neutralized"] == 2
 
 
 def test_le_total_reste_celui_des_documents_normalises(lancer):
@@ -103,6 +110,7 @@ def test_sans_document_la_maintenance_tourne_quand_meme(lancer):
         "cleanup",
         "cleanup_addresses",
         "VACUUM staging",
+        "arbitrate",
     ]
 
 

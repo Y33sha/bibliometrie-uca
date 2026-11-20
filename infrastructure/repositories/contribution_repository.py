@@ -10,7 +10,7 @@ from application.ports.repositories.contribution_repository import (
     ContributionRepository,
     ContributionRow,
 )
-from domain.persons.contribution_matching import NAME_MATCH_REASONS
+from domain.persons.contribution_matching import NAME_BASED_REASONS
 from infrastructure.db.queues import Queue, enqueue
 from infrastructure.sql_fragments import (
     CONTRIBUTIONS_AND_SOURCES,
@@ -72,7 +72,7 @@ class PgContributionRepository(ContributionRepository):
                 SELECT g.id
                 FROM {CONTRIBUTIONS_AND_SOURCES}
                 WHERE g.person_id = :pid
-                  AND g.resolution_mode IN {in_clause(NAME_MATCH_REASONS)}
+                  AND g.resolution_mode IN {in_clause(NAME_BASED_REASONS)}
                   AND ci.author_name_normalized = :nf
             """,
             {"pid": person_id, "nf": name_form},

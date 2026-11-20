@@ -22,20 +22,19 @@ _ORCID = "0000-0002-1825-0097"
 _IDREF = "123456789"
 
 
-def _member(raw, source="hal", identifiers=None, roles=(), pinned=None):
+def _member(raw, source="hal", identifiers=None, pinned=None):
     return AlignedSourceContribution(
         source=source,
         name=ContributorName(raw=raw),
         identifiers=identifiers or {},
-        roles=roles,
         pinned_person_id=pinned,
     )
 
 
-def _decide(members, index, rejected_person_ids=frozenset(), *, in_perimeter=True):
+def _decide(members, index, rejected_person_ids=frozenset(), *, in_perimeter=True, roles=()):
     """Décide la contribution formée de `members`, du périmètre par défaut."""
     return decide_contribution(
-        AlignedContribution(tuple(members), in_perimeter), index, rejected_person_ids
+        AlignedContribution(tuple(members), in_perimeter, roles), index, rejected_person_ids
     )
 
 
@@ -247,9 +246,23 @@ def test_un_nom_inconnu_du_perimetre_cree_une_personne():
 
 
 def test_un_jury_de_these_ne_cree_pas_de_personne():
-    members = [_member("Jean Martin", "theses", roles=(ContributionRole.RAPPORTEUR,))]
+    decision = _decide(
+        [_member("Jean Martin", "theses")], _index(), roles=(ContributionRole.RAPPORTEUR,)
+    )
 
-    assert _decide(members, _index()).reason == ContributionSkipReason.CREATION_NOT_ALLOWED
+    assert decision.reason == ContributionSkipReason.CREATION_NOT_ALLOWED
+
+
+def test_un_inventeur_est_rattache_a_une_personne_existante_sans_en_creer():
+    """Une contribution de brevet a le seul rôle inventeur : son nom la rattache à une personne connue, et un nom inconnu la laisse sans personne."""
+    roles = (ContributionRole.INVENTOR,)
+    known = _index([(1, "Martin", "Jean")])
+
+    assert _decide([_member("Jean Martin")], known, roles=roles).person_id == 1
+    assert (
+        _decide([_member("Paul Durand")], known, roles=roles).reason
+        == ContributionSkipReason.CREATION_NOT_ALLOWED
+    )
 
 
 def test_une_personne_revient_au_groupe_le_mieux_appuye_de_la_publication():
@@ -347,14 +360,4 @@ class TestFoundingName:
             _split_member("Martin", "Jean-Pierre", "hal"),
             _split_member("Martin", "Jean", "openalex"),
         ]
-        assert founding_name(members) == ("Martin", "Jean")
-
-    def test_le_role_des_membres_est_ignore(self):
-        jury = AlignedSourceContribution(
-            source="crossref",
-            name=ContributorName(last_name="Martin", first_name="Jean"),
-            identifiers={},
-            roles=("jury",),
-        )
-        members = [_split_member("Martin", "Jeanne", "hal"), jury]
         assert founding_name(members) == ("Martin", "Jean")

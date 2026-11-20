@@ -1,10 +1,15 @@
 """Doublons d'auteur dans la liste d'un enregistrement source (`domain.contributions.author_duplicates`)."""
 
 from domain.contributions.author_duplicates import (
+    cross_list_duplicates,
     duplicate_source_contributions,
     unaligned_duplicates,
 )
-from domain.contributions.author_grouping import SourceContribution, align_publication
+from domain.contributions.author_grouping import (
+    LARGE_LIST_AUTHORS,
+    SourceContribution,
+    align_publication,
+)
 
 
 def _source_record(names: list[str]) -> list[SourceContribution]:
@@ -18,6 +23,11 @@ def _record(source_record: int, names: list[tuple[str, str]]) -> list[SourceCont
         SourceContribution(source_record * 100 + pos, source_record, pos, last, first)
         for pos, (last, first) in enumerate(names)
     ]
+
+
+def _others(n: int, prefix: str = "nom") -> list[tuple[str, str]]:
+    """Renvoie `n` auteurs aux noms tous différents."""
+    return [(f"{prefix}{i}", "jean") for i in range(n)]
 
 
 def _unaligned_duplicates(source_records: dict[int, list[SourceContribution]]) -> dict[int, int]:
@@ -121,3 +131,131 @@ def test_des_noms_repetes_a_distance_sous_le_seuil_restent_des_homonymes():
     names[20:20] = ["nom3"]
     names[30:30] = ["nom7"]
     assert duplicate_source_contributions(_source_record(names)) == {}
+
+
+class TestCrossListDuplicates:
+    def test_un_nom_repete_sous_deux_graphies_et_cite_une_fois_ailleurs_est_un_doublon(self):
+        """INSPIRE liste « porteboeuf / sarah julie » puis « porteboeuf houssais / s » ; HAL le cite une fois, en dernier. L'occurrence au rang de HAL est gardée."""
+        inspire = _record(
+            1, [("leroy", "anne"), ("porteboeuf", "sarah julie"), ("porteboeuf houssais", "s")]
+        )
+        hal = _record(2, [("leroy", "anne"), ("porteboeuf houssais", "s")])
+
+        assert cross_list_duplicates({1: inspire, 2: hal}, references={1, 2}) == {101: 102}
+
+    def test_l_occurrence_au_rang_des_autres_listes_est_gardee(self):
+        """HAL répète « delabaere / amelie » en tête ; OpenAlex le cite une fois, en dernier."""
+        hal = _record(1, [("delabaere", "amelie"), ("leduc", "france"), ("delabaere", "amelie")])
+        openalex = _record(2, [("leduc", "france"), ("delabaere", "amelie")])
+
+        assert cross_list_duplicates({1: hal, 2: openalex}, references={1, 2}) == {100: 102}
+
+    def test_une_liste_hors_des_listes_de_reference_ne_compte_pas(self):
+        inspire = _record(1, [("leroy", "anne"), ("porteboeuf", "s"), ("porteboeuf houssais", "s")])
+        scanr = _record(2, [("porteboeuf houssais", "s")])
+
+        assert cross_list_duplicates({1: inspire, 2: scanr}, references={1}) == {}
+
+    def test_des_initiales_face_au_prenom_complet_signalent_deux_listes_bout_a_bout(self):
+        """Toutes les sources ajoutent la liste des membres, aux initiales, après les auteurs."""
+        authors = [("llorca", "pierre michel"), ("martin", "anne")]
+        members = [("durand", "p"), ("llorca", "p m")]
+        records = {n: _record(n, authors + members) for n in (1, 2)}
+
+        assert cross_list_duplicates(records, references={1, 2}) == {103: 100, 203: 200}
+
+    def test_un_nom_complet_repete_dans_une_courte_liste_est_un_doublon(self):
+        records = {n: _record(n, [("godi", "patricia"), ("godi", "patricia")]) for n in (1, 2)}
+
+        assert cross_list_duplicates(records, references={1, 2}) == {101: 100, 201: 200}
+
+    def test_un_nom_complet_repete_dans_une_grande_collaboration_reste_des_homonymes(self):
+        names = [*_others(LARGE_LIST_AUTHORS), ("hou", "yingrui"), ("hou", "yingrui")]
+        records = {n: _record(n, names) for n in (10, 20)}
+
+        assert cross_list_duplicates(records, references={10, 20}) == {}
+
+    def test_un_nom_de_famille_prolonge_dans_une_grande_collaboration_est_un_doublon(self):
+        n = LARGE_LIST_AUTHORS
+        inspire = _record(
+            10, [*_others(n), ("porteboeuf", "sarah julie"), ("porteboeuf houssais", "s")]
+        )
+        hal = _record(20, [*_others(n), ("porteboeuf houssais", "s")])
+
+        assert cross_list_duplicates({10: inspire, 20: hal}, references={10, 20}) == {
+            1000 + n: 1000 + n + 1
+        }
+
+    def test_des_initiales_proches_dans_une_grande_collaboration_restent_des_homonymes(self):
+        """« wang / y » et « wang / y w » chez Crossref : une autre liste qui cite le nom une fois ne suffit pas."""
+        crossref = _record(10, [*_others(LARGE_LIST_AUTHORS), ("wang", "y"), ("wang", "y w")])
+        hal = _record(20, [*_others(LARGE_LIST_AUTHORS), ("wang", "y")])
+
+        assert cross_list_duplicates({10: crossref, 20: hal}, references={10, 20}) == {}
+
+    def test_une_liste_de_membres_sous_le_seuil_des_grandes_collaborations_donne_un_doublon(self):
+        """Essai clinique de 150 noms : « souweine / bertrand » parmi les auteurs, « souweine / b » parmi les membres ; HAL liste seulement les auteurs."""
+        authors = [("souweine", "bertrand"), *_others(20)]
+        openalex = _record(10, [*authors, *_others(128, "membre"), ("souweine", "b")])
+        hal = _record(20, authors)
+
+        assert cross_list_duplicates({10: openalex, 20: hal}, references={10, 20}) == {1149: 1000}
+
+    def test_un_orcid_commun_signale_un_doublon_a_distance_dans_une_grande_collaboration(self):
+        n = LARGE_LIST_AUTHORS
+        orcid = "0000-0002-2646-6189"
+        inspire = [
+            SourceContribution(1, 1, 0, "porteboeuf", "sarah julie", "", orcid),
+            *_record(1, _others(n))[1:],
+            SourceContribution(2, 1, n, "porteboeuf houssais", "s", "", orcid),
+        ]
+
+        assert cross_list_duplicates({1: inspire}, references={1}) == {2: 1}
+
+    def test_un_orcid_commun_a_deux_noms_differents_ne_signale_pas_de_doublon(self):
+        """Une source donne l'ORCID d'un auteur à tous les auteurs de la liste."""
+        orcid = "0000-0002-2646-6189"
+        crossref = [
+            SourceContribution(1, 1, 0, "martin", "anne", "", orcid),
+            SourceContribution(2, 1, 1, "durand", "paul", "", orcid),
+        ]
+
+        assert cross_list_duplicates({1: crossref}, references={1}) == {}
+
+    def test_nom_et_prenom_permutes_dans_une_courte_liste_signalent_un_doublon(self):
+        names = [("de chazeron", "ingrid"), ("martin", "anne"), ("ingrid", "de chazeron")]
+        records = {n: _record(n, names) for n in (1, 2)}
+
+        assert cross_list_duplicates(records, references={1, 2}) == {102: 100, 202: 200}
+
+    def test_deux_prenoms_differents_de_meme_initiale_sont_deux_auteurs(self):
+        hal = _record(1, [("li", "yanru"), ("li", "yujie")])
+        crossref = _record(2, [("li", "yanru")])
+
+        assert cross_list_duplicates({1: hal, 2: crossref}, references={1, 2}) == {}
+
+    def test_des_homonymes_presents_dans_toutes_les_listes_restent_distincts(self):
+        records = {n: _record(n, [("xu", "z"), ("xu", "z"), ("martin", "anne")]) for n in (1, 2)}
+
+        assert cross_list_duplicates(records, references={1, 2}) == {}
+
+    def test_deux_orcid_differents_dans_une_autre_liste_designent_deux_homonymes(self):
+        """Crossref liste deux « schmidt / j » sans ORCID ; HAL leur donne deux ORCID différents."""
+        crossref = _record(1, [("schmidt", "j"), ("martin", "anne"), ("schmidt", "j")])
+        hal = [
+            SourceContribution(200, 2, 0, "schmidt", "j", "0000-0003-3424-337X"),
+            SourceContribution(201, 2, 1, "martin", "anne"),
+            SourceContribution(202, 2, 2, "schmidt", "j", "0000-0003-4027-7875"),
+        ]
+        scanr = _record(3, [("schmidt", "j"), ("martin", "anne")])
+
+        assert cross_list_duplicates({1: crossref, 2: hal, 3: scanr}, references={1, 2, 3}) == {}
+
+    def test_deux_orcid_differents_designent_deux_homonymes(self):
+        doubled = [
+            SourceContribution(100, 1, 0, "schmidt", "j", "0000-0003-3424-337X"),
+            SourceContribution(101, 1, 1, "schmidt", "j", "0000-0003-4027-7875"),
+        ]
+        once = _record(2, [("schmidt", "j")])
+
+        assert cross_list_duplicates({1: doubled, 2: once}, references={1, 2}) == {}

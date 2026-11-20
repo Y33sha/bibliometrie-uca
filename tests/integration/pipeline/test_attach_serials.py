@@ -236,26 +236,6 @@ def test_sans_revue_trouvee_la_revue_corrigee_reste(conn):
     assert (row.serial_id, row.raw) == (corrected, None)
 
 
-def test_modele_oa_d_openalex(conn):
-    record = _record(
-        conn,
-        "W1",
-        source="openalex",
-        title="PLOS ONE",
-        issns=_issns(linking="1932-6203"),
-        openalex_id="S202381698",
-        oa_model="full_oa",
-    )
-    _attach(conn)
-    assert (
-        conn.execute(
-            text("SELECT oa_model::text FROM serials WHERE id = :id"),
-            {"id": _serial_of(conn, record)},
-        ).scalar_one()
-        == "full_oa"
-    )
-
-
 def _title(conn, serial_id: int) -> str:
     return conn.execute(
         text("SELECT title FROM serials WHERE id = :id"), {"id": serial_id}
@@ -296,30 +276,6 @@ def test_titre_saisi_a_la_main_garde(conn):
     _record(conn, "a", title="Nature", issns=_issns("0028-0836"))
     _attach(conn)
     assert _title(conn, serial_id) == "Nature (London)"
-
-
-def test_modele_oa_saisi_a_la_main_garde(conn):
-    serial_id = insert_serial(conn, "PLOS ONE", oa_model="subscription")
-    conn.execute(
-        text("UPDATE serials SET manual_fields = ARRAY['oa_model'] WHERE id = :id"),
-        {"id": serial_id},
-    )
-    insert_serial_issn(conn, serial_id, issn="1932-6203", issnl="1932-6203", sudoc_checked=True)
-    _record(
-        conn,
-        "W1",
-        source="openalex",
-        title="PLOS ONE",
-        issns=_issns(linking="1932-6203"),
-        oa_model="full_oa",
-    )
-    _attach(conn)
-    assert (
-        conn.execute(
-            text("SELECT oa_model::text FROM serials WHERE id = :id"), {"id": serial_id}
-        ).scalar_one()
-        == "subscription"
-    )
 
 
 def test_idempotent(conn):

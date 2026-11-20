@@ -1,7 +1,9 @@
-"""Rôles des contributions sources, et traduction des rôles bruts de chaque source."""
+"""Rôles des contributions sources et des contributions, et traduction des rôles bruts de chaque source."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from enum import StrEnum
+
+from domain.documents.doc_types import DocType
 
 
 class ContributionRole(StrEnum):
@@ -131,6 +133,9 @@ THESIS_JURY_ROLES: frozenset[str] = frozenset(
     }
 )
 """Rôles de jury de thèse, donnés par theses.fr et ScanR."""
+
+ROLE_BY_DOC_TYPE: Mapping[DocType, ContributionRole] = {DocType.PATENT: ContributionRole.INVENTOR}
+"""Rôle unique des contributions d'une publication de ce type, quels que soient les rôles donnés par ses sources. HAL donne par défaut le rôle d'auteur aux inventeurs d'un brevet."""
 
 _THESIS_ROLES_IMPLYING_JURY = THESIS_JURY_ROLES - {ContributionRole.JURY_MEMBER}
 """Rôles de thèse qui impliquent l'appartenance au jury, et rendent `JURY_MEMBER` superflu."""

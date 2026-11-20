@@ -69,8 +69,9 @@ MAX_CONCURRENT: dict[str, int] = {
     "ops": 1,
     # API fragile : une requête à la fois.
     "theses": 1,
+    # Seuil annoncé par les en-têtes du polite pool (`x-concurrency-limit`) : 3 requêtes simultanées. Une requête de moins laisse une marge au décompte de Crossref.
+    "crossref": 2,
     # Polite pool : 3 requêtes simultanées au plus.
-    "crossref": 3,
     "datacite": 3,
     # Fiches des grandes collaborations : jusqu'à 2 Mo par fiche.
     "inspire": 2,
@@ -81,6 +82,9 @@ MAX_CONCURRENT: dict[str, int] = {
     "unpaywall": 5,
 }
 """Requêtes simultanées consenties à chaque accès, sous son plafond."""
+
+CROSSREF_SEARCH_MAX_CONCURRENT = 1
+"""Requêtes simultanées consenties à la recherche Crossref par ORCID (`GET /works?filter=`). Les en-têtes annoncent 3 requêtes simultanées et 3 req/s (`x-api-pool: polite-array`), mais Crossref répond 429 dès 2 requêtes simultanées."""
 
 
 MAX_PER_SECOND: dict[str, float] = {
@@ -95,8 +99,8 @@ MAX_PER_SECOND: dict[str, float] = {
     "ops": 0.5,
     # Aucun seuil publié.
     "theses": 3,
-    # Seuil annoncé par les en-têtes du polite pool (`x-rate-limit-limit`) : 3 req/s.
-    "crossref": 3,
+    # Seuil annoncé par les en-têtes du polite pool (`x-rate-limit-limit`) : 3 req/s. Le débit consenti laisse une marge au décompte de Crossref.
+    "crossref": 2,
     # Seuil publié du tier identifié (User-Agent avec mailto) : 1 000 requêtes par 5 minutes.
     "datacite": 3,
     # Aucun seuil dans les en-têtes de réponse.

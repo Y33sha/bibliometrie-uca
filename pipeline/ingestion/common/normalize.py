@@ -8,9 +8,8 @@ Tâches de la phase, dans l'ordre (`pipeline.graph`) :
 2. la suppression des contributions sources des enregistrements sources OpenAlex du même document qu'un enregistrement source INSPIRE-HEP (`domain.source_records.inspire_author_lists`) ;
 3. la suppression des enregistrements sources des documents disparus de leur source ;
 4. la suppression des informations du contributeur sans contribution source : la normalisation réassigne des contributions sources, et les étapes précédentes suppriment des contributions sources ;
-5. la suppression des adresses orphelines, pour la même raison.
-
-L'exécuteur lance ensuite le `VACUUM` de `staging`, vidé de ses payloads : `VACUUM FULL` en mode full, simple dans les autres modes.
+5. la suppression des adresses orphelines, pour la même raison. L'exécuteur lance ensuite le `VACUUM` de `staging`, vidé de ses payloads : `VACUUM FULL` en mode full, simple dans les autres modes ;
+6. l'arbitrage des identifiants de personne (`pipeline.transformation.persons.arbitration`).
 """
 
 from __future__ import annotations
@@ -52,6 +51,7 @@ from pipeline.runtime.observability.log_format import (
     quantity,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.transformation.persons.arbitration import ARBITRATE_IDENTIFIERS
 
 
 def build_normalizer(
@@ -197,7 +197,7 @@ _BY_SOURCE = tuple(
             "contribution_attributes_queue",
         ),
         # Ses propres lignes de `staging`, de la file de normalisation, enregistrements sources et contributions sources ; les contributions écrites par `author_grouping`.
-        previous_run=(
+        previous_runs=(
             "staging",
             "staging_normalization_queue",
             "source_records",
@@ -253,7 +253,7 @@ _CHILDREN = (
                     "source_records.distinct_author_count",
                     "publication_contributions_queue",
                 ),
-                previous_run=(
+                previous_runs=(
                     "source_records",
                     "source_record_identifiers",
                     "source_contributions",
@@ -284,7 +284,7 @@ _CHILDREN = (
                     "confirmed_source_contributions",
                     "rejected_contributions",
                 ),
-                previous_run=("source_records",),
+                previous_runs=("source_records",),
                 run=_prune,
             ),
         ),
@@ -300,7 +300,7 @@ _CHILDREN = (
                     "contributor_information.id",
                 ),
                 writes=("contributor_information.id",),
-                previous_run=("source_contributions",),
+                previous_runs=("source_contributions",),
                 run=_cleanup(
                     delete_orphan_contributor_information, "ligne supprimée", "lignes supprimées"
                 ),
@@ -319,11 +319,12 @@ _CHILDREN = (
         ),
         section="Maintenance des tables",
     ),
+    ARBITRATE_IDENTIFIERS,
 )
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
-    """Renvoie les métriques de la phase : documents normalisés, table des sources, enregistrements sources disparus supprimés."""
+    """Renvoie les métriques de la phase : documents normalisés, table des sources, enregistrements sources disparus supprimés, identifiants neutralisés par l'arbitrage."""
     rows = [
         {**cast("dict[str, object]", metrics.details["row"]), "duration_s": metrics.duration_s}
         for metrics in by_task.values()
@@ -335,6 +336,11 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     metrics.details["disappeared_pruned"] = by_task["prune_disappeared"].extras.get(
         "disappeared", 0
     )
+    arbitration = by_task[ARBITRATE_IDENTIFIERS.name].extras
+    metrics.details["summary"] = {
+        "identifiers_neutralized": arbitration.get("neutralized", 0),
+        "marked_contributions": arbitration.get("marked_contributions", 0),
+    }
     return metrics
 
 
@@ -342,6 +348,6 @@ PHASE = Phase(
     "normalize",
     "Normalisation des documents bruts",
     _CHILDREN,
-    Block.SOURCE_RECORDS,
+    Block.HARVESTING,
     assemble=assemble,
 )

@@ -1,6 +1,6 @@
 """Moissonnage theses.fr (`pipeline.ingestion.theses.harvest`) et champs des thèses.
 
-Requête et champs : fonctions pures. Liste des thèses : une requête pour tous les établissements, pagination sur `totalHits`, filtre sur les années de la fenêtre par le préfixe du NNT. Pilotage : seul le détail des thèses absentes de `staging` est lu, puis le bilan. Pas de réseau ni de base : un faux client sert des pages scriptées, la configuration, les thèses présentes et la lecture du détail sont simulées.
+Requête et champs : fonctions pures. Liste des thèses : une requête pour tous les établissements et la fenêtre d'années, pagination sur `totalHits`. Pilotage : seul le détail des thèses absentes de `staging` est lu, puis le bilan. Pas de réseau ni de base : un faux client sert des pages scriptées, la configuration, les thèses présentes et la lecture du détail sont simulées.
 """
 
 from __future__ import annotations
@@ -22,12 +22,16 @@ _LOGGER = logging.getLogger("test")
 
 
 class TestBuildQuery:
-    def test_un_ppn(self):
-        assert build_query(["196200032"]) == "etabSoutenancePpn:(196200032)"
+    def test_un_ppn_une_annee(self):
+        assert build_query(["196200032"], [2025]) == (
+            "etabSoutenancePpn:(196200032)"
+            " AND (dateSoutenance:[2025-01-01 TO 2025-12-31] OR status:enCours)"
+        )
 
-    def test_plusieurs_ppn_en_une_requete(self):
-        assert build_query(["196200032", "252404955"]) == (
+    def test_plusieurs_ppn_plusieurs_annees_en_une_requete(self):
+        assert build_query(["196200032", "252404955"], [2020, 2021, 2022]) == (
             "etabSoutenancePpn:(196200032 OR 252404955)"
+            " AND (dateSoutenance:[2020-01-01 TO 2022-12-31] OR status:enCours)"
         )
 
 
@@ -77,22 +81,10 @@ def test_pagination_jusqu_au_total():
     assert [appel.kwargs["start"] for appel in client.fetch_page.call_args_list] == [0, 2]
 
 
-def test_filtre_annee_sur_le_prefixe_du_nnt():
-    progress = Progress(None, "theses.fr", None, count_kept=True)
-    client = _client([[_these("2020AAA1"), _these("2021AAA1")]])
-    assert _lister(client, progress=progress, years=[2021]) == (2, ["2021AAA1"])
-    assert progress._kept == 1
-
-
-def test_la_fenetre_retient_plusieurs_annees():
-    client = _client([[_these("2019A"), _these("2020A"), _these("2021A")]])
-    assert _lister(client, years=[2020, 2021])[1] == ["2020A", "2021A"]
-
-
-def test_une_annee_retient_aussi_les_theses_en_cours():
-    """Une thèse en cours n'a pas d'année dans son identifiant : elle est retenue quelle que soit la fenêtre."""
-    client = _client([[_these("2020A"), _these("2021A"), _these("s367812", status="enCours")]])
-    assert _lister(client, years=[2021])[1] == ["2021A", "s367812"]
+def test_la_recherche_porte_sur_la_fenetre():
+    client = _client([[_these("2021A")]])
+    _lister(client, years=[2020, 2021])
+    assert client.fetch_page.call_args.args[0] == build_query(["PPN1"], [2020, 2021])
 
 
 def test_these_sans_identifiant_ignoree():
@@ -134,14 +126,7 @@ def test_run_interroge_tous_les_etablissements_d_un_coup(configuration, details)
     configuration(api_ids=["PPN1", "PPN2"], annees=[2020])
     client = _client([[_these("2020A"), _these("2020B")]])
     assert moissonneur(ThesesHarvester, client).run(arguments_du_run()).new == 2
-    assert client.fetch_page.call_args.args[0] == build_query(["PPN1", "PPN2"])
-
-
-def test_run_avec_une_annee_fait_le_bilan_des_theses_retenues(configuration, details):
-    configuration()
-    client = _client([[_these("2020A"), _these("2021A")]])
-    metrics = moissonneur(ThesesHarvester, client).run(arguments_du_run(years=(2021, 2021)))
-    assert metrics.new == 1
+    assert client.fetch_page.call_args.args[0] == build_query(["PPN1", "PPN2"], [2020])
 
 
 def test_run_sans_ppn_configure_refuse(configuration):

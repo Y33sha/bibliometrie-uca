@@ -4,7 +4,6 @@ import pytest
 
 from domain.serials.containers import SeriesDescription, VolumeDescription
 from domain.serials.issns import IssnSupport, SerialIssn
-from domain.serials.serial import OaModel
 from domain.source_records.biblio import (
     PageRange,
     compact_biblio,
@@ -100,7 +99,6 @@ _SERIES = SeriesDescription(
         SerialIssn(issn="1234", malformed=True),
     ),
     openalex_id="S123",
-    oa_model=OaModel.SUBSCRIPTION,
 )
 
 
@@ -115,7 +113,6 @@ def test_serie_ecrite_dans_journal_avec_ses_issn():
                 {"issn": "1234", "malformed": True},
             ],
             "openalex_id": "S123",
-            "oa_model": "subscription",
         },
     }
 

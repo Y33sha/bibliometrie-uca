@@ -1,4 +1,4 @@
-"""Phase `relations`, tâche `notices` : relations des publications avec leurs errata et leurs avis, qui sont hors des publications."""
+"""Phase `relations`, tâche `link_notices` : relations des publications avec leurs errata et leurs avis, qui sont hors des publications."""
 
 import logging
 

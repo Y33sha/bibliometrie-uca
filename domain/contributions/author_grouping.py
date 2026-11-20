@@ -26,10 +26,13 @@ class GroupingMethod(StrEnum):
     NAME = "name"
     """Nom de famille, nom et prénom, ou nom et initiale, uniques de part et d'autre."""
     GAP = "gap"
-    """Noms semblables dans le même trou."""
+    """Noms semblables dans le même trou, ou même initiale du prénom dans un trou d'un seul élément de chaque côté."""
     UNORDERED = "unordered"
     """Noms semblables hors de l'ordre des listes, avec un mot identique."""
 
+
+LARGE_LIST_AUTHORS = 300
+"""Longueur d'une liste de grande collaboration. Une grande collaboration compte des homonymes aux noms et aux initiales proches."""
 
 _is_full_first_name = lru_cache(maxsize=1_000_000)(is_full_first_name)
 
@@ -93,6 +96,10 @@ class SourceContribution:
     """Rang dans la liste ordonnée des auteurs, `None` hors de cette liste (jury de thèse chez theses.fr)."""
     last_name: str
     first_name: str
+    orcid: str = ""
+    """ORCID non neutralisé."""
+    author_orcid: str = ""
+    """ORCID donné par une source de `SOURCES_WITH_AUTHOR_ORCID`, neutralisé ou non."""
 
 
 @dataclass(frozen=True)
@@ -145,6 +152,10 @@ def _similarity(
     return name_similarity(
         s.last_name, s.first_name, ref.last_name, ref.first_name, unordered=unordered
     )
+
+
+def _same_first_initial(a: SourceContribution, b: SourceContribution) -> bool:
+    return bool(a.first_name) and a.first_name[:1] == b.first_name[:1]
 
 
 def _prefixes(s: SourceContribution) -> set[str]:
@@ -209,11 +220,17 @@ class _SourceRecordLinks:
         return [(ss, by_gap_g[k]) for k, ss in by_gap_s.items() if k in by_gap_g]
 
     def same_size_gaps(self) -> None:
-        """Dans chaque trou de même taille des deux côtés, compare les éléments un à un dans l'ordre et lie ceux aux noms semblables."""
+        """Dans chaque trou de même taille des deux côtés, compare les éléments un à un dans l'ordre et lie ceux aux noms semblables.
+
+        Hors grande collaboration (`LARGE_LIST_AUTHORS`), un trou d'un seul élément de chaque côté lie aussi deux noms de famille différents de même initiale du prénom : l'auteur a changé de nom (« vernier / jessica », « gable / jessica s m »).
+        """
+        by_rank = len(self.record_contributions) < LARGE_LIST_AUTHORS
         for ss, gs in self.gaps():
             if len(ss) == len(gs):
                 for s, g in zip(ss, gs, strict=True):
-                    if _similarity(s, g)[0] > SIMILARITY_THRESHOLD:
+                    if _similarity(s, g)[0] > SIMILARITY_THRESHOLD or (
+                        by_rank and len(ss) == 1 and _same_first_initial(s, g.reference)
+                    ):
                         self.link(s, g, GroupingMethod.GAP)
 
     def unequal_gaps(self) -> None:

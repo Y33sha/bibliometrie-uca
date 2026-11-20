@@ -15,6 +15,9 @@ from operator import attrgetter
 from sqlalchemy import Connection
 
 from domain.contributions.author_duplicates import (
+    SOURCES_MERGING_HOMONYMS,
+    SOURCES_WITH_AUTHOR_ORCID,
+    cross_list_duplicates,
     duplicate_source_contributions,
     unaligned_duplicates,
 )
@@ -25,6 +28,7 @@ from domain.contributions.author_grouping import (
     plan_contribution_ids,
     with_known_first_name,
 )
+from domain.contributions.author_positions import is_truncated_list
 from pipeline.graph import Block, Phase, Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.cpu import available_cpus
@@ -80,9 +84,30 @@ def contributions_by_source_record(
     for row in rows:
         first_name = with_known_first_name(row.first_name, row.known_first_name)
         source_records.setdefault(row.source_record, []).append(
-            SourceContribution(row.id, row.source_record, row.position, row.last_name, first_name)
+            SourceContribution(
+                row.id,
+                row.source_record,
+                row.position,
+                row.last_name,
+                first_name,
+                row.orcid,
+                row.raw_orcid if row.source in SOURCES_WITH_AUTHOR_ORCID else "",
+            )
         )
     return source_records
+
+
+def reference_source_records(rows: Sequence[SourceContributionRow]) -> set[int]:
+    """Renvoie les enregistrements sources d'une publication dont la liste d'auteurs prouve un doublon : liste complète (`is_truncated_list`), d'une source hors `SOURCES_MERGING_HOMONYMS`."""
+    lengths = Counter(row.source_record for row in rows if row.position is not None)
+    source_of = {row.source_record: row.source for row in rows}
+    longest = max(lengths.values(), default=0)
+    return {
+        record
+        for record, length in lengths.items()
+        if not is_truncated_list(source_of[record], length, longest)
+        and source_of[record] not in SOURCES_MERGING_HOMONYMS
+    }
 
 
 def deferred_source_records(rows: Sequence[SourceContributionRow]) -> set[int]:
@@ -93,15 +118,20 @@ def deferred_source_records(rows: Sequence[SourceContributionRow]) -> set[int]:
 def align_publication_contributions(
     rows: Sequence[SourceContributionRow],
 ) -> tuple[list[Contribution], dict[int, int]]:
-    """Renvoie les contributions d'une publication et ses doublons d'auteur (doublon → contribution source répétée). Les doublons restent hors des contributions : ceux de la liste d'un enregistrement source avant l'alignement, puis ceux révélés par l'alignement (`unaligned_duplicates`)."""
+    """Renvoie les contributions d'une publication et ses doublons d'auteur (doublon → contribution source répétée). Les doublons restent hors des contributions : avant l'alignement, ceux de la liste d'un enregistrement source, puis ceux révélés par les autres listes (`cross_list_duplicates`) ; après, ceux révélés par l'alignement (`unaligned_duplicates`)."""
     source_records = contributions_by_source_record(rows)
     duplicates: dict[int, int] = {}
     for source_contributions in source_records.values():
         duplicates |= duplicate_source_contributions(source_contributions)
-    kept = {
-        n: [s for s in record_contributions if s.id not in duplicates]
-        for n, record_contributions in source_records.items()
-    }
+
+    def without_duplicates() -> dict[int, list[SourceContribution]]:
+        return {
+            n: [s for s in record_contributions if s.id not in duplicates]
+            for n, record_contributions in source_records.items()
+        }
+
+    duplicates |= cross_list_duplicates(without_duplicates(), reference_source_records(rows))
+    kept = without_duplicates()
     contributions = align_publication(kept, deferred=deferred_source_records(rows))
     aligned = unaligned_duplicates(
         contributions, {s.id: s for record in kept.values() for s in record}
@@ -122,7 +152,7 @@ def membership_changes(
 
 
 # Échanges entre processus, en tuples : contribution source (champs de `SourceContributionRow`), appartenance (contribution source, enregistrement source, méthode), contribution (référence, appartenances).
-type SourceContributionTuple = tuple[int, int, str, int, int | None, str, str, str]
+type SourceContributionTuple = tuple[int, int, str, int, int | None, str, str, str, str, str]
 type MemberTuple = tuple[int, int, str]
 type ContributionTuple = tuple[int, list[MemberTuple]]
 type Aligned = tuple[list[ContributionTuple], dict[int, int]]
@@ -302,13 +332,13 @@ def build_contributions(
     return metrics
 
 
-def _build(ctx: PhaseContext) -> PhaseMetrics:
+def _align_source_contributions(ctx: PhaseContext) -> PhaseMetrics:
     """Recalcule les contributions des publications en file."""
     with ctx.open_tx() as conn:
         return build_contributions(conn, ctx.logger, rebuild=ctx.options.rebuild_author_grouping)
 
 
-def _attributes(ctx: PhaseContext) -> PhaseMetrics:
+def _recompute_contribution_attributes(ctx: PhaseContext) -> PhaseMetrics:
     """Recalcule les attributs des contributions en file. Les attributs ont leur propre file : l'affiliation d'une contribution source change sans changer sa contribution."""
     t0 = time.perf_counter()
     with (
@@ -326,7 +356,7 @@ def _attributes(ctx: PhaseContext) -> PhaseMetrics:
 
 _CHILDREN = (
     Task(
-        "build",
+        "align_source_contributions",
         reads=(
             "publications.id",
             "publication_contributions_queue",
@@ -358,7 +388,7 @@ _CHILDREN = (
             "contribution_resolution_queue",
             "publication_author_alignment",
         ),
-        previous_run=(
+        previous_runs=(
             # Publications, contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
             "publications.id",
             "contributions",
@@ -366,15 +396,14 @@ _CHILDREN = (
             "source_records.publication_id",
             # Marquages retirés par la tâche elle-même.
             "publication_contributions_queue",
-            # Personnes, identifiants, neutralisations et personnes des contributions, écrits par la phase `persons`.
+            # Personnes, identifiants et personnes des contributions, écrits par la phase `persons`.
             "person_identifiers",
             "persons",
-            "source_contributions.neutralized_identifiers",
         ),
-        run=_build,
+        run=_align_source_contributions,
     ),
     Task(
-        "attributes",
+        "recompute_contribution_attributes",
         reads=(
             "contribution_attributes_queue",
             "aligned_source_contributions",
@@ -392,6 +421,8 @@ _CHILDREN = (
             "source_contributions.source",
             "source_record_identifiers",
             "publications.doi",
+            # Type de document qui impose le rôle des contributions (`ROLE_BY_DOC_TYPE`).
+            "publications.doc_type",
             "contributions.id",
             "contributions.publication_id",
             "contributions.author_positions",
@@ -409,13 +440,14 @@ _CHILDREN = (
             "contribution_resolution_queue",
         ),
         # Personnes des contributions, écrites par la phase `persons` ; contributions et alignements supprimés, enregistrements sources détachés, publications supprimées par `finalize.purge_publications`.
-        previous_run=(
+        previous_runs=(
             "contributions",
             "aligned_source_contributions",
             "source_records.publication_id",
             "publications.doi",
+            "publications.doc_type",
         ),
-        run=_attributes,
+        run=_recompute_contribution_attributes,
         section="Attributs des contributions",
     ),
 )
@@ -423,8 +455,8 @@ _CHILDREN = (
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques du recalcul des contributions, avec le nombre de contributions aux attributs mis à jour."""
-    metrics = by_task["build"]
-    metrics.details["attributes_updated"] = by_task["attributes"].updated
+    metrics = by_task["align_source_contributions"]
+    metrics.details["attributes_updated"] = by_task["recompute_contribution_attributes"].updated
     return metrics
 
 
