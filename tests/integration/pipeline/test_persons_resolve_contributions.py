@@ -167,6 +167,46 @@ class TestCreation:
         assert _person(conn, variant) == (person, "name")
         assert counts["created"] == 0
 
+    def test_une_graphie_de_la_contribution_fondatrice_evite_une_seconde_creation(
+        self, sa_sync_conn
+    ):
+        conn = sa_sync_conn
+        founding = _contribution(
+            conn,
+            insert_publication(conn),
+            [("crossref", "Claire Durand", None, True), ("wos", "Claire Lefort", None, True)],
+        )
+        variant = _contribution(
+            conn, insert_publication(conn), [("hal", "Claire Lefort", None, True)]
+        )
+
+        counts = resolve_contributions(conn, logging.getLogger("test"))
+
+        assert counts["created"] == 1
+        assert _person(conn, variant)[0] == _person(conn, founding)[0] is not None
+
+    def test_une_graphie_d_une_contribution_qui_rejoint_la_personne_evite_une_seconde_creation(
+        self, sa_sync_conn
+    ):
+        conn = sa_sync_conn
+        founding = _contribution(
+            conn, insert_publication(conn), [("crossref", "Claire Durand", None, True)]
+        )
+        joining = _contribution(
+            conn,
+            insert_publication(conn),
+            [("hal", "Claire Durand", None, True), ("wos", "Claire Lefort", None, True)],
+        )
+        variant = _contribution(
+            conn, insert_publication(conn), [("openalex", "Claire Lefort", None, True)]
+        )
+
+        counts = resolve_contributions(conn, logging.getLogger("test"))
+
+        assert counts["created"] == 1
+        person = _person(conn, founding)[0]
+        assert _person(conn, joining)[0] == _person(conn, variant)[0] == person is not None
+
 
 def test_une_personne_deja_rattachee_dans_la_publication_n_est_pas_reprise(sa_sync_conn):
     conn = sa_sync_conn

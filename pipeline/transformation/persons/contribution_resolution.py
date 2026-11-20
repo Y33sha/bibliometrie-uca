@@ -427,7 +427,7 @@ def create_persons(
 ) -> int:
     """Traite une à une les contributions à décision de création, contre l'index tenu à jour. Met `decisions` à jour et renvoie le nombre de personnes créées.
 
-    Une contribution désignée par une personne créée dans le même passage rejoint cette personne. Sinon, une personne est créée depuis son nom (`founding_name`) et enregistrée dans l'index. Une personne déjà rattachée à une autre contribution de la publication reste à cette autre contribution.
+    Une contribution désignée par une personne créée dans le même passage rejoint cette personne. Sinon, une personne est créée depuis son nom (`founding_name`) et enregistrée dans l'index. Une personne déjà rattachée à une autre contribution de la publication reste à cette autre contribution. Les noms des contributions sources d'une contribution rattachée deviennent des formes de nom de sa personne dans l'index, comme le fait `populate_person_name_forms` en base.
 
     Args:
         progress: avance d'une contribution traitée ; retient les personnes créées.
@@ -492,6 +492,9 @@ def create_persons(
             )
             add_identifiers_from_contributions(
                 decision.person_id, identifiers_to_attribute(members, decision), repo=repo
+            )
+            index.add_name_forms(
+                decision.person_id, (m.name_forms[0] for m in members if m.name_forms)
             )
             taken_here.add(decision.person_id)
     return created

@@ -11,7 +11,7 @@ Une contribution réunit les contributions sources d'un même auteur dans une pu
 À chaque niveau, les candidats de la contribution sont l'intersection des candidats non vides de ses contributions sources. Les candidats d'une contribution source par identifiant réunissent les personnes désignées par chacun de ses identifiants. Une intersection vide ou de plusieurs personnes laisse la contribution sans personne. Les personnes rejetées pour la publication sont écartées des candidats à chaque niveau. Dans une publication, une personne revient à une seule contribution (`settle_publication`).
 """
 
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -180,6 +180,13 @@ class PersonIndex:
             by_value = self.identifiers.get(id_type)
             if by_value is not None and value not in by_value:
                 by_value[value] = identified
+
+    def add_name_forms(self, person_id: int, forms: Iterable[str]) -> None:
+        """Associe à la personne des formes de nom : les noms des contributions sources d'une contribution rattachée pendant la décision. Une forme déjà associée à une autre personne devient ambiguë."""
+        for form in forms:
+            persons = self.name_forms.get(form, [])
+            if person_id not in persons:
+                self.name_forms[form] = [*persons, person_id]
 
 
 @dataclass(frozen=True)
