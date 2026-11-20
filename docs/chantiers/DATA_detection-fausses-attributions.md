@@ -18,30 +18,39 @@ Mesures du 2026-11-20 (`data/experiments/contributions-orphelines/`), chaque pub
 
 ## Phasage
 
-### Phase 1 — Clusters et homonymes probables
+### Phase 1 — Exploration du modèle
 
-- [ ] Règle du domaine : clusters des publications d'une personne, par les indices partagés.
-- [ ] Calcul des clusters des personnes et stockage pour l'administration.
+Scripts de mesure dans `data/experiments/`, sans code du pipeline. Jeu de validation : les publications rejetées, contributions de l'homonyme, face aux publications non rejetées des mêmes personnes.
+
+- [ ] Pondération des indices selon leur rareté : une revue généraliste, un thème répandu, un coauteur d'une grande collaboration comptent peu.
+- [ ] Détection de communautés (Louvain, Leiden) face aux composantes connexes, sur le graphe pondéré.
+- [ ] Indices à retenir, et apport de chacun : coauteurs, laboratoires, structures HAL, revues, thèmes et sous-champs OpenAlex, domaines HAL, années.
+- [ ] Mesures de chaque variante : séparation des publications rejetées sur le jeu de validation ; personnes à fiche RH signalées, avec relecture automatique des clusters (sous-champs, laboratoires, années) ; chercheurs pluridisciplinaires signalés à tort.
+- [ ] Détecteur des attributions suspectes : profil de l'homonyme amorcé par un cluster, rappel et fausses alertes selon le nombre de publications de l'homonyme.
+- [ ] Choix du modèle, puis décisions de conception : stockage ou calcul à la demande des clusters, seuils.
+
+### Phase 2 — Clusters et homonymes probables
+
+- [ ] Règle du domaine : clusters des publications d'une personne, selon le modèle retenu.
+- [ ] Calcul des clusters des personnes pour l'administration.
 - [ ] Onglet « Homonymes probables » de l'administration : personnes à plusieurs clusters, sous-champs de chaque cluster, rejet d'un cluster entier.
 
-### Phase 2 — Homonyme des personnes rejetées
+### Phase 3 — Homonyme des personnes rejetées
 
 - [ ] Migration : colonne `persons.homonym_of`.
 - [ ] Tâche du pipeline : dans une publication rejetée pour une personne, la seule contribution sans personne au nom de la personne rejoint l'homonyme, créé au besoin. Une contribution dont le rejet a disparu perd l'homonyme. Code de départ : commit 0b1be1d1a, sans le rattachement par le nom.
 - [ ] Fusion de personnes : l'homonyme de la personne absorbée devient celui de la personne conservée.
 
-### Phase 3 — Attributions suspectes
+### Phase 4 — Attributions suspectes
 
 - [ ] Détecteur : une publication rattachée à une personne qui a un homonyme, hors épinglage, est suspecte quand la cascade de départage désigne l'homonyme.
 - [ ] Onglet « Attributions suspectes » de l'administration : rejet ou confirmation d'un clic.
 - [ ] Mesure sur le stock, puis relecture des alertes.
 
-### Phase 4 — Documentation
+### Phase 5 — Documentation
 
 - [ ] Mise à jour de la documentation du rattachement des personnes et de l'administration.
 
 ## Questions ouvertes
 
-- Un indice très répandu (revue généraliste, coauteur d'une grande collaboration) relie parfois deux clusters distincts. Une pondération des indices et une détection de communautés séparent mieux qu'une composante connexe.
 - Un chercheur pluridisciplinaire réunit des clusters distincts sans homonyme.
-- Seuil d'un cluster significatif : trois publications dans la mesure.
