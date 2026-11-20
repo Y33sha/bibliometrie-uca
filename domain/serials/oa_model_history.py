@@ -37,6 +37,12 @@ class OaModelHistory:
         return self.model if year >= since else OaModel.SUBSCRIPTION
 
 
+DOAJ_OPEN_LICENSE_SINCE_KEY = (
+    "When did the journal start to publish all content using an open license?"
+)
+"""Colonne du dump DOAJ, clé de `serials.doaj_payload` : année depuis laquelle la revue publie tout son contenu sous licence ouverte."""
+
+
 def doaj_year(value: str | None) -> int | None:
     """Renvoie l'année déclarée au DOAJ, `None` pour une valeur absente ou autre qu'une année."""
     if value is None or not (value.isascii() and value.isdigit() and len(value) == 4):

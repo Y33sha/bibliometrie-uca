@@ -15,12 +15,15 @@ from domain.publications.open_access import (
     is_restricted,
     publication_oa_status,
 )
-from domain.serials.oa_model_history import OaModelHistory, doaj_year
+from domain.serials.oa_model_history import (
+    DOAJ_OPEN_LICENSE_SINCE_KEY,
+    OaModelHistory,
+    doaj_year,
+)
 from domain.serials.serial import OaModel
 from domain.types import JsonValue
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.sql_fragments import under_active_embargo
-from pipeline.ingestion.complements.doaj import OPEN_LICENSE_SINCE_KEY
 
 
 class OaFacts(NamedTuple):
@@ -97,7 +100,7 @@ def _serial_oa_histories(conn: Connection, serial_ids: Sequence[int]) -> dict[in
             "SELECT id, oa_model::text AS oa_model, openalex_is_oa, openalex_oa_flip_year,"
             " doaj_payload->>:doaj_key AS doaj_since FROM serials WHERE id = ANY(:ids)"
         ),
-        {"ids": list(serial_ids), "doaj_key": OPEN_LICENSE_SINCE_KEY},
+        {"ids": list(serial_ids), "doaj_key": DOAJ_OPEN_LICENSE_SINCE_KEY},
     )
     return {
         r.id: OaModelHistory(

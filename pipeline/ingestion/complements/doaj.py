@@ -23,9 +23,6 @@ ALLOWED_DUMP_HOSTS = frozenset({"doaj.org", "doaj-live-journal-csv.s3.amazonaws.
 Ce téléchargement est la seule requête sortante du projet à suivre une redirection : `doaj.org` renvoie vers un lien signé, à durée limitée, sur son stockage objet. Ailleurs, une redirection est une erreur : les URL écrites dans le code sont donc la liste des hôtes joignables. Cette liste garde la propriété : une redirection vers un autre hôte échoue en le nommant.
 """
 
-OPEN_LICENSE_SINCE_KEY = "When did the journal start to publish all content using an open license?"
-"""Colonne du dump : année depuis laquelle la revue publie tout son contenu sous licence ouverte."""
-
 MAX_DUMP_BYTES = 256 * 1024 * 1024
 """Plafond d'octets acceptés pour le dump.
 
