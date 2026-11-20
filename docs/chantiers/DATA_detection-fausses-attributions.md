@@ -51,9 +51,16 @@ Mesures de la phase 1 (`data/experiments/fausses-attributions/`). Jeu de validat
 
 ## Décisions
 
-- Le profil de comparaison d'une personne réunit les publications rejetées pour elle, quel que soit le détenteur de la contribution à son nom. Il se calcule à la demande depuis les rejets.
+- Deux détections alimentent une seule file d'attributions suspectes :
+  - personne à fiche RH : clusters signalés par le modèle de référence ;
+  - personne ayant au moins un rejet : publications pour lesquelles la cascade de départage désigne le profil des publications rejetées plutôt que celui de la personne.
+- Le profil de comparaison d'une personne réunit les publications rejetées pour elle, quel que soit le détenteur de la contribution à son nom. Il se calcule depuis les rejets.
+- Les rôles de jury de thèse restent hors du graphe. Une thèse dont la personne est l'auteur y figure.
+- La partition utilise la bibliothèque `igraph`.
+- Une phase placée après `persons` recalcule à chaque run la table `persons.suspect_contributions` : contribution, personne, motif, cluster.
 - La détection signale à l'administration, qui décide. Aucun détachement automatique.
-- Pour une personne sans rejet, l'administration rejette un cluster signalé entier : ses publications amorcent le profil de comparaison.
+- Rejeter un cluster ou une publication passe par le détachement groupé des contributions. Les rejets nourrissent ensuite le profil de comparaison.
+- Confirmer épingle les contributions sur la personne. Un cluster contenant une contribution épinglée n'est plus signalé.
 
 ## Phasage
 
@@ -67,23 +74,35 @@ Scripts de mesure dans `data/experiments/`, sans code du pipeline. Jeu de valida
 - [x] Mesures de chaque variante : séparation des publications rejetées sur le jeu de validation ; personnes à fiche RH signalées, avec relecture automatique des clusters (sous-champs, laboratoires, années) ; chercheurs pluridisciplinaires signalés à tort.
 - [x] Profil de comparaison d'une publication rejetée épinglée ou rattachée à une autre personne : homonyme créé par l'administration, autre personne à fiche RH.
 - [x] Détecteur des attributions suspectes : profil de l'homonyme amorcé par un cluster, rappel et fausses alertes selon le nombre de publications de l'homonyme.
-- [ ] Choix du modèle, puis décisions de conception : stockage ou calcul à la demande des clusters, seuils.
+- [x] Choix du modèle, puis décisions de conception : stockage ou calcul à la demande des clusters, seuils.
 
-### Phase 2 — Clusters et homonymes probables
+### Phase 2 — Ordre des phases
 
-- [ ] Règle du domaine : clusters des publications d'une personne, selon le modèle retenu.
-- [ ] Calcul des clusters des personnes pour l'administration.
-- [ ] Onglet « Homonymes probables » de l'administration : personnes à plusieurs clusters, sous-champs de chaque cluster, rejet d'un cluster entier.
+- [ ] `relations` puis `subjects` juste après `publications`, dans le bloc « Entités ». Le décompte des sujets rejoint `finalize`, après la purge des publications.
 
-### Phase 3 — Attributions suspectes
+### Phase 3 — Détection
 
-- [ ] Détecteur : une publication rattachée à une personne, hors épinglage, est suspecte quand la cascade de départage désigne le profil des publications rejetées pour la personne.
-- [ ] Onglet « Attributions suspectes » de l'administration : rejet ou confirmation d'un clic.
+- [ ] Dépendance `igraph`.
+- [ ] Règle du domaine : graphe pondéré des publications d'une personne, partition de Leiden, clusters signalés.
+- [ ] Migration : table `persons.suspect_contributions`.
+- [ ] Phase du pipeline après `persons` : clusters signalés des personnes à fiche RH, publications des personnes ayant un rejet désignées par la cascade de départage.
+
+### Phase 4 — File de l'administration
+
+- [ ] Attribution d'une contribution déjà rattachée à la personne visée : épinglage.
+- [ ] API : compteur et liste de la file, par personne puis par cluster, clusters sans adresse en Auvergne en tête.
+- [ ] Onglet « Attributions suspectes » des files de triage des personnes : rejet ou confirmation d'un cluster ou d'une publication.
 - [ ] Mesure sur le stock, puis relecture des alertes.
 
-### Phase 4 — Documentation
+### Phase 5 — Indices supplémentaires
 
-- [ ] Mise à jour de la documentation du rattachement des personnes et de l'administration.
+- [ ] Contribution sans affiliation au périmètre, ou à adresse hors périmètre, rattachée seulement par IdRef ou idHAL.
+- [ ] Contribution à prénom réduit à l'initiale, rattachée par IdRef ou idHAL.
+- [ ] Clusters des personnes sans fiche RH, à partir d'un nombre minimal de publications.
+
+### Phase 6 — Documentation
+
+- [ ] Mise à jour de la documentation du pipeline, du rattachement des personnes et de l'administration, et de la liste des phases de `CLAUDE.md`.
 
 ## Questions ouvertes
 
