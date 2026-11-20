@@ -62,4 +62,4 @@ Le relevé montre aussi des phases qui réunissent des tâches indépendantes : 
 
 ## Questions ouvertes
 
-- Moissonnage par source : chaque source enchaînerait moissonnage, recherches et normalisation sans attendre les autres sources. Le run gagnerait la durée perdue à chaque phase à attendre la source la plus lente. Le journal, l'option `--from` et les métriques sont organisés par phase.
+- Moissonnage par source : chaque source enchaînerait moissonnage, recherches et normalisation sans attendre les autres sources. La normalisation traiterait les documents par lots, en parallèle du moissonnage. Le run gagnerait la durée perdue à chaque phase à attendre la source la plus lente. Le journal, l'option `--from` et les métriques sont organisés par phase.
