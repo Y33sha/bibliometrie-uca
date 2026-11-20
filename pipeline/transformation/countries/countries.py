@@ -87,7 +87,11 @@ _DETECT_BY_COUNTRY_NAME = Task(
     reads=(*_DETECTION_READS, "addresses.countries", "addresses.publication_count"),
     writes=("address_country_candidates",),
     # Adresses marquées depuis la dernière résolution, retirées de la file par `resolve_countries` ; pays des adresses écrits par `resolve_countries` ; nombre de publications des adresses, recompté par `finalize`.
-    previous_run=("address_candidates_queue", "addresses.countries", "addresses.publication_count"),
+    previous_runs=(
+        "address_candidates_queue",
+        "addresses.countries",
+        "addresses.publication_count",
+    ),
     run=_detect_by_country_name,
     section="Pays des adresses d'après le nom de pays qui les termine",
 )
@@ -98,7 +102,7 @@ _DETECT_BY_PLACE_NAME = Task(
     reads=_DETECTION_READS,
     writes=("address_country_candidates",),
     # Adresses marquées depuis la dernière résolution, retirées de la file par `resolve_countries`.
-    previous_run=("address_candidates_queue",),
+    previous_runs=("address_candidates_queue",),
     run=in_transaction(detect_by_place_name.run),
     section="Pays des adresses d'après les noms de villes et d'institutions",
 )
@@ -119,7 +123,7 @@ _RESOLVE_COUNTRIES = Task(
         "address_candidates_queue",
     ),
     # Nombre de publications des adresses, recompté par `finalize`.
-    previous_run=("addresses.publication_count",),
+    previous_runs=("addresses.publication_count",),
     run=_resolve,
     section="Choix du pays des adresses parmi les pays trouvés",
 )
@@ -150,7 +154,7 @@ _REFRESH_SOURCE_RECORD_COUNTRIES = Task(
         "publications_queue",
     ),
     # Rattachements des enregistrements sources, écrits par `publications.reconcile` et `finalize.purge_publications`.
-    previous_run=("source_records.publication_id",),
+    previous_runs=("source_records.publication_id",),
     run=_refresh,
     section="Rafraîchissement des pays des enregistrements sources",
 )

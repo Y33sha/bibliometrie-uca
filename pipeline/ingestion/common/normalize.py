@@ -197,7 +197,7 @@ _BY_SOURCE = tuple(
             "contribution_attributes_queue",
         ),
         # Ses propres lignes de `staging`, de la file de normalisation, enregistrements sources et contributions sources ; les contributions écrites par `author_grouping`.
-        previous_run=(
+        previous_runs=(
             "staging",
             "staging_normalization_queue",
             "source_records",
@@ -253,7 +253,7 @@ _CHILDREN = (
                     "source_records.distinct_author_count",
                     "publication_contributions_queue",
                 ),
-                previous_run=(
+                previous_runs=(
                     "source_records",
                     "source_record_identifiers",
                     "source_contributions",
@@ -284,7 +284,7 @@ _CHILDREN = (
                     "confirmed_source_contributions",
                     "rejected_contributions",
                 ),
-                previous_run=("source_records",),
+                previous_runs=("source_records",),
                 run=_prune,
             ),
         ),
@@ -300,7 +300,7 @@ _CHILDREN = (
                     "contributor_information.id",
                 ),
                 writes=("contributor_information.id",),
-                previous_run=("source_contributions",),
+                previous_runs=("source_contributions",),
                 run=_cleanup(
                     delete_orphan_contributor_information, "ligne supprimée", "lignes supprimées"
                 ),

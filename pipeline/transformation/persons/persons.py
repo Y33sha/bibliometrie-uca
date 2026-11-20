@@ -109,7 +109,7 @@ _CHILDREN = (
             # Marquages traités, retirés de la file.
             "contribution_resolution_queue",
         ),
-        previous_run=(
+        previous_runs=(
             # Formes de nom régénérées par `populate_person_name_forms` ; personnes, identifiants et formes supprimés, contributions vidées et marquées par `purge_persons`.
             "person_identifiers",
             "person_name_forms",
@@ -137,7 +137,7 @@ _CHILDREN = (
         ),
         writes=("person_name_forms",),
         # Contributions vidées et personnes supprimées par `purge_persons` ; alignements supprimés par `finalize.purge_publications`.
-        previous_run=(
+        previous_runs=(
             "persons",
             "person_name_forms",
             "contributions.person_id",
@@ -179,7 +179,7 @@ _CHILDREN = (
             "person_name_forms.id",
         ),
         # Contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
-        previous_run=(
+        previous_runs=(
             "contributions",
             "aligned_source_contributions",
             "source_records.publication_id",

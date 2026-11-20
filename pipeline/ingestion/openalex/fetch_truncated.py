@@ -85,7 +85,7 @@ _CHILDREN = (
         "refetch_openalex",
         reads=("staging",),
         writes=("staging", "staging_normalization_queue"),
-        previous_run=("staging",),
+        previous_runs=("staging",),
         network="openalex",
         run=_refetch,
         section="Listes d'auteurs tronquées",

@@ -326,7 +326,7 @@ TASKS = (
         ),
         writes=("publication_relations",),
         # Lecture de la table avant sa reconstruction, pour compter les arêtes ajoutées et disparues.
-        previous_run=("publication_relations",),
+        previous_runs=("publication_relations",),
         run=in_transaction(rebuild),
         section="Relations avec les errata et les avis",
     ),

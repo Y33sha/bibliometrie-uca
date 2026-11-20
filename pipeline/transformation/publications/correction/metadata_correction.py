@@ -63,7 +63,7 @@ _CHILDREN = (
             "source_record_keys_queue",
         ),
         # Revues, monographies et éditeurs vides, supprimés par `finalize`.
-        previous_run=(
+        previous_runs=(
             "source_records",
             "source_record_identifiers.removed_by",
             "serials.serial_type",
@@ -94,7 +94,7 @@ _CHILDREN = (
             "dois.registered",
         ),
         writes=("doi_targets", "source_record_keys_queue"),
-        previous_run=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
+        previous_runs=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
         section="Cibles des DOI de formes secondaires",
         run=in_transaction(doi_targets.run),
     ),
@@ -126,7 +126,7 @@ _CHILDREN = (
             "source_record_identifiers.removed_by",
             "source_record_keys_queue",
         ),
-        previous_run=("source_records", "source_record_identifiers.removed_by"),
+        previous_runs=("source_records", "source_record_identifiers.removed_by"),
         section="Retraits de DOI par confrontation de documents",
         run=in_transaction(remove_identifiers.run),
     ),
@@ -152,7 +152,7 @@ _CHILDREN = (
         ),
         writes=("source_records.is_matchable", "source_record_keys_queue"),
         # Retraits de DOI de la réconciliation, que `is_matchable` ignore (`reconsidered`).
-        previous_run=("source_records.is_matchable", "source_record_identifiers.removed_by"),
+        previous_runs=("source_records.is_matchable", "source_record_identifiers.removed_by"),
         section="Enregistrements sources écartés de la réconciliation",
         run=in_transaction(matchable.run),
     ),

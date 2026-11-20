@@ -49,7 +49,7 @@ _CHILDREN = tuple(
         str(source),
         reads=("config", "staging", "source_records.publication_year"),
         writes=("staging", "staging_normalization_queue"),
-        previous_run=("staging", "source_records"),
+        previous_runs=("staging", "source_records"),
         network=source,
         parallel_group="sources",
         run=lambda ctx, source=source: _run_fetch_stale(ctx, source, _years(ctx)),

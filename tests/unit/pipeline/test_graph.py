@@ -118,7 +118,7 @@ def test_chaque_donnee_declaree_existe_dans_le_schema():
     unknown = sorted(
         (task.name, item)
         for task in ALL_TASKS
-        for item in {*task.reads, *task.writes, *task.previous_run}
+        for item in {*task.reads, *task.writes, *task.previous_runs}
         if not (
             item in views
             or item in columns
@@ -139,7 +139,7 @@ def test_lecture_non_declaree_detectee():
     writer = _task("b", writes=("t.c",))
     reader = _task("a", reads=("t",))
     assert order_violations([reader, writer]) == [("a", "t", "b")]
-    declared = _task("a", reads=("t",), previous_run=("t.c",))
+    declared = _task("a", reads=("t",), previous_runs=("t.c",))
     assert order_violations([declared, writer]) == []
 
 

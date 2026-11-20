@@ -388,7 +388,7 @@ _CHILDREN = (
             "contribution_resolution_queue",
             "publication_author_alignment",
         ),
-        previous_run=(
+        previous_runs=(
             # Publications, contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
             "publications.id",
             "contributions",
@@ -440,7 +440,7 @@ _CHILDREN = (
             "contribution_resolution_queue",
         ),
         # Personnes des contributions, écrites par la phase `persons` ; contributions et alignements supprimés, enregistrements sources détachés, publications supprimées par `finalize.purge_publications`.
-        previous_run=(
+        previous_runs=(
             "contributions",
             "aligned_source_contributions",
             "source_records.publication_id",

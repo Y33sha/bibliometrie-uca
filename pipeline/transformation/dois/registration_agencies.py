@@ -105,7 +105,7 @@ TASKS = (
             "publication_relations",
         ),
         writes=("doi_prefixes.id", "doi_prefixes.ra"),
-        previous_run=("source_records", "source_record_identifiers", "publication_relations"),
+        previous_runs=("source_records", "source_record_identifiers", "publication_relations"),
         network=DOI_ORG,
         run=resolve_prefixes,
         section="Agences d'enregistrement des préfixes DOI",

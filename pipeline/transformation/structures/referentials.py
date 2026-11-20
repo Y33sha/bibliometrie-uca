@@ -53,7 +53,7 @@ REFRESH_ROR = Task(
         # Dépendants d'une organisation qui change de pays.
         "source_contribution_countries_queue",
     ),
-    previous_run=("ror_dump_imports",),
+    previous_runs=("ror_dump_imports",),
     network="zenodo",
     run=_refresh_ror,
     section="Référentiel ROR",
@@ -70,7 +70,7 @@ REFRESH_HAL_STRUCTURES = Task(
         # Contributions sources d'une structure qui change de pays.
         "source_contribution_countries_queue",
     ),
-    previous_run=("hal_structures", "hal_structure_aliases"),
+    previous_runs=("hal_structures", "hal_structure_aliases"),
     network="hal",
     run=_refresh_hal_structures,
     section="Référentiel des structures HAL",

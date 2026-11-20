@@ -55,7 +55,7 @@ ARBITRATE_IDENTIFIERS = Task(
         "contribution_resolution_queue",
         "person_identifiers",
     ),
-    previous_run=(
+    previous_runs=(
         # Doublons d'auteur repérés par l'alignement des auteurs.
         "source_contributions.duplicate_of",
         # Identifiants attribués et contributions rattachées par la phase `persons`.

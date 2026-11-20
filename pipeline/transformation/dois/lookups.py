@@ -446,7 +446,7 @@ RESOLVE_DOIS = Task(
         "dois.registered",
         "publications_queue",
     ),
-    previous_run=_LOOKUP_PREVIOUS_RUN,
+    previous_runs=_LOOKUP_PREVIOUS_RUN,
     network=registry.DOI_ORG,
     run=_resolve_dois,
     section="URL de résolution des DOI sur doi.org",

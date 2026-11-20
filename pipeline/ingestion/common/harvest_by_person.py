@@ -43,7 +43,7 @@ _CHILDREN = tuple(
         ),
         writes=("staging", "staging_normalization_queue"),
         # Identifiants des personnes RH et publications qui composent les lots, posés par les phases suivantes.
-        previous_run=(
+        previous_runs=(
             "contributions",
             "person_identifiers",
             "persons",

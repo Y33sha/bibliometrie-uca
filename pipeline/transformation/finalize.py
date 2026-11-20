@@ -232,7 +232,7 @@ _SERIAL_PUBLISHERS = Task(
     ),
     writes=("serials.publisher_id",),
     # Les revues et les monographies supprimées ensuite comme référentiels vides n'ont pas de publication : leur suppression ne change aucun éditeur.
-    previous_run=("serials.id", "monographs.serial_id"),
+    previous_runs=("serials.id", "monographs.serial_id"),
     run=_serial_publishers,
     section=_SYNC_SECTION,
     label="Éditeur des revues",
@@ -279,7 +279,7 @@ _DELETE_EMPTY_SERIALS = Task(
         "serial_issns.serial_id",
     ),
     # Les éditeurs supprimés ensuite comme référentiels vides sont sans revue.
-    previous_run=("publishers.name",),
+    previous_runs=("publishers.name",),
     run=in_transaction(delete_empty_serials.run_delete_empty_serials),
     section=_EMPTY_CONTAINERS_SECTION,
     label=delete_empty_serials.LABEL,
@@ -326,7 +326,7 @@ _PUBLICATION_COUNTS = Task(
         "serials.publication_count",
         "publishers.publication_count",
     ),
-    previous_run=("addresses",),
+    previous_runs=("addresses",),
     run=_publication_counts,
 )
 
