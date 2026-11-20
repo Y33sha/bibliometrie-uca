@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict ZWVCQC1PyghDwSq6TW9UdzlyPK0n3QtVXwuzsfVEaUNmojxD6anfUA0XLOCmq7D
+\restrict TpN8tnXFfnKhfse8bhahGtn25sV2cehWAlj0K9y7OUsjAy4YgtjWlHZGexKUu6f
 
--- Dumped from database version 18.7 (Ubuntu 18.7-1.pgdg22.04+5)
--- Dumped by pg_dump version 19.0 (Ubuntu 19.0-1.pgdg22.04+1)
+-- Dumped from database version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -439,8 +439,7 @@ CREATE TYPE public.resolution_mode AS ENUM (
     'laboratory',
     'hal_structure',
     'serial',
-    'activity_years',
-    'homonym'
+    'activity_years'
 );
 
 
@@ -1038,8 +1037,7 @@ CREATE TABLE persons.persons (
     last_name_normalized text NOT NULL,
     first_name_normalized text NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
-    exclusion public.person_exclusion,
-    homonym_of integer
+    exclusion public.person_exclusion
 );
 
 
@@ -1047,14 +1045,7 @@ CREATE TABLE persons.persons (
 -- Name: COLUMN persons.exclusion; Type: COMMENT; Schema: persons; Owner: -
 --
 
-COMMENT ON COLUMN persons.persons.exclusion IS 'Motif d''exclusion : not_a_person (fausse entité), out_of_perimeter (personne réelle hors du périmètre, ou homonyme d''une personne rejetée). Nul pour une personne retenue.';
-
-
---
--- Name: COLUMN persons.homonym_of; Type: COMMENT; Schema: persons; Owner: -
---
-
-COMMENT ON COLUMN persons.persons.homonym_of IS 'Personne dont celle-ci est l''homonyme, créé pour les publications rejetées pour elle.';
+COMMENT ON COLUMN persons.persons.exclusion IS 'Motif d''exclusion décidé à la main : not_a_person (fausse entité), out_of_perimeter (personne réelle rattachée au périmètre par erreur). Nul pour une personne retenue.';
 
 
 --
@@ -4887,13 +4878,6 @@ CREATE INDEX idx_rejected_contributions_person ON persons.rejected_contributions
 
 
 --
--- Name: persons_homonym_of_idx; Type: INDEX; Schema: persons; Owner: -
---
-
-CREATE INDEX persons_homonym_of_idx ON persons.persons USING btree (homonym_of);
-
-
---
 -- Name: idx_merge_redirects_kept; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5766,14 +5750,6 @@ ALTER TABLE ONLY persons.person_name_forms
 
 
 --
--- Name: persons persons_homonym_of_fkey; Type: FK CONSTRAINT; Schema: persons; Owner: -
---
-
-ALTER TABLE ONLY persons.persons
-    ADD CONSTRAINT persons_homonym_of_fkey FOREIGN KEY (homonym_of) REFERENCES persons.persons(id) ON DELETE SET NULL;
-
-
---
 -- Name: rejected_contributions rejected_contributions_person_id_fkey; Type: FK CONSTRAINT; Schema: persons; Owner: -
 --
 
@@ -6353,5 +6329,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZWVCQC1PyghDwSq6TW9UdzlyPK0n3QtVXwuzsfVEaUNmojxD6anfUA0XLOCmq7D
+\unrestrict TpN8tnXFfnKhfse8bhahGtn25sV2cehWAlj0K9y7OUsjAy4YgtjWlHZGexKUu6f
 

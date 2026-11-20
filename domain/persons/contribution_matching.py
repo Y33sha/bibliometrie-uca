@@ -64,8 +64,6 @@ class ContributionMatchReason(StrEnum):
     """Signal qui rattache une contribution à une personne. Reflet du type PostgreSQL `resolution_mode`."""
 
     MANUAL = "manual"
-    HOMONYM = "homonym"
-    """Contribution d'une publication rejetée pour une personne, rattachée à l'homonyme de cette personne."""
     ORCID = "orcid"
     HAL_PERSON_ID = "hal_person_id"
     IDREF = "idref"
@@ -99,20 +97,17 @@ _REASON_BY_IDENTIFIER: dict[PersonIdentifierType, ContributionMatchReason] = {
     PersonIdentifierType.IDREF: ContributionMatchReason.IDREF,
 }
 
-HUMAN_DECISION_REASONS = (ContributionMatchReason.MANUAL, ContributionMatchReason.HOMONYM)
-"""Signaux issus d'une décision de l'administration : épinglage, rejet de la personne dont la contribution rejoint l'homonyme."""
-
 MATCH_REASON_PRIORITY: tuple[ContributionMatchReason, ...] = (
-    *HUMAN_DECISION_REASONS,
+    ContributionMatchReason.MANUAL,
     *(_REASON_BY_IDENTIFIER[id_type] for id_type in IDENTIFIER_ORDER),
     *NAME_BASED_REASONS,
 )
-"""Signaux de rattachement, du mieux classé au moins bien classé : décision de l'administration, identifiants du plus fiable au moins fiable, nom, départage d'un nom ambigu."""
+"""Signaux de rattachement, dans l'ordre d'examen de la décision : épinglage, identifiants du plus fiable au moins fiable, nom, départage d'un nom ambigu."""
 
 
 def _strength(reason: ContributionMatchReason) -> int:
-    """Renvoie le rang d'un rattachement, du mieux appuyé au moins bien appuyé : décision de l'administration, identifiant, nom, départage d'un nom ambigu."""
-    if reason in HUMAN_DECISION_REASONS:
+    """Renvoie le rang d'un rattachement, du mieux appuyé au moins bien appuyé : épinglage, identifiant, nom, départage d'un nom ambigu."""
+    if reason == ContributionMatchReason.MANUAL:
         return 0
     if reason in TIE_BREAK_REASONS:
         return 3

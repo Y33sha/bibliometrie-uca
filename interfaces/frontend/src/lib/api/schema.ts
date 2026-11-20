@@ -4756,7 +4756,7 @@ export interface components {
         };
         /**
          * PersonExclusion
-         * @description Motif d'exclusion d'une personne, décidé à la main ou posé sur l'homonyme d'une personne rejetée (`persons.homonym_of`). Une personne exclue est absente de l'interface publique et du périmètre. Ses formes de nom servent au matching.
+         * @description Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'interface publique et du périmètre. Ses formes de nom servent au matching.
          * @enum {string}
          */
         PersonExclusion: "not_a_person" | "out_of_perimeter";

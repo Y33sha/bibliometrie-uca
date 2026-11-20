@@ -8,21 +8,19 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 def build_metrics(
     *,
-    homonyms: Mapping[str, int],
     resolution: Mapping[str, int],
     name_forms: Mapping[str, int],
     purge: Mapping[str, int],
 ) -> PhaseMetrics:
-    """Assemble les métriques de la phase depuis les compteurs des homonymes des personnes rejetées (`attach_homonyms`), du rattachement des contributions (`resolve_contributions`), de la régénération des formes de nom et de la purge.
+    """Assemble les métriques de la phase depuis les compteurs du rattachement des contributions (`resolve_contributions`), de la régénération des formes de nom et de la purge.
 
-    `details.table` compte les contributions rattachées pendant le run, par mode de résolution (`ContributionMatchReason`), et celles qui fondent une personne (`created`). Le mode `manual` réunit les épinglages appliqués et les décisions par épinglage. Le mode `homonym` compte les contributions rattachées aux homonymes.
+    `details.table` compte les contributions rattachées pendant le run, par mode de résolution (`ContributionMatchReason`), et celles qui fondent une personne (`created`). Le mode `manual` réunit les épinglages appliqués et les décisions par épinglage.
     """
     attached = {
         reason: resolution.get(f"{ContributionOutcome.MATCH}:{reason}", 0)
         for reason in ContributionMatchReason
     }
     attached[ContributionMatchReason.MANUAL] += resolution.get("pinned", 0)
-    attached[ContributionMatchReason.HOMONYM] += homonyms.get("homonym_contributions_attached", 0)
     created = resolution.get(f"{ContributionOutcome.CREATE}:{ContributionMatchReason.NAME}", 0)
 
     metrics = PhaseMetrics()
@@ -35,7 +33,6 @@ def build_metrics(
         ]
     }
     metrics.details["summary"] = {
-        **homonyms,
         **resolution,
         "ambiguous_marked": purge.get("ambiguous_marked", 0),
         "deleted_attributions": purge.get("deleted_attributions", 0),

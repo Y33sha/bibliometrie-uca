@@ -122,8 +122,6 @@ MERGE_STEPS: dict[str, MergeStep] = {
         "persons", "last_name", "first_name", "last_name_normalized", "first_name_normalized"
     ),
     "created_at": untouched("persons", "created_at"),
-    # L'homonyme de l'absorbée devient celui de la conservée.
-    "homonyms": transfer("persons", "homonym_of"),
     "exclusion": MergeStep((("persons", "exclusion"),), _merge_exclusion, decision=True),
 }
 """Ordre d'exécution : les rejets et les confirmations sont transférés avant que le rejet l'emporte (`merge_into`)."""

@@ -1,4 +1,4 @@
-"""Phase `persons` : homonymes des personnes rejetées (`homonyms`), rattachement des contributions aux personnes (`contribution_resolution`), formes de nom (`populate_person_name_forms`), puis purge (`purge`). Chaque tâche a sa transaction."""
+"""Phase `persons` : rattachement des contributions aux personnes (`contribution_resolution`), formes de nom (`populate_person_name_forms`), puis purge (`purge`). Chaque tâche a sa transaction."""
 
 from __future__ import annotations
 
@@ -10,32 +10,9 @@ from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, infle
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.transformation.persons.contribution_resolution import resolve_contributions
-from pipeline.transformation.persons.homonyms import attach_homonyms
 from pipeline.transformation.persons.metrics import build_metrics
 from pipeline.transformation.persons.populate_person_name_forms import populate
 from pipeline.transformation.persons.purge import purge
-
-
-def _attach_homonyms(ctx: PhaseContext) -> PhaseMetrics:
-    with ctx.open_tx() as conn:
-        counts = attach_homonyms(conn)
-    ctx.logger.info(
-        "%s%s, %s",
-        BRANCH,
-        quantity(
-            counts["homonym_contributions_attached"],
-            "contribution rattachée",
-            "contributions rattachées",
-        ),
-        quantity(counts["homonym_contributions_released"], "détachée"),
-    )
-    ctx.logger.info(
-        "%s%s, %s",
-        LAST_BRANCH,
-        quantity(counts["homonyms_created"], "homonyme créé", "homonymes créés"),
-        quantity(counts["homonyms_deleted"], "supprimé"),
-    )
-    return PhaseMetrics(extras=counts)
 
 
 def _resolve_contributions(ctx: PhaseContext) -> PhaseMetrics:
@@ -100,36 +77,6 @@ _TIE_BREAK_PREVIOUS_RUN = ("publications.serial_id", "publications.publication_y
 
 
 _CHILDREN = (
-    Task(
-        "attach_homonyms",
-        reads=(
-            "rejected_contributions",
-            "source_records.publication_id",
-            "persons",
-            "contributions.id",
-            "contributions.publication_id",
-            "contributions.person_id",
-            "contributions.resolution_mode",
-            "aligned_source_contributions",
-            "source_contributions.contributor_information_id",
-            "contributor_information",
-        ),
-        writes=(
-            "persons",
-            "person_name_forms",
-            "contributions.person_id",
-            "contributions.resolution_mode",
-        ),
-        # Personnes et contributions vidées par `purge_persons` ; contributions et alignements supprimés, enregistrements sources détachés par `finalize.purge_publications`.
-        previous_run=(
-            "persons",
-            "contributions",
-            "aligned_source_contributions",
-            "source_records.publication_id",
-        ),
-        run=_attach_homonyms,
-        section="Homonymes des personnes rejetées",
-    ),
     Task(
         "resolve_contributions",
         reads=(
@@ -247,7 +194,6 @@ _CHILDREN = (
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     """Renvoie les métriques de la phase, d'après les décomptes de ses tâches."""
     return build_metrics(
-        homonyms=by_task["attach_homonyms"].extras,
         resolution=by_task["resolve_contributions"].extras,
         name_forms=by_task["populate_person_name_forms"].extras,
         purge=by_task["purge_persons"].extras,

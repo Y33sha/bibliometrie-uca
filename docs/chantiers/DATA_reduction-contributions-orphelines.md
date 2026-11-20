@@ -141,17 +141,12 @@ L'indice de périmètre « déposant du brevet » va à tous les inventeurs de l
 
 ### Phase 6 — Homonymes des personnes rejetées
 
-Un rejet de l'administration écarte une personne d'une publication. La contribution à son nom reste sans personne, et la prochaine publication de l'homonyme lui revient par le nom. Au 2026-11-20 : 5 019 rejets pour 64 personnes ; 3 472 contributions des enregistrements rejetés sont sans personne et hors périmètre, 240 rattachées à une autre personne, 8 orphelines.
+Piste écartée : une fiche d'homonyme, exclue hors périmètre, réunit les contributions des publications rejetées pour une personne ; la cascade de départage choisit ensuite entre la personne et son homonyme. Au 2026-11-20, 848 paires (publication, personne) rejetées : 589 ont une seule contribution sans personne au nom de la personne, 258 aucune.
 
-- [x] Simulation du 2026-11-20 (`simulation_homonymes.py`) : un homonyme par personne rejetée, de profil tiré des contributions rejetées ; la cascade de départage choisit entre la personne et son homonyme.
-  - Contributions des personnes rattachées par le nom ou par départage : 292 gardées, 1 passée à l'homonyme, 25 sans personne.
-  - Contributions rejetées du périmètre, jugées chacune sans sa publication : par le nom, 164 à l'homonyme, 11 à la personne, 6 à aucune ; par un identifiant de la personne, le rattachement par identifiant l'emporte.
-- [x] Migration `d7e2b9f4a061` : colonne `persons.homonym_of`, valeur `homonym` de `resolution_mode`.
-- [x] Tâche `persons.attach_homonyms`, avant le rattachement : la contribution sans personne d'une publication rejetée pour une personne, seule au nom de la personne, rejoint l'homonyme de la personne. L'homonyme est créé au besoin, au nom de la personne, exclu hors périmètre. Une contribution rattachée à l'homonyme dont le rejet a disparu perd sa personne.
-- [x] Rattachement : les contributions de l'homonyme, comme les épinglages, restent hors de la redécision (`HUMAN_DECISION_REASONS`).
-- [x] Fusion de personnes : l'homonyme de la personne absorbée devient celui de la personne conservée.
-- [x] Tests du domaine et de la tâche.
-- [ ] Deux runs : le premier crée les homonymes, sa purge marque les contributions devenues ambiguës, le second les redécide. Bilan des orphelines et des rattachements à l'homonyme.
+- [x] Simulation du 2026-11-20 (`simulation_homonymes.py`), profil de l'homonyme tiré de ces 589 contributions :
+  - contributions des personnes rattachées par le nom ou par départage : 168 gardées, 1 passée à l'homonyme, 17 sans personne ;
+  - contributions rejetées du périmètre, attribuées par le nom et jugées chacune sans sa publication : 6, toutes à la personne. Les contributions captées par l'homonyme sont hors périmètre, donc jamais rattachées par le nom.
+- [x] Code retiré, migration `d7e2b9f4a061` annulée : 17 orphelines de plus pour aucun rejet évité.
 
 ### Phase 7 — Documentation
 

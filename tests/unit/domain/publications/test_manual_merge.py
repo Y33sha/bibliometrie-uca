@@ -41,9 +41,8 @@ def test_the_doi_of_a_zenodo_dataset_counts():
 
 def test_priority_ranks_every_mode_in_the_order_of_the_decision():
     assert set(MATCH_REASON_PRIORITY) == set(ContributionMatchReason)
-    assert MATCH_REASON_PRIORITY[:7] == (
+    assert MATCH_REASON_PRIORITY[:6] == (
         ContributionMatchReason.MANUAL,
-        ContributionMatchReason.HOMONYM,
         ORCID,
         ContributionMatchReason.HAL_PERSON_ID,
         ContributionMatchReason.IDREF,

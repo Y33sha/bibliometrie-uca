@@ -1177,15 +1177,10 @@ persons = Table(
         "exclusion",
         person_exclusion_enum,
         comment=(
-            "Motif d'exclusion : not_a_person (fausse entité), "
-            "out_of_perimeter (personne réelle hors du périmètre, ou homonyme d'une personne rejetée). "
+            "Motif d'exclusion décidé à la main : not_a_person (fausse entité), "
+            "out_of_perimeter (personne réelle rattachée au périmètre par erreur). "
             "Nul pour une personne retenue."
         ),
-    ),
-    Column(
-        "homonym_of",
-        Integer,
-        comment="Personne dont celle-ci est l'homonyme, créé pour les publications rejetées pour elle.",
     ),
     schema="persons",
 )
