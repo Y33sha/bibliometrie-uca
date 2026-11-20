@@ -35,8 +35,8 @@ Le relevé montre aussi des phases qui réunissent des tâches indépendantes : 
 
 ### Phase 2 — Fin de `publishing`
 
-- [ ] `learn_serial_doi_namespaces` passe après `type_proceedings_volumes`.
-- [ ] `serial_by_doi` quitte `metadata_correction` pour la fin de `publishing`. La matrice de `metadata_correction` dans l'administration perd sa ligne.
+- [x] `learn_serial_doi_namespaces` passe après `type_proceedings_volumes`.
+- [x] `serial_by_doi` quitte `metadata_correction` pour la fin de `publishing`, dans l'étape `doi_namespaces`. Son module reste avec les corrections, dont il partage le magasin. La matrice de `metadata_correction` dans l'administration perd sa ligne, la table de `publishing` la gagne.
 
 ### Phase 3 — Arbitrage des identifiants
 

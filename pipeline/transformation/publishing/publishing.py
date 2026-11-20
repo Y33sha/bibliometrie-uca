@@ -6,7 +6,7 @@ Contraintes d'ordre :
 - La fusion des autres noms des éditeurs suit la résolution des préfixes, qui pose leurs titulaires, et le rattachement des enregistrements sources aux éditeurs.
 - Les ISSN des séries précèdent leur vérification Sudoc et l'import de la table ISSN-L, qui précèdent le rattachement des enregistrements sources aux revues : le rattachement lit l'ISSN-L et le titre Sudoc de chaque ISSN.
 - La recherche des métadonnées des revues dans OpenAlex suit le rattachement, qui donne à chaque revue ses ISSN et ses enregistrements sources. Elle précède le typage en recueil d'actes, qui vise aussi les revues `unknown`.
-- Les espaces de noms DOI suivent le rattachement et le typage des revues.
+- Les espaces de noms DOI suivent le rattachement et le typage des revues, et le rattachement des monographies à leur collection : une collection de livres est sans espace de noms. Le rattachement de la revue manquante par le DOI (`serial_by_doi`) suit les espaces de noms.
 - Le rattachement des enregistrements sources aux monographies suit la fusion des autres noms des éditeurs : l'éditeur départage les volumes de même titre.
 - Le rattachement des monographies à leur collection suit le rattachement des enregistrements sources. La nature des monographies lit le type de la collection posé par le rattachement.
 
@@ -36,6 +36,7 @@ from pipeline.ingestion.openalex.sources import fetch_source_lists, fetch_source
 from pipeline.runtime.config import cap, delay
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.transformation.publications.correction import serial_by_doi
 from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
 from pipeline.transformation.publishing.monographs import (
     attach_monographs,
@@ -71,10 +72,11 @@ _IDENTIFIED: dict[str, Callable[[PhaseMetrics], int]] = {
     "check_serials_in_openalex": lambda m: m.extras.get("openalex_found", 0),
     "type_proceedings_serials": lambda m: m.extras.get("serials_typed_proceedings", 0),
     "type_journal_serials": lambda m: m.extras.get("serials_typed_journal", 0),
-    "learn_serial_doi_namespaces": lambda m: m.extras.get("serial_doi_namespaces", 0),
     "attach_monographs": lambda m: m.updated,
     "link_monographs_to_collections": lambda m: m.extras.get("monographs_linked", 0),
     "type_proceedings_volumes": lambda m: m.extras.get("monographs_to_proceedings", 0),
+    "learn_serial_doi_namespaces": lambda m: m.extras.get("serial_doi_namespaces", 0),
+    "serial_by_doi": lambda m: m.updated,
 }
 """Tâches de la table d'observabilité, dans l'ordre d'exécution, avec ce qui compte comme identifié pour chacune."""
 
@@ -500,6 +502,31 @@ _LEARN_SERIAL_DOI_NAMESPACES = Task(
 )
 
 
+_SERIAL_BY_DOI = Task(
+    "serial_by_doi",
+    reads=(
+        "serial_doi_namespaces",
+        "source_record_identifiers",
+        "source_records.serial_id",
+        "source_records.corrections",
+        "source_records.doc_type",
+    ),
+    writes=(
+        "source_records.serial_id",
+        "source_records.corrections",
+        "source_record_keys_queue",
+    ),
+    # Types et identifiants corrigés par `metadata_correction` ; espaces de noms des revues vides, supprimés avec elles par `finalize.delete_empty_serials`.
+    previous_run=(
+        "source_records",
+        "source_record_identifiers.removed_by",
+        "serial_doi_namespaces",
+    ),
+    label="Revues manquantes désignées par le DOI",
+    run=in_transaction(serial_by_doi.run),
+)
+
+
 _ENRICH_SERIALS_FROM_DOAJ = Task(
     "enrich_serials_from_doaj",
     reads=(
@@ -622,7 +649,6 @@ _CHILDREN = (
                     _ENRICH_SERIALS_FROM_DOAJ,
                 ),
             ),
-            _LEARN_SERIAL_DOI_NAMESPACES,
         ),
         section="Publications en série",
     ),
@@ -631,6 +657,12 @@ _CHILDREN = (
         "ISBN et titres des enregistrements sources → monographie de chaque enregistrement source, rattachée à sa collection, typée",
         (_ATTACH_MONOGRAPHS, _LINK_MONOGRAPHS_TO_COLLECTIONS, _TYPE_PROCEEDINGS_VOLUMES),
         section="Monographies",
+    ),
+    Step(
+        "doi_namespaces",
+        "DOI des enregistrements sources et revues typées → espaces de noms DOI des revues, revue manquante désignée par le DOI",
+        (_LEARN_SERIAL_DOI_NAMESPACES, _SERIAL_BY_DOI),
+        section="Espaces de noms DOI",
     ),
 )
 

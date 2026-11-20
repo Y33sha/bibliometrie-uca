@@ -2,7 +2,6 @@
 
 Tâches (`pipeline.graph`), dans l'ordre du graphe :
 
-- **serial_by_doi** rattache la revue manquante désignée par l'espace de noms du DOI. Elle passe en premier : `correct_source_records` lit le type de la revue rattachée, et requalifie l'enregistrement source au même run.
 - **correct_source_records** applique à chaque enregistrement source les règles de correction (`correct_source_record`), et retire les identifiants et les liens des dépôts HAL introuvables.
 - **doi_targets** donne une cible au DOI des formes secondaires DataCite d'une œuvre présente en base.
 - **remove_identifiers** retire le DOI partagé par des œuvres distinctes (ouvrage et chapitre, volume d'actes et communication, enregistrement source d'une autre œuvre), et le DOI inconnu de doi.org.
@@ -22,33 +21,9 @@ from pipeline.transformation.publications.correction import (
     doi_targets,
     matchable,
     remove_identifiers,
-    serial_by_doi,
 )
 
 _CHILDREN = (
-    Task(
-        "serial_by_doi",
-        reads=(
-            "serial_doi_namespaces",
-            "source_record_identifiers",
-            "source_records.serial_id",
-            "source_records.corrections",
-            "source_records.doc_type",
-        ),
-        writes=(
-            "source_records.serial_id",
-            "source_records.corrections",
-            "source_record_keys_queue",
-        ),
-        # Espaces de noms des revues vides, supprimés avec elles par `finalize.delete_empty_serials`.
-        previous_run=(
-            "source_records",
-            "source_record_identifiers.removed_by",
-            "serial_doi_namespaces",
-        ),
-        section="Revues non renseignées, identifiables par le DOI du document",
-        run=in_transaction(serial_by_doi.run),
-    ),
     Task(
         "correct_source_records",
         reads=(
