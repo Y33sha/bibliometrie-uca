@@ -122,10 +122,15 @@ Au 2026-11-19, 387 orphelines ont leur personne rattachée à une autre contribu
   - nom mal découpé par la source (4) : « as / gremeau », « hang nguyen / and », « nemo » pour « nemoto / rie » ;
   - fusion erronée de deux communications HAL de même titre, aux listes d'auteurs différentes (1).
 - [x] Alignement par le rang : dans un trou d'un seul auteur de chaque côté, la contribution source rejoint la contribution quand l'initiale du prénom concorde, dans une liste de moins de 300 auteurs. Simulation du 2026-11-19 (`simulation_trou_unique.py`) : 5 des 11 orphelines résolues ; sur 3 000 publications tirées au hasard, 8 liens ajoutés, dont 7 changements de nom plausibles. Au-delà de 300 auteurs, les liens ajoutés sont souvent faux (Reboud et Rebollo de Miguel, Xia et Xie).
+- [x] Recalcul des contributions après l'alignement par le rang. Run du 2026-11-20 : 162 orphelines. Les liens par le rang résolvent 3 doublons et font apparaître 3 conflits de noms : les deux noms de Marie Riquelme désignent deux personnes.
 
 ### Phase 4 — Cas restants
 
-- [ ] Relecture des 11 conflits de noms, des 10 orphelines aux candidats tous rejetés et du conflit d'identifiants.
+- [x] Relecture des 13 conflits de noms, des 8 orphelines aux personnes candidates toutes rejetées et du conflit d'identifiants (`conflits_noms.py`) :
+  - conflits de noms : 11 personnes en double, sous deux noms d'une même personne (Ribeiro Mickael et Micakël, Fahrat et Farhat, Riquelme et Arbre, « Chéreau Dr Isabelle ») ; 2 erreurs d'alignement ou de source (« laurichesse / h » rattaché à Henri pour Hélène) ;
+  - personnes candidates toutes rejetées : le rejet humain écarte la seule personne au nom de la contribution, donc l'auteur est un homonyme sans fiche de personne ;
+  - conflit d'identifiants : l'IdRef de ScanR désigne une autre personne que l'identifiant HAL.
+- [ ] Deux contributions rattachées par le rejeu de la décision restent orphelines après le run du 2026-11-20 (Cosserant, Clement). Vérifier au run suivant.
 
 ### Phase 5 — Contributions des brevets
 
