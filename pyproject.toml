@@ -7,11 +7,11 @@ name = "bibliometrie-uca"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
-    "httpx2==2.16.0",            # client HTTP unique du projet
+    "httpx2==2.16.2",            # client HTTP unique du projet
     "psycopg[binary]==3.3.9",    # driver PostgreSQL de SQLAlchemy
-    "sqlalchemy==2.1.8",         # query builder Core
+    "sqlalchemy==2.1.9",         # query builder Core
     "alembic==1.20.1",           # migrations DB
-    "fastapi==0.162.7",
+    "fastapi==0.163.1",
     "starlette==1.10.0",          # importé directement (Response, Scope, RequestResponseEndpoint)
     "anyio==4.16.0",             # importé directement : taille du threadpool posée au démarrage de l'API
     "uvicorn==0.54.0",           # serveur ASGI ; lancé en ligne de commande, jamais importé
