@@ -54,6 +54,7 @@ from domain.merge import MergedEntity
 from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
+from domain.persons.suspect_attributions import SuspectReason
 from domain.platforms.platform import PlatformType
 from domain.publications.oa_status import OaStatus
 from domain.publications.relations import RelationType
@@ -896,6 +897,38 @@ rejected_contributions = Table(
         "Couples (enregistrement source, personne) rejetés par l'administration, "
         "par clé naturelle de l'enregistrement source. Le rejet d'un enregistrement source "
         "disparu de sa source s'applique à son retour."
+    ),
+    schema="persons",
+)
+
+
+suspect_reason_enum = PgEnum(*SuspectReason, name="suspect_reason", create_type=False)
+
+suspect_contributions = Table(
+    "suspect_contributions",
+    metadata,
+    Column("contribution_id", Integer, primary_key=True),
+    Column(
+        "person_id",
+        Integer,
+        nullable=False,
+        comment="Personne rattachée à la contribution au moment du calcul.",
+    ),
+    Column("reason", suspect_reason_enum, nullable=False),
+    Column(
+        "cluster",
+        SmallInteger,
+        comment="Numéro du cluster signalé parmi ceux de la personne. NULL pour le motif `rejected_publications`.",
+    ),
+    CheckConstraint(
+        "(cluster IS NULL) = (reason = 'rejected_publications')",
+        name="suspect_contributions_cluster_by_reason",
+    ),
+    comment=(
+        "Contributions rattachées à une personne et probablement signées par un homonyme : "
+        "publication d'un cluster isolé (`cluster`), ou plus proche des publications rejetées "
+        "pour la personne que de ses autres publications (`rejected_publications`). "
+        "Recalculée à chaque run."
     ),
     schema="persons",
 )
