@@ -139,7 +139,19 @@ L'indice de périmètre « déposant du brevet » va à tous les inventeurs de l
 - [x] Une contribution d'une publication de type brevet a le seul rôle inventeur (`ROLE_BY_DOC_TYPE`). La décision du rattachement juge la création d'une personne sur les rôles de la contribution. Un changement de type de la publication remet ses contributions en recomposition.
 - [x] Remise en file des 410 contributions de brevet au rôle d'auteur (`requeue_doc_type_roles`), puis `run_pipeline --from author_grouping`.
 
-### Phase 6 — Documentation
+### Phase 6 — Homonymes des personnes rejetées
+
+Un rejet de l'administration écarte une personne d'une publication. La contribution à son nom reste sans personne, et la prochaine publication de l'homonyme lui revient par le nom. Au 2026-11-20 : 5 019 rejets pour 64 personnes ; 3 472 contributions des enregistrements rejetés sont sans personne et hors périmètre, 240 rattachées à une autre personne, 8 orphelines.
+
+- [x] Simulation du 2026-11-20 (`simulation_homonymes.py`) : un homonyme par personne rejetée, de profil tiré des contributions rejetées ; la cascade de départage choisit entre la personne et son homonyme.
+  - Contributions des personnes rattachées par le nom ou par départage : 292 gardées, 1 passée à l'homonyme, 25 sans personne.
+  - Contributions rejetées du périmètre, jugées chacune sans sa publication : par le nom, 164 à l'homonyme, 11 à la personne, 6 à aucune ; par un identifiant de la personne, le rattachement par identifiant l'emporte.
+- [ ] Migration : colonne `persons.homonym_of`, valeur `homonym` de `resolution_mode`.
+- [ ] Tâche `persons.attach_homonyms`, avant le rattachement : la contribution sans personne d'une publication rejetée pour une personne, seule au nom de la personne, rejoint l'homonyme de la personne. L'homonyme est créé au besoin, au nom de la personne, exclu hors périmètre. Une contribution rattachée à l'homonyme dont le rejet a disparu perd sa personne.
+- [ ] Fusion de personnes : l'homonyme de la personne absorbée devient celui de la personne conservée.
+- [ ] Tests, run, bilan des orphelines et des rattachements à l'homonyme.
+
+### Phase 7 — Documentation
 
 - [ ] Mise à jour de la documentation du rattachement des personnes.
 
