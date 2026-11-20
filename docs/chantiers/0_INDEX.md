@@ -6,6 +6,7 @@
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 - [Détection des fausses attributions](DATA_detection-fausses-attributions.md)
+- [Modèle open access des revues](DATA_modele-open-access-des-revues.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 - [Réduction des contributions orphelines](DATA_reduction-contributions-orphelines.md)
 - [Réorganisation du pipeline selon ses dépendances](CODE_reorganisation-du-pipeline.md)
