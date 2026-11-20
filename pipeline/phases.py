@@ -43,12 +43,12 @@ PHASES: tuple[Phase, ...] = (
     countries.PHASE,
     metadata_correction.PHASE,
     publications.PHASE,
+    relations.PHASE,
+    subjects.PHASE,
     author_grouping.PHASE,
     persons.PHASE,
     finalize.PHASE,
     open_access.PHASE,
-    relations.PHASE,
-    subjects.PHASE,
 )
 
 

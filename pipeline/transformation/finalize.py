@@ -1,6 +1,6 @@
 """Phase `finalize` : données dérivées des contributions, après la résolution des personnes. Chaque tâche a sa transaction.
 
-La phase supprime les publications sans enregistrement source, ou sans contribution rattachée à une personne ni indice d'appartenance au périmètre lié au document (`DOCUMENT_EVIDENCE`). Elle recompose ensuite le périmètre des publications et les vues matérialisées des structures, sur les publications restantes. Elle recalcule l'éditeur des revues, supprime les référentiels vides, puis recompte les publications des adresses, revues et éditeurs.
+La phase supprime les publications sans enregistrement source, ou sans contribution rattachée à une personne ni indice d'appartenance au périmètre lié au document (`DOCUMENT_EVIDENCE`). Elle recompose ensuite le périmètre des publications et les vues matérialisées des structures, sur les publications restantes. Elle recalcule l'éditeur des revues, supprime les référentiels vides, recompte les publications des adresses, revues et éditeurs, puis l'usage des sujets.
 
 Les référentiels vides se suppriment dans l'ordre monographies, revues, éditeurs : une monographie retient sa collection, une revue ou un préfixe DOI son éditeur. Leur suppression suit celle des publications : un référentiel vidé pendant le run disparaît dans le même run.
 
@@ -30,6 +30,7 @@ from pipeline.transformation.publications.lifecycle import purge_publications
 from pipeline.transformation.publications.publication_perimeter import (
     refresh_publications_perimeter_evidence,
 )
+from pipeline.transformation.publications.subjects.subjects import COUNT_SUBJECT_USAGE
 from pipeline.transformation.publishing.monographs import delete_empty_monographs
 from pipeline.transformation.publishing.publication_counts import (
     refresh_publisher_publication_counts,
@@ -346,6 +347,7 @@ _CHILDREN = (
         ),
     ),
     _PUBLICATION_COUNTS,
+    COUNT_SUBJECT_USAGE,
 )
 
 

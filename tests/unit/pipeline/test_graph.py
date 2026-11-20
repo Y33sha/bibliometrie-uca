@@ -185,7 +185,7 @@ def test_la_resolution_des_adresses_suit_leur_nettoyage():
 
 def test_les_decomptes_de_sujets_ne_dependent_pas_des_publications():
     """Les décomptes lisent seulement `publication_subjects` : le périmètre des publications ne les concerne pas."""
-    deps = dependencies(ALL_TASKS)["subjects.count_subject_usage"]
+    deps = dependencies(ALL_TASKS)["finalize.count_subject_usage"]
     assert "finalize.publications_in_perimeter" not in deps
 
 

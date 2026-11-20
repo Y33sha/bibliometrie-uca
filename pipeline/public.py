@@ -29,12 +29,12 @@ PHASE_ORDER: tuple[str, ...] = (
     "countries",
     "metadata_correction",
     "publications",
+    "relations",
+    "subjects",
     "author_grouping",
     "persons",
     "finalize",
     "open_access",
-    "relations",
-    "subjects",
 )
 """Noms des phases, dans l'ordre d'exécution de `pipeline.phases.PHASES`."""
 

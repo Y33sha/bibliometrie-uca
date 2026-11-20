@@ -78,7 +78,7 @@ Scripts de mesure dans `data/experiments/`, sans code du pipeline. Jeu de valida
 
 ### Phase 2 — Ordre des phases
 
-- [ ] `relations` puis `subjects` juste après `publications`, dans le bloc « Entités ». Le décompte des sujets rejoint `finalize`, après la purge des publications.
+- [x] `relations` puis `subjects` juste après `publications`, dans le bloc « Entités ». Le décompte des sujets rejoint `finalize`, après la purge des publications.
 
 ### Phase 3 — Détection
 

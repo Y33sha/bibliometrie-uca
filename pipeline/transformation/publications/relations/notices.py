@@ -325,8 +325,17 @@ TASKS = (
             "publication_relations",
         ),
         writes=("publication_relations",),
-        # Lecture de la table avant sa reconstruction, pour compter les arêtes ajoutées et disparues.
-        previous_runs=("publication_relations",),
+        previous_runs=(
+            # Lecture de la table avant sa reconstruction, pour compter les arêtes ajoutées et disparues.
+            "publication_relations",
+            # Publications supprimées, enregistrements sources détachés par `finalize.purge_publications`.
+            "publications.id",
+            "publications.doc_type",
+            "publications.doi",
+            "publications.title_normalized",
+            "publications.publication_year",
+            "source_records.publication_id",
+        ),
         run=in_transaction(rebuild),
         section="Relations avec les errata et les avis",
     ),

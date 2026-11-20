@@ -89,6 +89,12 @@ TASKS = (
             "publications.is_retracted",
         ),
         writes=("publications.is_retracted",),
+        previous_runs=(
+            # Publications et relations supprimées, enregistrements sources détachés par `finalize.purge_publications`.
+            "publications.is_retracted",
+            "publication_relations",
+            "source_records.publication_id",
+        ),
         run=in_transaction(mark_retracted),
         label="Publications rétractées",
     ),

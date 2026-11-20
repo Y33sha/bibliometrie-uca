@@ -7,5 +7,5 @@ PHASE = Phase(
     "relations",
     "Relations entre publications, indicateur « Rétracté »",
     (*rebuild.TASKS, *notices.TASKS, *retractions.TASKS),
-    Block.DERIVED_DATA,
+    Block.ENTITIES,
 )

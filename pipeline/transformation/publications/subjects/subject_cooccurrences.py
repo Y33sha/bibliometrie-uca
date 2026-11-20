@@ -1,4 +1,4 @@
-"""Seconde tâche de la phase `subjects`, après l'ingestion des liens `publication_subjects` : recalcul des données dérivées de ces liens.
+"""Tâche `count_subject_usage`, exécutée par la phase `finalize` après la purge des publications : recalcul des données dérivées des liens `publication_subjects`.
 
 - `subjects.usage_count` : nombre de publications distinctes par sujet.
 - `subject_labels` : vue matérialisée des sujets regroupés par libellé normalisé, tous vocabulaires confondus, avec leur nombre de publications.
