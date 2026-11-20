@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict OkAofhqtQ6h9Rboi4KzcwjRMefZsYmPMsnxjBFUVrMRdLtmtEDU1zBZhVBoDZ3L
+\restrict hSLOSkAqZUPGyizDDofkNzme0odh5Fc9HRjKjrrKrJ4DWIPqhDYm0vYTCowZsSX
 
 -- Dumped from database version 18.7 (Ubuntu 18.7-1.pgdg22.04+5)
 -- Dumped by pg_dump version 19.0 (Ubuntu 19.0-1.pgdg22.04+1)
@@ -561,6 +561,16 @@ CREATE TYPE public.subject_vocabulary AS ENUM (
 
 
 --
+-- Name: suspect_reason; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.suspect_reason AS ENUM (
+    'cluster',
+    'rejected_publications'
+);
+
+
+--
 -- Name: is_author_role(text[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1085,6 +1095,40 @@ CREATE TABLE persons.rejected_contributions (
 --
 
 COMMENT ON TABLE persons.rejected_contributions IS 'Couples (enregistrement source, personne) rejetés par l''administration, par clé naturelle de l''enregistrement source. Le rejet d''un enregistrement source disparu de sa source s''applique à son retour.';
+
+
+--
+-- Name: suspect_contributions; Type: TABLE; Schema: persons; Owner: -
+--
+
+CREATE TABLE persons.suspect_contributions (
+    contribution_id integer NOT NULL,
+    person_id integer NOT NULL,
+    reason public.suspect_reason NOT NULL,
+    cluster smallint,
+    CONSTRAINT suspect_contributions_cluster_by_reason CHECK (((cluster IS NULL) = (reason = 'rejected_publications'::public.suspect_reason)))
+);
+
+
+--
+-- Name: TABLE suspect_contributions; Type: COMMENT; Schema: persons; Owner: -
+--
+
+COMMENT ON TABLE persons.suspect_contributions IS 'Contributions rattachées à une personne et probablement signées par un homonyme : publication d''un cluster isolé (`cluster`), ou plus proche des publications rejetées pour la personne que de ses autres publications (`rejected_publications`). Recalculée à chaque run.';
+
+
+--
+-- Name: COLUMN suspect_contributions.person_id; Type: COMMENT; Schema: persons; Owner: -
+--
+
+COMMENT ON COLUMN persons.suspect_contributions.person_id IS 'Personne rattachée à la contribution au moment du calcul.';
+
+
+--
+-- Name: COLUMN suspect_contributions.cluster; Type: COMMENT; Schema: persons; Owner: -
+--
+
+COMMENT ON COLUMN persons.suspect_contributions.cluster IS 'Numéro du cluster signalé parmi ceux de la personne. NULL pour le motif `rejected_publications`.';
 
 
 --
@@ -4060,6 +4104,14 @@ ALTER TABLE ONLY persons.rejected_contributions
 
 
 --
+-- Name: suspect_contributions suspect_contributions_pkey; Type: CONSTRAINT; Schema: persons; Owner: -
+--
+
+ALTER TABLE ONLY persons.suspect_contributions
+    ADD CONSTRAINT suspect_contributions_pkey PRIMARY KEY (contribution_id);
+
+
+--
 -- Name: alembic_version alembic_version_pkc; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4891,6 +4943,13 @@ CREATE INDEX idx_pnf_person_id ON persons.person_name_forms USING btree (person_
 --
 
 CREATE INDEX idx_rejected_contributions_person ON persons.rejected_contributions USING btree (person_id);
+
+
+--
+-- Name: suspect_contributions_person_id_idx; Type: INDEX; Schema: persons; Owner: -
+--
+
+CREATE INDEX suspect_contributions_person_id_idx ON persons.suspect_contributions USING btree (person_id);
 
 
 --
@@ -5774,6 +5833,22 @@ ALTER TABLE ONLY persons.rejected_contributions
 
 
 --
+-- Name: suspect_contributions suspect_contributions_contribution_id_fkey; Type: FK CONSTRAINT; Schema: persons; Owner: -
+--
+
+ALTER TABLE ONLY persons.suspect_contributions
+    ADD CONSTRAINT suspect_contributions_contribution_id_fkey FOREIGN KEY (contribution_id) REFERENCES publications.contributions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: suspect_contributions suspect_contributions_person_id_fkey; Type: FK CONSTRAINT; Schema: persons; Owner: -
+--
+
+ALTER TABLE ONLY persons.suspect_contributions
+    ADD CONSTRAINT suspect_contributions_person_id_fkey FOREIGN KEY (person_id) REFERENCES persons.persons(id) ON DELETE CASCADE;
+
+
+--
 -- Name: aligned_source_contributions aligned_source_contributions_contribution_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
 --
 
@@ -6345,5 +6420,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OkAofhqtQ6h9Rboi4KzcwjRMefZsYmPMsnxjBFUVrMRdLtmtEDU1zBZhVBoDZ3L
+\unrestrict hSLOSkAqZUPGyizDDofkNzme0odh5Fc9HRjKjrrKrJ4DWIPqhDYm0vYTCowZsSX
 
