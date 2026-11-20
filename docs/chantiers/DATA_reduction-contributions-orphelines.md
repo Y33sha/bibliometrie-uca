@@ -127,7 +127,7 @@ Au 2026-11-19, 387 orphelines ont leur personne rattachée à une autre contribu
 ### Phase 4 — Cas restants
 
 - [x] Relecture des 13 conflits de noms, des 8 orphelines aux personnes candidates toutes rejetées et du conflit d'identifiants (`conflits_noms.py`) :
-  - conflits de noms : 11 personnes en double, sous deux noms d'une même personne (Ribeiro Mickael et Micakël, Fahrat et Farhat, Riquelme et Arbre, « Chéreau Dr Isabelle ») ; 2 erreurs d'alignement ou de source (« laurichesse / h » rattaché à Henri pour Hélène) ;
+  - conflits de noms : 10 contributions d'une personne en double sous deux noms, soit 8 paires de personnes (Ribeiro Mickael et Micakël, Fahrat et Farhat, Riquelme et Arbre, « Chéreau Dr Isabelle »…). 3 erreurs d'alignement ou de source (« goli / g » pour Godi, « laurichesse / h » rattaché à Henri pour Hélène) ;
   - personnes candidates toutes rejetées : le rejet humain écarte la seule personne au nom de la contribution, donc l'auteur est un homonyme sans fiche de personne ;
   - conflit d'identifiants : l'IdRef de ScanR désigne une autre personne que l'identifiant HAL.
 - [ ] Deux contributions rattachées par le rejeu de la décision restent orphelines après le run du 2026-11-20 (Cosserant, Clement). Vérifier au run suivant.
