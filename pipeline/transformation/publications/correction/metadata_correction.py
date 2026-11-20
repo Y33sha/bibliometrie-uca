@@ -67,8 +67,6 @@ _CHILDREN = (
             "source_records",
             "source_record_identifiers.removed_by",
             "serials.serial_type",
-            "serials.oa_model",
-            "serials.doaj_payload",
             "monographs.proceedings",
             "publishers.publisher_type",
         ),
