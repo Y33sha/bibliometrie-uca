@@ -1,6 +1,6 @@
 """Moissonnage d'une source par l'identifiant des personnes RH, identifiant confirmé ou authentifié : socle commun des tâches `harvest_by_person`.
 
-Chaque source est interrogée par lots de personnes, page après page, sur la plage d'années du moissonnage. Les lots réunissent les personnes qui copublient (`person_batches`). Une requête réunit tous les identifiants des personnes du lot, dans les types acceptés par la source (`SourceProfile.person_identifiers`). Les lots partent en parallèle, dans la limite de requêtes simultanées de la source (`MAX_CONCURRENT`). Un document ramené par plusieurs lots est écrit une fois par run. Une erreur sur un lot émet un signal `harvest_error`, et le moissonnage passe au suivant.
+Chaque source est interrogée par lots de personnes, page après page, sur la plage d'années du moissonnage. Les lots réunissent les personnes qui copublient (`person_batches`). Une requête réunit tous les identifiants des personnes du lot, dans les types acceptés par la source (`SourceProfile.person_identifiers`). Les lots partent en parallèle, dans la limite de requêtes simultanées de la recherche (`max_concurrent`). Un document ramené par plusieurs lots est écrit une fois par run. Une erreur sur un lot émet un signal `harvest_error`, et le moissonnage passe au suivant.
 """
 
 from __future__ import annotations
@@ -79,6 +79,11 @@ class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
 
     BATCH_SIZE: ClassVar[int] = 10
     """Personnes par requête."""
+
+    @property
+    def max_concurrent(self) -> int:
+        """Requêtes simultanées consenties à la recherche : celles de la source."""
+        return MAX_CONCURRENT[self.SOURCE]
 
     @property
     def id_types(self) -> frozenset[PersonIdentifierType]:
@@ -167,7 +172,7 @@ class PersonSearchHarvester[ClientT](SourceHarvester[ClientT]):
                     lambda batch, token: self.fetch_page(
                         batch.identifiers, years, token, batch.label
                     ),
-                    max_concurrent=MAX_CONCURRENT[self.SOURCE],
+                    max_concurrent=self.max_concurrent,
                     on_page=on_page,
                     on_end=on_end,
                 )
