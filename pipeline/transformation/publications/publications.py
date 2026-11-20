@@ -59,6 +59,9 @@ _CONSOLIDATION_READS = (
     "apc_payments",
     "serials.serial_type",
     "serials.oa_model",
+    "serials.openalex_is_oa",
+    "serials.openalex_oa_flip_year",
+    "serials.doaj_payload",
     "monographs.serial_id",
     "dois.unpaywall_oa_status",
     # Titulaire du préfixe DOI Crossref, éditeur de la publication.

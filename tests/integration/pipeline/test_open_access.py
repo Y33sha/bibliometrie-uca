@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from pipeline.transformation.publications.open_access import recompute_oa_status
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.serials import insert_serial
 
 
 def _verdict(conn, doi: str, status: str) -> None:
@@ -39,3 +40,22 @@ def test_un_verdict_unpaywall_change_le_statut_de_la_publication(sa_sync_conn):
     rows = {row["key"]: row for row in metrics.details["table"]["rows"]}
     assert rows["gold"]["delta"] == 1
     assert rows["closed"]["delta"] == -1
+
+
+def test_une_revue_passee_a_l_open_access_integral_donne_hybrid_avant_son_passage(sa_sync_conn):
+    conn = sa_sync_conn
+    serial = insert_serial(conn, "Revue passée à l'open access", oa_model="full_oa")
+    conn.execute(
+        text(
+            "UPDATE serials SET openalex_is_oa = true, openalex_oa_flip_year = 2011 WHERE id = :id"
+        ),
+        {"id": serial},
+    )
+    before = insert_publication(conn, doi="10.1/avant", serial_id=serial, publication_year=2010)
+    _verdict(conn, "10.1/avant", "gold")
+    after = insert_publication(conn, doi="10.1/apres", serial_id=serial, publication_year=2011)
+    _verdict(conn, "10.1/apres", "gold")
+
+    recompute_oa_status(conn, logging.getLogger("test"))
+
+    assert (_status(conn, before), _status(conn, after)) == ("hybrid", "gold")

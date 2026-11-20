@@ -434,6 +434,8 @@ _CHECK_SERIALS_IN_OPENALEX = Task(
     writes=(
         "serials.openalex_id",
         "serials.openalex_checked_at",
+        "serials.openalex_is_oa",
+        "serials.openalex_oa_flip_year",
         "serials.serial_type",
         "serial_list_entries",
         "serial_lists",

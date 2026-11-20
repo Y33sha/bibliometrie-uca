@@ -21,7 +21,8 @@ BATCH_SIZE = 5000
 """Publications par lot : la taille borne la mémoire et le nombre d'allers-retours SQL."""
 
 _PUBLICATIONS = text("""
-    SELECT id, doi, serial_id, doc_type::text AS doc_type, source_extras, oa_status::text AS oa_status
+    SELECT id, doi, serial_id, doc_type::text AS doc_type, source_extras, publication_year,
+           oa_status::text AS oa_status
     FROM publications
     ORDER BY id
 """)
@@ -37,7 +38,10 @@ def _statuses(conn: Connection, rows: Sequence[Row[tuple[object, ...]]]) -> dict
     """Renvoie le statut open access calculé de chaque publication du lot."""
     inputs = oa_inputs(
         conn,
-        [OaFacts(r.id, r.doi, r.serial_id, r.doc_type, r.source_extras) for r in rows],
+        [
+            OaFacts(r.id, r.doi, r.serial_id, r.doc_type, r.source_extras, r.publication_year)
+            for r in rows
+        ],
     )
     return {r.id: str(inputs[r.id].status()) for r in rows}
 
@@ -74,8 +78,12 @@ RECOMPUTE_OA_STATUS = Task(
         "publications.serial_id",
         "publications.doc_type",
         "publications.source_extras",
+        "publications.publication_year",
         "publications.oa_status",
         "serials.oa_model",
+        "serials.openalex_is_oa",
+        "serials.openalex_oa_flip_year",
+        "serials.doaj_payload",
         "dois.unpaywall_oa_status",
         "dois.registered_url",
         "embargoes",

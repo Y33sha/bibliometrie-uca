@@ -50,4 +50,6 @@ La consolidation calcule seule les métadonnées d'une publication, depuis ses e
 3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
 4. Sinon : `embargoed` avec un enregistrement source sous embargo actif (`embargoes`), `closed` avec une copie déclarée fermée, un verdict, ou pour une thèse en cours ou réservée à l'intranet de son établissement, `unknown` sans aucune information.
 
+Le modèle de la revue est celui de l'année de parution. Une revue entièrement en open access ou diamant est sur abonnement avant l'année de son passage à l'open access intégral, donnée par OpenAlex, sinon par le DOAJ. Sans cette année, son modèle est inconnu, sauf pour une revue née en open access intégral d'après OpenAlex.
+
 Le verdict d'Unpaywall relève ces accès, sans les abaisser : `gold`, `hybrid` ou `diamond` vaut une copie ouverte chez l'éditeur sous licence, `bronze` sans licence, `green` une copie d'archive ouverte. Un brevet a le statut `unknown`.

@@ -460,6 +460,22 @@ serials = Table(
             "NULL : jamais cherchées."
         ),
     ),
+    Column(
+        "openalex_is_oa",
+        Boolean,
+        comment=(
+            "Revue en open access intégral d'après OpenAlex (`is_oa`). "
+            "NULL : revue absente d'OpenAlex ou jamais cherchée."
+        ),
+    ),
+    Column(
+        "openalex_oa_flip_year",
+        SmallInteger,
+        comment=(
+            "Année du passage de la revue à l'open access intégral d'après OpenAlex "
+            "(`oa_flip_year`). NULL pour une revue née en open access intégral."
+        ),
+    ),
     Column("oa_model", oa_model_enum),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("serial_type", serial_type_enum, server_default="unknown"),

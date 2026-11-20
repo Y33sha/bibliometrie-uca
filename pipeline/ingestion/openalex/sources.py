@@ -26,7 +26,7 @@ SOURCES_BATCH = 100
 """Valeurs d'un filtre à `|`, plafond d'OpenAlex."""
 
 _PER_PAGE = 200
-_SELECT = "id,issn,type,listed_in,works_count"
+_SELECT = "id,issn,type,listed_in,works_count,is_oa,oa_flip_year"
 
 type SourceFilter = Literal["issn", "openalex"]
 """Filtre de `/sources` : par ISSN, ou par identifiant OpenAlex."""
@@ -84,6 +84,8 @@ def parse_source(item: Mapping[str, JsonValue]) -> OpenAlexSource | None:
             code for value in as_sequence(item.get("listed_in")) if (code := as_str(value))
         ),
         works_count=as_int(item.get("works_count")) or 0,
+        is_oa=item.get("is_oa") is True,
+        oa_flip_year=as_int(item.get("oa_flip_year")),
     )
 
 

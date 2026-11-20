@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict TpN8tnXFfnKhfse8bhahGtn25sV2cehWAlj0K9y7OUsjAy4YgtjWlHZGexKUu6f
+\restrict OkAofhqtQ6h9Rboi4KzcwjRMefZsYmPMsnxjBFUVrMRdLtmtEDU1zBZhVBoDZ3L
 
--- Dumped from database version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
--- Dumped by pg_dump version 18.7 (Ubuntu 18.7-1.pgdg22.04+2)
+-- Dumped from database version 18.7 (Ubuntu 18.7-1.pgdg22.04+5)
+-- Dumped by pg_dump version 19.0 (Ubuntu 19.0-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2683,7 +2683,9 @@ CREATE TABLE publishing.serials (
     doaj_imported_at timestamp with time zone,
     publication_count integer DEFAULT 0 NOT NULL,
     manual_fields text[] DEFAULT '{}'::text[] NOT NULL,
-    openalex_checked_at timestamp with time zone
+    openalex_checked_at timestamp with time zone,
+    openalex_is_oa boolean,
+    openalex_oa_flip_year smallint
 );
 
 
@@ -2692,6 +2694,20 @@ CREATE TABLE publishing.serials (
 --
 
 COMMENT ON COLUMN publishing.serials.openalex_checked_at IS 'Date de la dernière recherche des métadonnées de la revue dans OpenAlex. NULL : jamais cherchées.';
+
+
+--
+-- Name: COLUMN serials.openalex_is_oa; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serials.openalex_is_oa IS 'Revue en open access intégral d''après OpenAlex (`is_oa`). NULL : revue absente d''OpenAlex ou jamais cherchée.';
+
+
+--
+-- Name: COLUMN serials.openalex_oa_flip_year; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serials.openalex_oa_flip_year IS 'Année du passage de la revue à l''open access intégral d''après OpenAlex (`oa_flip_year`). NULL pour une revue née en open access intégral.';
 
 
 --
@@ -6329,5 +6345,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict TpN8tnXFfnKhfse8bhahGtn25sV2cehWAlj0K9y7OUsjAy4YgtjWlHZGexKUu6f
+\unrestrict OkAofhqtQ6h9Rboi4KzcwjRMefZsYmPMsnxjBFUVrMRdLtmtEDU1zBZhVBoDZ3L
 
