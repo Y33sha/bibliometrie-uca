@@ -62,7 +62,7 @@ Moissonnage et normalisation
 - `fetch_missing` — Recherche dans chaque source des documents trouvés dans une autre (hal-id, NNT, numéro de brevet, DOI), sources en parallèle
 - `fetch_stale` — Recherche des documents non revus par le moissonnage
 - `fetch_truncated` — Complétion des listes d'auteurs OpenAlex tronquées
-- `normalize` — Normalisation staging → source_records, source_contributions, addresses
+- `normalize` — Normalisation staging → source_records, source_contributions, addresses, puis arbitrage des identifiants de personne
 
 Référentiels
 
@@ -72,7 +72,6 @@ Référentiels
 
 Enregistrements sources
 
-- `identifier_arbitration` — Arbitrage des identifiants de personne
 - `affiliations` — Structures et périmètre des contributions sources
 - `countries` — Pays des adresses et des enregistrements sources
 - `metadata_correction` — Correction des enregistrements sources

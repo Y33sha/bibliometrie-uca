@@ -15,7 +15,7 @@ Le relevé montre aussi des phases qui réunissent des tâches indépendantes : 
 - Ordre cible des blocs et des phases :
   - **Moissonnage et normalisation** : `harvest`, `harvest_by_person`, `fetch_missing`, `fetch_stale`, `fetch_truncated`, `normalize` ;
   - **Référentiels** : `structure_referentials` (`refresh_ror`, `refresh_hal_structures`), `dois` (`resolve_prefixes`, `resolve_dois`), `publishing` ;
-  - **Enregistrements sources** : `identifier_arbitration`, `affiliations`, `countries`, `metadata_correction` ;
+  - **Enregistrements sources** : `affiliations`, `countries`, `metadata_correction` ;
   - **Entités** : `publications`, `author_grouping`, `persons` ;
   - **Données dérivées** : `finalize`, `open_access`, `relations`, `subjects`.
 - `verify_unpaywall` interroge Unpaywall sur le DOI des publications, après `finalize`. Une tâche nouvelle recalcule ensuite le statut open access des publications au verdict modifié (`oa_inputs`), sans consolidation complète. `consolidate_publications` lit le verdict déjà en base.
@@ -40,15 +40,15 @@ Le relevé montre aussi des phases qui réunissent des tâches indépendantes : 
 
 ### Phase 3 — Arbitrage des identifiants
 
-- [x] Phase `identifier_arbitration` : `arbitrate_identifiers` quitte `persons` et passe juste après `normalize`.
-- [x] Le bilan de `persons` perd celui de l'arbitrage, repris par la phase nouvelle avec sa vue dans l'administration.
+- [x] `arbitrate_identifiers` quitte `persons` et clôt la phase `normalize`.
+- [x] Le bilan de `persons` perd celui de l'arbitrage, repris par celui de `normalize` et sa vue dans l'administration.
 
 ### Phase 4 — Référentiels ROR et HAL, pays
 
 - [x] Phase `structure_referentials` : `refresh_ror` et `refresh_hal_structures` quittent `affiliations`.
 - [x] Phase `countries` : les quatre tâches des pays quittent `affiliations`.
 - [x] Bilan de chaque phase (`assemble`) et vues de l'administration : l'entonnoir des pays quitte la vue de `affiliations` pour celle de `countries`. La vue `countries` d'une ancienne phase du même nom disparaît.
-- [x] Ordre des phases : `normalize`, `structure_referentials`, `dois`, `publishing`, `identifier_arbitration`, `affiliations`, `countries`, `metadata_correction`.
+- [x] Ordre des phases : `normalize`, `structure_referentials`, `dois`, `publishing`, `affiliations`, `countries`, `metadata_correction`.
 
 ### Phase 5 — Blocs
 

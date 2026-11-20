@@ -1,13 +1,11 @@
-"""Phase `identifier_arbitration` : arbitrage des identifiants de personne (`identifier_arbitration`), juste après la normalisation.
+"""Tâche `normalize.arbitrate_identifiers` : arbitrage des identifiants de personne (`identifier_arbitration`), en fin de normalisation.
 
 Les neutralisations écrites sont lues par le périmètre des contributions sources (phase `affiliations`), l'alignement des auteurs et le rattachement des contributions aux personnes.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-
-from pipeline.graph import Block, Phase, Task
+from pipeline.graph import Task
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -68,25 +66,6 @@ ARBITRATE_IDENTIFIERS = Task(
         "source_records.publication_id",
     ),
     run=_arbitrate_identifiers,
+    section="Conflits d'identifiants",
     label="Identifiants portés sous le nom d'une autre personne",
-)
-
-
-def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
-    """Renvoie les métriques de la phase : identifiants neutralisés et contributions à redécider."""
-    counts = by_task["arbitrate_identifiers"].extras
-    metrics = PhaseMetrics(updated=counts.get("neutralized", 0))
-    metrics.details["summary"] = {
-        "identifiers_neutralized": counts.get("neutralized", 0),
-        "marked_contributions": counts.get("marked_contributions", 0),
-    }
-    return metrics
-
-
-PHASE = Phase(
-    "identifier_arbitration",
-    "Arbitrage des identifiants de personne",
-    (ARBITRATE_IDENTIFIERS,),
-    Block.SOURCE_RECORDS,
-    assemble=assemble,
 )

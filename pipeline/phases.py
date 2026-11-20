@@ -19,7 +19,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation import finalize
 from pipeline.transformation.countries import countries
 from pipeline.transformation.dois import dois
-from pipeline.transformation.persons import arbitration, persons
+from pipeline.transformation.persons import persons
 from pipeline.transformation.publications import open_access, publications
 from pipeline.transformation.publications.author_grouping import author_grouping
 from pipeline.transformation.publications.correction import metadata_correction
@@ -39,7 +39,6 @@ PHASES: tuple[Phase, ...] = (
     referentials.PHASE,
     dois.PHASE,
     publishing.PHASE,
-    arbitration.PHASE,
     affiliations.PHASE,
     countries.PHASE,
     metadata_correction.PHASE,

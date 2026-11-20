@@ -25,7 +25,6 @@ PHASE_ORDER: tuple[str, ...] = (
     "structure_referentials",
     "dois",
     "publishing",
-    "identifier_arbitration",
     "affiliations",
     "countries",
     "metadata_correction",

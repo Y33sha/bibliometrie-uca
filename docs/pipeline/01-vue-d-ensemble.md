@@ -26,7 +26,7 @@ Les phases s'exécutent dans cet ordre, qui suit les dépendances entre tâches.
 - `fetch_missing` cherche dans chaque source les documents trouvés dans une autre.
 - `fetch_stale` cherche de nouveau les documents non revus depuis un délai, et repère ceux qui ont disparu de leur source.
 - `fetch_truncated` complète les listes d'auteurs OpenAlex tronquées.
-- [`normalize`](03-normalize.md) transforme les documents bruts en enregistrements sources et en contributions sources.
+- [`normalize`](03-normalize.md) transforme les documents bruts en enregistrements sources et en contributions sources. Elle se termine par l'[arbitrage des identifiants](09-persons.md#arbitrage-des-identifiants-normalizearbitrate_identifiers), qui neutralise un identifiant de personne écrit sous le nom d'une autre personne.
 
 **Référentiels**
 
@@ -36,7 +36,6 @@ Les phases s'exécutent dans cet ordre, qui suit les dépendances entre tâches.
 
 **Enregistrements sources**
 
-- [`identifier_arbitration`](09-persons.md#arbitrage-des-identifiants-identifier_arbitration) neutralise un identifiant de personne écrit sous le nom d'une autre personne.
 - [`affiliations`](04-affiliations.md) reconnaît les structures des contributions sources, et marque leur entrée dans le périmètre.
 - [`countries`](04-affiliations.md#pays-countries) reconnaît les pays des adresses, des contributions sources et des enregistrements sources.
 - [`metadata_correction`](06-metadata-correction.md) corrige les enregistrements sources.

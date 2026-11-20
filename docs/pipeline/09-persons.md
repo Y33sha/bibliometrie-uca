@@ -47,6 +47,6 @@ Les saisies manuelles (épinglage d'une contribution source, formes de nom confi
 
 Une personne sans contribution du périmètre est supprimée, sauf si elle est présente dans le référentiel RH ou fait l'objet d'une décision humaine. Ses contributions perdent leur personne.
 
-## Arbitrage des identifiants (`identifier_arbitration`)
+## Arbitrage des identifiants (`normalize.arbitrate_identifiers`)
 
-La phase suit la normalisation, avant le périmètre et l'alignement des auteurs. Une valeur d'identifiant (ORCID, IdRef, `hal_person_id`) contenue dans des contributions sources sous des noms différents va au nom majoritaire. Les contributions sources qui la contiennent sous un autre nom la neutralisent : la valeur ne rattache plus la contribution à une personne, et ne la fait plus entrer dans le périmètre. Les collectifs et les doublons d'auteur ne votent pas.
+La tâche clôt la normalisation, avant le périmètre et l'alignement des auteurs. Une valeur d'identifiant (ORCID, IdRef, `hal_person_id`) contenue dans des contributions sources sous des noms différents va au nom majoritaire. Les contributions sources qui la contiennent sous un autre nom la neutralisent : la valeur ne rattache plus la contribution à une personne, et ne la fait plus entrer dans le périmètre. Les collectifs et les doublons d'auteur ne votent pas.
