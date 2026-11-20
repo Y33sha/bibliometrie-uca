@@ -14,7 +14,6 @@ from domain.platforms.platform import PlatformType
 from domain.platforms.registry import PMC_ARTICLE_URL, PUBMED_CENTRAL, known_platform_of_source
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
-from domain.serials.serial import OaModel
 from domain.source_records.biblio import compact_biblio
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -234,10 +233,6 @@ def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerDescription:
     issns = source_issns(unknown=as_strs(source.get("issn")), linking=as_str(source.get("issn_l")))
 
     source_type = as_str(source.get("type"))
-    oa_model: OaModel | None = None
-    if source_type == "journal":
-        oa_model = OaModel.FULL_OA if source.get("is_oa") else OaModel.SUBSCRIPTION
-
     return ContainerDescription(
         source="openalex",
         raw_doc_type=as_str(work.get("type")),
@@ -247,7 +242,6 @@ def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerDescription:
         book_title=title if source_type == "conference" else None,
         issns=issns,
         openalex_id=openalex_id or None,
-        oa_model=oa_model,
         year=as_int(work.get("publication_year")),
     )
 

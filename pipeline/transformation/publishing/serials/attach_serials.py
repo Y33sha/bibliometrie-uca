@@ -6,7 +6,7 @@
 
 - chaque ISSN reçoit la revue de son ISSN-L : celui de la table de l'ISSN International Centre (`import_issnl_table`), à défaut celui de l'ISSN qui l'annule d'après le Sudoc, à défaut celui d'OpenAlex, à défaut l'ISSN lui-même. Cette revue est celle de la ligne de l'ISSN-L, à défaut la plus fréquente parmi les ISSN de cet ISSN-L, à défaut une revue créée. Une revue va à un seul ISSN-L ;
 - chaque enregistrement source rejoint la revue de l'ISSN-L de ses ISSN, à défaut la revue de son identifiant OpenAlex, à défaut la revue de son titre : décision de l'administration (`serial_title_decisions`), seule revue à ISSN de même titre, revue à ISSN de titre compatible d'un autre enregistrement source de sa publication au run précédent, ou revue sans ISSN de même titre, créée au besoin. L'éditeur départage plusieurs revues à ISSN de même titre ;
-- le titre d'une revue est celui de la notice Sudoc de son ISSN-L, à défaut celui d'un autre de ses ISSN, à défaut le plus fréquent parmi ses enregistrements sources. Son modèle OA vient des enregistrements sources OpenAlex dont l'ISSN-L, d'après OpenAlex, est celui de la revue. Un champ saisi à la main reste inchangé.
+- le titre d'une revue est celui de la notice Sudoc de son ISSN-L, à défaut celui d'un autre de ses ISSN, à défaut le plus fréquent parmi ses enregistrements sources. Un titre saisi à la main reste inchangé.
 
 Un enregistrement source qui change de revue est marqué pour la réconciliation. Pour un enregistrement source dont la revue est corrigée par la correction des métadonnées, la revue calculée devient la valeur d'avant correction (`corrections.serial_id.raw`). Une revue vidée de ses enregistrements sources, sans ISSN ni monographie, est absorbée par la revue qui en reçoit le plus, avec une redirection.
 """
@@ -110,20 +110,12 @@ _WRITE_TITLES = text(f"""
       AND NOT '{ManualField.TITLE.value}' = ANY(s.manual_fields)
 """)
 
-_WRITE_OA_MODELS = text(f"""
-    UPDATE serials s SET oa_model = CAST(t.oa_model AS oa_model)
-    FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS t(id integer, oa_model text)
-    WHERE s.id = t.id AND s.oa_model IS DISTINCT FROM CAST(t.oa_model AS oa_model)
-      AND NOT '{ManualField.OA_MODEL.value}' = ANY(s.manual_fields)
-""")
-
 
 @dataclass(slots=True)
 class _Mention:
     """Série décrite par un enregistrement source."""
 
     id: int
-    source: str
     publication_id: int | None
     """Publication de l'enregistrement source au run précédent."""
     serial_id: int | None
@@ -161,7 +153,6 @@ def _mention(row: Row[tuple[object, ...]]) -> _Mention:
     )
     return _Mention(
         id=int(row.id),
-        source=str(row.source),
         publication_id=row.publication_id,
         serial_id=row.serial_id,
         publisher_id=row.publisher_id,
@@ -285,33 +276,20 @@ def _notice_titles(conn: Connection, issnl_of: dict[str, str]) -> dict[str, str]
     return titles
 
 
-def _refresh_attributes(
+def _refresh_titles(
     conn: Connection,
     mentions: list[_Mention],
     attachment: _Attachment,
     issnl_of: dict[str, str],
     serial_of_issnl: dict[str, int],
 ) -> None:
-    """Écrit le titre et le modèle OA des revues."""
+    """Écrit le titre des revues."""
     issnl_of_serial = {serial_id: issnl for issnl, serial_id in serial_of_issnl.items()}
     titles: dict[int, Counter[str]] = {}
-    oa_models: dict[int, Counter[str]] = {}
     for m in mentions:
         serial_id = attachment.serial_of[m.id]
-        if serial_id is None or m.series is None:
-            continue
-        if m.series.title:
+        if serial_id is not None and m.series is not None and m.series.title:
             titles.setdefault(serial_id, Counter())[m.series.title] += 1
-        own_issnl = issnl_of_serial.get(serial_id)
-        if (
-            m.source == "openalex"
-            and m.series.oa_model
-            and (
-                m.openalex_issnl is None
-                or issnl_of.get(m.openalex_issnl, m.openalex_issnl) == own_issnl
-            )
-        ):
-            oa_models.setdefault(serial_id, Counter())[m.series.oa_model] += 1
     notice_titles = _notice_titles(conn, issnl_of)
     serial_titles = []
     for serial_id in sorted(set(titles) | set(issnl_of_serial)):
@@ -322,13 +300,10 @@ def _refresh_attributes(
             serial_titles.append({"id": serial_id, "title": title, "key": normalize_text(title)})
     if serial_titles:
         conn.execute(_WRITE_TITLES, {"rows": json.dumps(serial_titles)})
-    models = [{"id": s, "oa_model": most_frequent(c)} for s, c in oa_models.items()]
-    if models:
-        conn.execute(_WRITE_OA_MODELS, {"rows": json.dumps(models)})
 
 
 def run_attach_serials(conn: Connection, logger: logging.Logger) -> PhaseMetrics:  # noqa: ARG001
-    """Rattache chaque enregistrement source à sa revue, absorbe les revues vidées et écrit les attributs des revues.
+    """Rattache chaque enregistrement source à sa revue, absorbe les revues vidées et écrit le titre des revues.
 
     Le plan se calcule d'abord sur les faits en base. Les revues à créer du plan sont créées ensuite, puis les liens écrits.
     """
@@ -355,7 +330,7 @@ def run_attach_serials(conn: Connection, logger: logging.Logger) -> PhaseMetrics
         attachment.serial_of[m.id] = resolve(serial) if serial is not None else None
     changed, received = _write_attachment(conn, mentions, attachment)
     absorbed = _absorb(conn, received)
-    _refresh_attributes(conn, mentions, attachment, issnl_of, serial_of_issnl)
+    _refresh_titles(conn, mentions, attachment, issnl_of, serial_of_issnl)
     metrics = PhaseMetrics()
     metrics.add(
         seen=len(mentions),

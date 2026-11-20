@@ -50,7 +50,6 @@ def _bound(repo):
         mp.setattr(
             step, "type_doaj_serials_as_journals", lambda conn: repo.type_doaj_serials_as_journals()
         )
-        mp.setattr(step, "model_diamond_serials", lambda conn: 0)
         yield
 
 

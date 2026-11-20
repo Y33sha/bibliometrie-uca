@@ -1,4 +1,4 @@
-"""Import du dump CSV du DOAJ, typage en revue des entrées présentes dans le DOAJ, et classement des revues diamant.
+"""Import du dump CSV du DOAJ, et typage en revue des entrées présentes dans le DOAJ.
 
 Chaque ligne du dump est rattachée à sa revue par ISSN. La revue reçoit la ligne nettoyée (`doaj_payload`) et la date de l'import. La présence d'une revue dans le DOAJ est son appartenance à la liste `doaj`, donnée par OpenAlex (`check_serials_in_openalex`).
 
@@ -12,28 +12,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import NamedTuple
 
-from sqlalchemy import (
-    Boolean,
-    ColumnElement,
-    Connection,
-    and_,
-    func,
-    literal_column,
-    not_,
-    or_,
-    select,
-    update,
-)
+from sqlalchemy import Connection, func, select, update
 
 from domain.dates import date_to_french
 from domain.documents.identifiers import ISSN
 from domain.normalize import optional_plain_text
-from domain.serials.serial import OaModel, SerialType
-from domain.serials.serial_lists import DIAMOND_DISCOVERY_HUB, DOAJ
+from domain.serials.serial import SerialType
+from domain.serials.serial_lists import DOAJ
 from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_datetime_or_none
 from infrastructure.db.tables import serial_issns, serials
-from infrastructure.sql_fragments import in_serial_list
 from pipeline.http.dump_download import DumpUnavailableError
 from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -42,7 +30,7 @@ from pipeline.runtime.observability.signals import (
     signal_dump_unrecognized,
     signal_source_unavailable,
 )
-from pipeline.transformation.publishing.serials.store import OA_MODEL_NOT_MANUAL, TYPE_NOT_MANUAL
+from pipeline.transformation.publishing.serials.store import TYPE_NOT_MANUAL, in_list
 
 LABEL = "Import du DOAJ"
 """Libellé de la tâche dans le journal de la phase."""
@@ -104,52 +92,13 @@ def update_serial_doaj(
     )
 
 
-def _in_list(code: str) -> ColumnElement[bool]:
-    """Condition vraie quand la revue appartient à la liste `code`."""
-    return literal_column(in_serial_list(serials.fullname + ".id", code), Boolean)
-
-
 def type_doaj_serials_as_journals(conn: Connection) -> int:
     """Type en revue les entrées de type inconnu présentes dans le DOAJ, qui répertorie seulement des revues. Un type saisi à la main reste en l'état. Renvoie le nombre d'entrées typées."""
     return conn.execute(
         update(serials)
-        .where(_in_list(DOAJ), serials.c.serial_type == SerialType.UNKNOWN, TYPE_NOT_MANUAL)
+        .where(in_list(DOAJ), serials.c.serial_type == SerialType.UNKNOWN, TYPE_NOT_MANUAL)
         .values(serial_type=SerialType.JOURNAL)
     ).rowcount
-
-
-_DIAMOND = or_(
-    _in_list(DIAMOND_DISCOVERY_HUB),
-    and_(
-        _in_list(DOAJ),
-        serials.c.doaj_payload["APC"].astext == "No",
-        serials.c.doaj_payload["Has other fees"].astext == "No",
-    ),
-)
-"""Revue du Diamond Discovery Hub, ou revue présente dans le DOAJ sans APC ni autres frais."""
-
-
-def model_diamond_serials(conn: Connection) -> int:
-    """Classe `diamond` les revues du Diamond Discovery Hub et les revues du DOAJ sans APC ni autres frais. Classe `full_oa` les revues `diamond` hors de ces cas. Un modèle saisi à la main reste en l'état. Renvoie le nombre de revues modifiées."""
-    to_diamond = conn.execute(
-        update(serials)
-        .where(
-            _DIAMOND,
-            serials.c.oa_model.is_distinct_from(OaModel.DIAMOND),
-            OA_MODEL_NOT_MANUAL,
-        )
-        .values(oa_model=OaModel.DIAMOND)
-    ).rowcount
-    to_full_oa = conn.execute(
-        update(serials)
-        .where(
-            serials.c.oa_model == OaModel.DIAMOND,
-            not_(_DIAMOND),
-            OA_MODEL_NOT_MANUAL,
-        )
-        .values(oa_model=OaModel.FULL_OA)
-    ).rowcount
-    return to_diamond + to_full_oa
 
 
 def doaj_last_import_at(conn: Connection) -> datetime | None:
@@ -234,7 +183,7 @@ def run_enrich_serials_from_doaj(
     refresh_after_days: int,
     download_dump: DownloadDump,
 ) -> PhaseMetrics:
-    """Télécharge et importe le dump DOAJ quand le dernier import date de plus de `refresh_after_days` jours. Type ensuite en revue les entrées présentes dans le DOAJ (`type_doaj_serials_as_journals`) et classe les revues diamant (`model_diamond_serials`).
+    """Télécharge et importe le dump DOAJ quand le dernier import date de plus de `refresh_after_days` jours. Type ensuite en revue les entrées présentes dans le DOAJ (`type_doaj_serials_as_journals`).
 
     Un dump inaccessible laisse le référentiel inchangé et signale la source indisponible : la phase continue, l'import est repris au run suivant.
     """
@@ -242,7 +191,6 @@ def run_enrich_serials_from_doaj(
         conn, logger, refresh_after_days=refresh_after_days, download_dump=download_dump
     )
     type_doaj_serials_as_journals(conn)
-    model_diamond_serials(conn)
     return metrics
 
 

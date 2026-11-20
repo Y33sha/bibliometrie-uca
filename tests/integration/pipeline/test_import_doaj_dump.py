@@ -1,17 +1,12 @@
-"""Import du dump DOAJ (`run_import_doaj_dump`), typage en revue des entrées présentes dans le DOAJ, classement des revues diamant."""
+"""Import du dump DOAJ (`run_import_doaj_dump`), typage en revue des entrées présentes dans le DOAJ."""
 
 from sqlalchemy import text
 
 from pipeline.transformation.publishing.serials.enrich_serials_from_doaj import (
-    model_diamond_serials,
     run_import_doaj_dump,
     type_doaj_serials_as_journals,
 )
-from tests.integration.helpers.serials import (
-    add_to_serial_list,
-    insert_serial,
-    insert_serial_issn,
-)
+from tests.integration.helpers.serials import insert_serial, insert_serial_issn
 
 
 def _create_serial(conn, *, issn=None, eissn=None):
@@ -117,74 +112,4 @@ class TestTypeDoajSerialsAsJournals:
             absent: "unknown",
             typed: "proceedings",
             manual: "unknown",
-        }
-
-
-def _doaj_serial(conn, title, *, oa_model, apc, fees="No", manual=False, in_doaj=True):
-    """Insère une revue avec sa fiche DOAJ et ses frais déclarés, présente dans le DOAJ sauf mention contraire."""
-    serial_id = insert_serial(conn, title, oa_model=oa_model, is_in_doaj=in_doaj)
-    conn.execute(
-        text(
-            "UPDATE serials SET doaj_payload = jsonb_build_object('APC', CAST(:apc AS text), 'Has other fees', CAST(:fees AS text)),"
-            " manual_fields = CASE WHEN :manual THEN ARRAY['oa_model'] ELSE manual_fields END WHERE id = :id"
-        ),
-        {"apc": apc, "fees": fees, "manual": manual, "id": serial_id},
-    )
-    return serial_id
-
-
-def _ddh_serial(conn, title, *, oa_model):
-    """Insère une revue du Diamond Discovery Hub."""
-    serial_id = insert_serial(conn, title, oa_model=oa_model)
-    add_to_serial_list(conn, serial_id, "ddh")
-    return serial_id
-
-
-class TestModelDiamondSerials:
-    def test_doaj_without_fees_and_diamond_discovery_hub_are_diamond(self, sa_sync_conn):
-        free = _doaj_serial(sa_sync_conn, "Libre", oa_model="full_oa", apc="No")
-        free_subscription = _doaj_serial(
-            sa_sync_conn, "Abonnement", oa_model="subscription", apc="No"
-        )
-        other_fees = _doaj_serial(sa_sync_conn, "Frais", oa_model="full_oa", apc="No", fees="Yes")
-        lost_diamond = _doaj_serial(sa_sync_conn, "Payante", oa_model="diamond", apc="Yes")
-        left_doaj = _doaj_serial(
-            sa_sync_conn, "Sortie du DOAJ", oa_model="diamond", apc="No", in_doaj=False
-        )
-        manual = _doaj_serial(sa_sync_conn, "Manuelle", oa_model="full_oa", apc="No", manual=True)
-        manual_diamond = insert_serial(sa_sync_conn, "Marquée", oa_model="diamond")
-        sa_sync_conn.execute(
-            text("UPDATE serials SET manual_fields = ARRAY['oa_model'] WHERE id = :id"),
-            {"id": manual_diamond},
-        )
-        hub = _ddh_serial(sa_sync_conn, "Hub", oa_model="full_oa")
-        hub_diamond = _ddh_serial(sa_sync_conn, "Hub diamant", oa_model="diamond")
-
-        assert model_diamond_serials(sa_sync_conn) == 5
-        ids = [
-            free,
-            free_subscription,
-            other_fees,
-            lost_diamond,
-            left_doaj,
-            manual,
-            manual_diamond,
-            hub,
-            hub_diamond,
-        ]
-        models = dict(
-            sa_sync_conn.execute(
-                text("SELECT id, oa_model::text FROM serials WHERE id = ANY(:ids)"), {"ids": ids}
-            ).all()
-        )
-        assert models == {
-            free: "diamond",
-            free_subscription: "diamond",
-            other_fees: "full_oa",
-            lost_diamond: "full_oa",
-            left_doaj: "full_oa",
-            manual: "full_oa",
-            manual_diamond: "diamond",
-            hub: "diamond",
-            hub_diamond: "diamond",
         }

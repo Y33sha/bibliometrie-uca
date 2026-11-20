@@ -56,6 +56,7 @@ from pipeline.transformation.publishing.serials import (
     enrich_serials_from_doaj,
     import_issnl_table,
     learn_serial_doi_namespaces,
+    model_serials,
     type_journal_serials,
     type_proceedings_serials,
 )
@@ -72,6 +73,7 @@ _IDENTIFIED: dict[str, Callable[[PhaseMetrics], int]] = {
     "check_serials_in_openalex": lambda m: m.extras.get("openalex_found", 0),
     "type_proceedings_serials": lambda m: m.extras.get("serials_typed_proceedings", 0),
     "type_journal_serials": lambda m: m.extras.get("serials_typed_journal", 0),
+    "model_serials": lambda m: m.updated,
     "attach_monographs": lambda m: m.updated,
     "link_monographs_to_collections": lambda m: m.extras.get("monographs_linked", 0),
     "type_proceedings_volumes": lambda m: m.extras.get("monographs_to_proceedings", 0),
@@ -536,8 +538,6 @@ _ENRICH_SERIALS_FROM_DOAJ = Task(
         "serial_list_entries",
         "serials.doaj_imported_at",
         "serials.serial_type",
-        "serials.oa_model",
-        "serials.doaj_payload",
         "serials.manual_fields",
         "config",
     ),
@@ -545,12 +545,28 @@ _ENRICH_SERIALS_FROM_DOAJ = Task(
         "serials.doaj_payload",
         "serials.doaj_imported_at",
         "serials.serial_type",
-        "serials.oa_model",
     ),
     previous_run=("serial_issns", "serials"),
     network="doaj",
     run=_run_enrich_serials_from_doaj,
     label=enrich_serials_from_doaj.LABEL,
+)
+
+
+_MODEL_SERIALS = Task(
+    "model_serials",
+    reads=(
+        "serial_list_entries",
+        "serials.doaj_payload",
+        "serials.openalex_is_oa",
+        "serials.oa_model",
+        "serials.manual_fields",
+    ),
+    writes=("serials.oa_model",),
+    # Collections créées par `link_monographs_to_collections`, revues vides supprimées par `finalize.delete_empty_serials`.
+    previous_run=("serials",),
+    run=in_transaction(model_serials.run_model_serials),
+    label=model_serials.LABEL,
 )
 
 
@@ -643,12 +659,13 @@ _CHILDREN = (
             _ATTACH_SERIALS,
             Step(
                 "qualification",
-                "revues → identifiant OpenAlex, listes de revues, type, fiche DOAJ",
+                "revues → identifiant OpenAlex, listes de revues, type, fiche DOAJ, modèle open access",
                 (
                     _CHECK_SERIALS_IN_OPENALEX,
                     _TYPE_PROCEEDINGS_SERIALS,
                     _TYPE_JOURNAL_SERIALS,
                     _ENRICH_SERIALS_FROM_DOAJ,
+                    _MODEL_SERIALS,
                 ),
             ),
         ),

@@ -187,6 +187,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
           check_serials_in_openalex: "revues cherchées dans OpenAlex",
           type_proceedings_serials: "revues typées recueils d'actes",
           type_journal_serials: "entrées typées revues",
+          model_serials: "modèles open access des revues modifiés",
           attach_monographs: "enregistrements sources rattachés aux monographies",
           link_monographs_to_collections: "monographies rattachées à leur collection",
           type_proceedings_volumes: "monographies retypées (actes ou livre)",

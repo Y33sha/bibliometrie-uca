@@ -6,13 +6,24 @@ L'édition dans l'administration passe par `infrastructure/repositories/serial_r
 from collections.abc import Sequence
 from typing import NamedTuple
 
-from sqlalchemy import Connection, any_, exists, literal, select, text, update
+from sqlalchemy import (
+    Boolean,
+    ColumnElement,
+    Connection,
+    any_,
+    exists,
+    literal,
+    literal_column,
+    select,
+    text,
+    update,
+)
 
 from domain.normalize import normalize_text
 from domain.serials.serial import ManualField, SerialType
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import serial_issns, serials
-from infrastructure.sql_fragments import active_issns
+from infrastructure.sql_fragments import active_issns, in_serial_list
 
 
 class SerialSummary(NamedTuple):
@@ -29,6 +40,12 @@ TYPE_NOT_MANUAL = ~(literal(ManualField.SERIAL_TYPE.value) == any_(serials.c.man
 """Type modifiable par le pipeline : absent des champs saisis à la main."""
 OA_MODEL_NOT_MANUAL = ~(literal(ManualField.OA_MODEL.value) == any_(serials.c.manual_fields))
 """Modèle OA modifiable par le pipeline : absent des champs saisis à la main."""
+
+
+def in_list(code: str) -> ColumnElement[bool]:
+    """Condition vraie quand la revue appartient à la liste `code`."""
+    return literal_column(in_serial_list(serials.fullname + ".id", code), Boolean)
+
 
 _SERIAL_SUMMARIES = text(f"""
     SELECT j.id, j.title, p.name AS publisher, {active_issns("j.id")} AS issns
