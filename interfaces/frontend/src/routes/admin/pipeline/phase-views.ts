@@ -11,6 +11,8 @@
  * Une phase sans entrée ici retombe sur l'affichage générique des compteurs `PhaseMetrics` (total / new / updated / unchanged / errors / extras).
  */
 
+import { resolutionModeLabels } from '#lib/labels.js';
+
 export type SummaryItem = { key: string; label: string };
 export type TableColumn = {
   key: string;
@@ -309,17 +311,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
         source: "table",
         firstColumnLabel: "Mode de rattachement",
         rowLabels: {
-          manual: "Épinglage",
-          orcid: "ORCID",
-          hal_person_id: "Compte HAL",
-          idref: "IdRef",
-          name: "Nom sans homonymie",
-          compatible_name: "Initiales compatibles",
-          coauthors: "Nom ambigu, départagé par les coauteurs",
-          laboratory: "Nom ambigu, départagé par le laboratoire",
-          hal_structure: "Nom ambigu, départagé par la structure HAL",
-          serial: "Nom ambigu, départagé par la revue",
-          activity_years: "Nom ambigu, départagé par les années d'activité",
+          ...resolutionModeLabels,
           created: "Personne créée",
         },
         columns: [{ key: "count", label: "Contributions rattachées", pct: true }],

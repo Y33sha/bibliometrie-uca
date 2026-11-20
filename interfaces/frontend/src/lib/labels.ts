@@ -122,6 +122,21 @@ export function identifierTypeLabel(idType: string): string {
 	return identifierTypeLabels[idType] ?? idType;
 }
 
+/** Libellés des modes de rattachement d'une contribution à une personne — enum PG `resolution_mode`. */
+export const resolutionModeLabels: Record<string, string> = {
+	manual: 'Épinglage',
+	orcid: 'ORCID',
+	hal_person_id: 'Compte HAL',
+	idref: 'IdRef',
+	name: 'Nom sans homonymie',
+	compatible_name: 'Initiales compatibles',
+	coauthors: 'Nom ambigu, départagé par les coauteurs',
+	laboratory: 'Nom ambigu, départagé par le laboratoire',
+	hal_structure: 'Nom ambigu, départagé par la structure HAL',
+	serial: 'Nom ambigu, départagé par la revue',
+	activity_years: "Nom ambigu, départagé par les années d'activité"
+};
+
 
 /** Libellés FR des motifs d'exclusion d'une personne — enum PG `person_exclusion`. */
 export const personExclusionLabels: Record<PersonExclusion, string> = {
