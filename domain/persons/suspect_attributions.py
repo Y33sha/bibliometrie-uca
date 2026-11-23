@@ -66,6 +66,8 @@ class PublicationClues:
     anchored: bool
     """Contribution rattachée par un mode de `ANCHOR_MODES` : la publication est sûrement de la personne."""
     clues: frozenset[Clue]
+    confirmed: bool = False
+    """Une adresse de la contribution est rattachée à une structure de la fiche RH de la personne : la publication n'est jamais signalée."""
 
 
 @dataclass(frozen=True)
@@ -144,7 +146,7 @@ def signaled_clusters(
 ) -> list[list[int]]:
     """Renvoie les clusters signalés des publications d'une personne, par identifiant de contribution.
 
-    Le cluster principal réunit le plus de contributions ancrées, puis le plus de publications. Un autre cluster est signalé s'il compte au moins `MIN_CLUSTER_SIZE` publications, aucune contribution ancrée, et une conductance d'au plus `MAX_CONDUCTANCE`.
+    Le cluster principal réunit le plus de contributions ancrées, puis le plus de publications. Un autre cluster est signalé s'il est sans contribution ancrée, avec une conductance d'au plus `MAX_CONDUCTANCE`, et au moins `MIN_CLUSTER_SIZE` publications non confirmées. Seules ses publications non confirmées sont renvoyées.
     """
     if len(publications) < MIN_PUBLICATIONS:
         return []
@@ -160,14 +162,20 @@ def signaled_clusters(
         key=lambda k: (sum(publications[i].anchored for i in clusters[k]), len(clusters[k])),
     )
     conductance = _conductances(membership, weights, len(clusters))
-    return [
-        [publications[i].contribution_id for i in members]
-        for k, members in enumerate(clusters)
-        if k != main
-        and len(members) >= MIN_CLUSTER_SIZE
-        and not any(publications[i].anchored for i in members)
-        and conductance[k] <= MAX_CONDUCTANCE
-    ]
+    signaled = []
+    for k, members in enumerate(clusters):
+        if (
+            k == main
+            or any(publications[i].anchored for i in members)
+            or conductance[k] > MAX_CONDUCTANCE
+        ):
+            continue
+        unconfirmed = [
+            publications[i].contribution_id for i in members if not publications[i].confirmed
+        ]
+        if len(unconfirmed) >= MIN_CLUSTER_SIZE:
+            signaled.append(unconfirmed)
+    return signaled
 
 
 _REJECTED_PROFILE = -1

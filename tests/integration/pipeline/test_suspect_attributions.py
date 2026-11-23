@@ -5,19 +5,29 @@ import logging
 from sqlalchemy import text
 
 from pipeline.transformation.persons.suspect_attributions import detect
-from tests.integration.helpers.alignment import align_source_contributions
+from tests.integration.helpers.addresses import insert_address, insert_address_structure
+from tests.integration.helpers.alignment import (
+    add_aligned_source_contribution,
+    align_source_contributions,
+)
 from tests.integration.helpers.contributions import (
     insert_contribution,
     upsert_split_contributor_information,
 )
 from tests.integration.helpers.persons import (
+    insert_hr_period,
     insert_hr_record,
     insert_person,
     insert_rejected_contribution,
 )
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.serials import insert_serial
-from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
+from tests.integration.helpers.sources import (
+    insert_source_contribution,
+    insert_source_contribution_address,
+    insert_source_record,
+)
+from tests.integration.helpers.structures import insert_structure
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,26 +51,48 @@ def _suspects(conn):
     ).all()
 
 
-def test_un_cluster_isole_d_une_personne_a_fiche_rh_est_signale(sa_sync_conn):
-    person = insert_person(sa_sync_conn, "Morel", first_name="Laurent")
-    insert_hr_record(sa_sync_conn, person)
-    own_serial = insert_serial(sa_sync_conn, "Biologie cellulaire")
-    other_serial = insert_serial(sa_sync_conn, "Électrotechnique")
+def _isolated_cluster(conn):
+    """Sème une personne à fiche RH : trois publications ancrées dans une revue, trois autres dans une autre revue. Renvoie (personne, [(publication, contribution)] du cluster isolé)."""
+    person = insert_person(conn, "Morel", first_name="Laurent")
+    insert_hr_record(conn, person)
+    own_serial = insert_serial(conn, "Biologie cellulaire")
+    other_serial = insert_serial(conn, "Électrotechnique")
     for _ in range(3):
-        _contribution(
-            sa_sync_conn, insert_publication(sa_sync_conn, serial_id=own_serial), person, "orcid"
-        )
-    isolated = [
-        _contribution(
-            sa_sync_conn, insert_publication(sa_sync_conn, serial_id=other_serial), person, "idref"
-        )
-        for _ in range(3)
-    ]
+        _contribution(conn, insert_publication(conn, serial_id=own_serial), person, "orcid")
+    isolated = []
+    for _ in range(3):
+        publication = insert_publication(conn, serial_id=other_serial)
+        isolated.append((publication, _contribution(conn, publication, person, "idref")))
+    return person, isolated
+
+
+def test_un_cluster_isole_d_une_personne_a_fiche_rh_est_signale(sa_sync_conn):
+    person, isolated = _isolated_cluster(sa_sync_conn)
 
     metrics = detect(sa_sync_conn, _LOGGER)
 
-    assert _suspects(sa_sync_conn) == [(c, person, "cluster", 1) for c in isolated]
+    assert _suspects(sa_sync_conn) == [(c, person, "cluster", 1) for _, c in isolated]
     assert metrics.extras["suspect_in_clusters"] == 3
+
+
+def test_une_adresse_du_laboratoire_rh_confirme_la_publication(sa_sync_conn):
+    """Les publications à l'adresse du laboratoire de la fiche RH sortent du cluster, qui passe sous la taille minimale."""
+    person, isolated = _isolated_cluster(sa_sync_conn)
+    laboratory = insert_structure(sa_sync_conn, "LAB")
+    insert_hr_period(sa_sync_conn, person, structure_id=laboratory)
+    address = insert_address(sa_sync_conn, "Laboratoire, Clermont-Ferrand")
+    insert_address_structure(sa_sync_conn, address, structure_id=laboratory)
+    publication, contribution = isolated[0]
+    source_record = insert_source_record(
+        sa_sync_conn, publication, source="crossref", source_id="c1"
+    )
+    source_contribution = insert_source_contribution(sa_sync_conn, source_record, source="crossref")
+    insert_source_contribution_address(sa_sync_conn, source_contribution, address_id=address)
+    add_aligned_source_contribution(sa_sync_conn, contribution, source_contribution, source_record)
+
+    detect(sa_sync_conn, _LOGGER)
+
+    assert _suspects(sa_sync_conn) == []
 
 
 def _resembling_rejected(conn, *, exclusion=None):

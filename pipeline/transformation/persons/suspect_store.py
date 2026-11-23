@@ -44,6 +44,11 @@ def _subjects(vocabulary: str, level: int) -> str:
 
 _CLUES_SQL = f"""
     SELECT g.id, g.person_id, g.resolution_mode::text IN {in_clause(ANCHOR_MODES)} AS anchored,
+           EXISTS (SELECT 1 FROM aligned_source_contributions gm
+                   JOIN source_contribution_addresses sca ON sca.source_contribution_id = gm.source_contribution_id
+                   JOIN address_structures ast ON ast.address_id = sca.address_id
+                   JOIN hr_periods hp ON hp.structure_id = ast.structure_id AND hp.person_id = g.person_id
+                   WHERE gm.contribution_id = g.id) AS confirmed,
            p.serial_id,
            ARRAY(SELECT o.person_id FROM contributions o
                  WHERE o.publication_id = g.publication_id AND o.id <> g.id
@@ -68,7 +73,7 @@ _CLUES_SQL = f"""
 
 
 def fetch_publication_clues(conn: Connection) -> dict[int, list[PublicationClues]]:
-    """Renvoie les indices des publications de chaque personne à fiche RH retenue, hors contributions des seuls rôles de jury de thèse."""
+    """Renvoie les indices des publications de chaque personne à fiche RH retenue, hors contributions des seuls rôles de jury de thèse. Une contribution est confirmée quand une de ses adresses est rattachée à une structure de la fiche RH de la personne."""
     by_person: dict[int, list[PublicationClues]] = defaultdict(list)
     for r in conn.execute(text(_CLUES_SQL)):
         clues = {(ClueFamily.COAUTHOR, p) for p in r.coauthors}
@@ -78,7 +83,9 @@ def fetch_publication_clues(conn: Connection) -> dict[int, list[PublicationClues
         clues |= {(ClueFamily.HAL_DOMAIN, s) for s in r.hal_domains}
         if r.serial_id is not None:
             clues.add((ClueFamily.SERIAL, r.serial_id))
-        by_person[r.person_id].append(PublicationClues(r.id, r.anchored, frozenset(clues)))
+        by_person[r.person_id].append(
+            PublicationClues(r.id, r.anchored, frozenset(clues), r.confirmed)
+        )
     return by_person
 
 

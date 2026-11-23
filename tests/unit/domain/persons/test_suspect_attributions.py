@@ -87,6 +87,23 @@ def test_le_cluster_principal_reunit_le_plus_de_contributions_ancrees():
     assert clusters == [[2, 3, 4, 5, 6, 7]]
 
 
+def test_une_publication_a_l_adresse_du_laboratoire_rh_n_est_pas_signalee():
+    """Le cluster perd ses publications confirmées, puis passe sous la taille minimale."""
+    publications = _person()
+    publications[3] = PublicationClues(4, False, publications[3].clues, confirmed=True)
+
+    assert signaled_clusters(publications, _FREQUENCIES, _labels(0, 0, 0, 1, 1, 1)) == []
+
+
+def test_un_cluster_signale_omet_ses_publications_confirmees():
+    publications = _person() + [_publication(7, _RARE_SERIAL)]
+    publications[3] = PublicationClues(4, False, publications[3].clues, confirmed=True)
+
+    clusters = signaled_clusters(publications, _FREQUENCIES, _labels(0, 0, 0, 1, 1, 1, 1))
+
+    assert clusters == [[5, 6, 7]]
+
+
 def test_un_petit_cluster_n_est_pas_signale():
     publications = _person()
 
