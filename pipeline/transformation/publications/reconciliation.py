@@ -418,6 +418,7 @@ def _member(row: ReconcileRow, doi_targets: dict[str, str]) -> ReconcileMember:
         publication_year=row.publication_year,
         doc_type=row.doc_type,
         matchable=row.is_matchable,
+        source=row.source,
     )
 
 

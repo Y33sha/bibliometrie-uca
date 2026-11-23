@@ -4,7 +4,7 @@ Les enregistrements sources du voisinage se répartissent en partitions : compos
 
 Un DOI appartient à une seule partition. Un DOI partagé par plusieurs partitions reste à celle qui l'a en rôle fort, et les enregistrements sources des autres le perdent. Un DOI fort dans aucune partition est retiré de toutes. Le voisinage se repartitionne ensuite sans ces DOI.
 
-Chaque partition aboutit sur une seule publication, son ancre : celle qui a déjà son DOI, sinon celle du plus petit enregistrement source rattaché. L'ancre garde son identifiant, et donc les corrections faites à la main. Une partition d'enregistrements sources orphelins, sans publication, en crée une si l'un d'eux est dans le périmètre ; sinon, elle reste orpheline. Un enregistrement source écarté (`is_matchable`) ou d'un type de document exclu (`OUT_OF_SCOPE_DOC_TYPES`) n'entre dans aucune partition, et quitte sa publication.
+Chaque partition aboutit sur une seule publication, son ancre : celle qui a déjà son DOI, sinon celle du plus petit enregistrement source rattaché. L'ancre garde son identifiant, et donc les corrections faites à la main. Une partition d'enregistrements sources orphelins, sans publication, en crée une si l'un d'eux est dans le périmètre ; sinon, elle reste orpheline. Un enregistrement source écarté (`is_matchable`) ou d'un type de document exclu (`OUT_OF_SCOPE_DOC_TYPES`) n'entre dans aucune partition, et quitte sa publication. Les types de `PARTITIONED_OUT_OF_SCOPE_DOC_TYPES` entrent dans les partitions : une partition faite seulement de ces types et d'enregistrements d'agrégateurs de types génériques (`GENERIC_DOC_TYPES`) reste sans publication, et dans une autre partition ils quittent la publication.
 """
 
 from collections import Counter, defaultdict
@@ -14,9 +14,13 @@ from typing import NamedTuple
 
 from domain.entity_resolution import connected_components
 from domain.publications.metadata import has_minimal_publication_metadata
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
+from domain.publications.scope import (
+    GENERIC_DOC_TYPES,
+    OUT_OF_SCOPE_DOC_TYPES,
+    PARTITIONED_OUT_OF_SCOPE_DOC_TYPES,
+)
 from domain.source_records.keys import Derivation, DoiKeys, anchor_of, doi_anchors
-from domain.sources.registry import DISTINCT_WORK_SOURCES
+from domain.sources.registry import AGGREGATOR_SOURCES, DISTINCT_WORK_SOURCES
 
 MANUAL_MERGE_KEY = "manual_merge"
 """Nom de clé des jetons de fusion manuelle, valeur de clé = identifiant de la fusion manuelle."""
@@ -72,11 +76,27 @@ class ReconcileMember:
     doc_type: str | None = None
     matchable: bool = True
     """L'enregistrement source entre dans la réconciliation (`is_matchable`)."""
+    source: str | None = None
 
     @property
     def admitted(self) -> bool:
-        """Vrai si l'enregistrement source entre dans les groupes : il entre dans la réconciliation (`is_matchable`), et son type de document est retenu (`OUT_OF_SCOPE_DOC_TYPES`). Un erratum qui partage une clé avec l'article corrigé reste ainsi hors de sa publication."""
-        return self.matchable and self.doc_type not in OUT_OF_SCOPE_DOC_TYPES
+        """Vrai si l'enregistrement source entre dans les partitions : il entre dans la réconciliation (`is_matchable`), et son type de document est retenu (`OUT_OF_SCOPE_DOC_TYPES`) ou entre dans les partitions (`PARTITIONED_OUT_OF_SCOPE_DOC_TYPES`). Un erratum qui partage une clé avec l'article corrigé reste ainsi hors de sa publication."""
+        return self.matchable and (
+            self.doc_type not in OUT_OF_SCOPE_DOC_TYPES
+            or self.doc_type in PARTITIONED_OUT_OF_SCOPE_DOC_TYPES
+        )
+
+    @property
+    def partitioned_out_of_scope(self) -> bool:
+        """Vrai pour un type exclu qui entre dans les partitions (`PARTITIONED_OUT_OF_SCOPE_DOC_TYPES`)."""
+        return self.doc_type in PARTITIONED_OUT_OF_SCOPE_DOC_TYPES
+
+    @property
+    def generic(self) -> bool:
+        """Vrai pour un enregistrement source d'un agrégateur (`AGGREGATOR_SOURCES`) de type générique (`GENERIC_DOC_TYPES`) ou sans type."""
+        return self.source in AGGREGATOR_SOURCES and (
+            self.doc_type is None or self.doc_type in GENERIC_DOC_TYPES
+        )
 
     @property
     def materializable(self) -> bool:
@@ -275,6 +295,28 @@ def _unique_doi_partitions(
             removed[source_record_id] |= dois
 
 
+def _without_out_of_scope(
+    partitions: list[tuple[Anchor | None, list[ReconcileMember]]],
+) -> tuple[list[tuple[Anchor | None, list[ReconcileMember]]], frozenset[int]]:
+    """Renvoie les partitions privées des enregistrements sources mis de côté, et ces enregistrements sources.
+
+    Une partition faite seulement de types de `PARTITIONED_OUT_OF_SCOPE_DOC_TYPES` et d'enregistrements sources génériques (`ReconcileMember.generic`) est mise de côté entière. Dans une autre partition, seuls les enregistrements sources de `PARTITIONED_OUT_OF_SCOPE_DOC_TYPES` sont mis de côté.
+    """
+    kept: list[tuple[Anchor | None, list[ReconcileMember]]] = []
+    set_aside: set[int] = set()
+    for anchor, part in partitions:
+        out_of_scope = [m for m in part if m.partitioned_out_of_scope]
+        if not out_of_scope:
+            kept.append((anchor, part))
+            continue
+        if all(m.partitioned_out_of_scope or m.generic for m in part):
+            set_aside.update(m.source_record_id for m in part)
+            continue
+        set_aside.update(m.source_record_id for m in out_of_scope)
+        kept.append((anchor, [m for m in part if not m.partitioned_out_of_scope]))
+    return kept, frozenset(set_aside)
+
+
 def _doi_of(anchor: Anchor | None) -> str | None:
     """Renvoie le DOI d'une ancre DOI, `None` pour une ancre d'œuvre ou une partition sans ancre."""
     return anchor.value if anchor is not None and anchor.kind == _DOI else None
@@ -402,18 +444,22 @@ def plan_reconciliation(
     members = list(members)
     admitted = [m for m in members if m.admitted]
     partitions, removed_dois = _unique_doi_partitions(admitted)
+    partitions, set_aside = _without_out_of_scope(partitions)
+    grouped = [m for _, part in partitions for m in part]
     claims = [
         claim
         for anchor, part in partitions
         if (claim := _claim(_doi_of(anchor), part, existing_publication_by_doi or {})) is not None
     ]
-    award = _award(claims, admitted)
+    award = _award(claims, grouped)
     excluded = sorted(
-        m.source_record_id for m in members if not m.admitted and m.publication_id is not None
+        m.source_record_id
+        for m in members
+        if (not m.admitted or m.source_record_id in set_aside) and m.publication_id is not None
     )
     return ReconcilePlan(
         groups=award.groups,
-        dissolved=_dissolutions(members, admitted, award, publication_sizes or {}),
+        dissolved=_dissolutions(members, grouped, award, publication_sizes or {}),
         detached=(*excluded, *award.unfounded),
         doi_removals=tuple(
             sorted(

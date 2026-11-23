@@ -30,6 +30,7 @@ def _m(
     primary=None,
     derived=None,
     work_id=None,
+    source=None,
 ):
     """Construit un membre du voisinage.
 
@@ -53,6 +54,7 @@ def _m(
         publication_year=year,
         doc_type=doc_type,
         matchable=matchable,
+        source=source,
     )
 
 
@@ -589,6 +591,92 @@ class TestExclusion:
         assert _groups(plan) == {10: (2, 3)}
         assert plan.detached == (1,)
         assert plan.dissolved == (DissolvedPublication(20, 10),)
+
+
+class TestPartitionedOutOfScope:
+    """Thèses d'exercice, mémoires, échantillons et numéros de revue : dans les partitions, sans publication."""
+
+    _DUMAS = [("hal_id", "dumas-05737026")]
+
+    def test_le_jumeau_openalex_d_une_these_d_exercice_reste_sans_publication(self):
+        """Cas réel : l'enregistrement OpenAlex `thesis` comporte le hal-id de la thèse d'exercice DUMAS."""
+        plan = plan_reconciliation(
+            [
+                _m(1, None, tokens=self._DUMAS, in_perimeter=True, doc_type="practice_thesis"),
+                _m(
+                    2,
+                    None,
+                    tokens=self._DUMAS,
+                    in_perimeter=True,
+                    doc_type="thesis",
+                    source="openalex",
+                ),
+            ]
+        )
+        assert plan.groups == ()
+        assert plan.detached == ()
+
+    def test_une_these_de_doctorat_garde_sa_publication(self):
+        """Donné par theses.fr, le type `thesis` désigne une thèse de doctorat : la thèse d'exercice seule reste dehors."""
+        plan = plan_reconciliation(
+            [
+                _m(1, None, tokens=self._DUMAS, in_perimeter=True, doc_type="practice_thesis"),
+                _m(
+                    2, 10, tokens=self._DUMAS, in_perimeter=True, doc_type="thesis", source="theses"
+                ),
+            ]
+        )
+        assert _groups(plan) == {10: (2,)}
+        assert plan.detached == ()
+
+    def test_le_jumeau_quitte_sa_publication(self):
+        plan = plan_reconciliation(
+            [
+                _m(1, None, tokens=self._DUMAS, in_perimeter=True, doc_type="practice_thesis"),
+                _m(
+                    2,
+                    10,
+                    tokens=self._DUMAS,
+                    in_perimeter=True,
+                    doc_type="thesis",
+                    source="openalex",
+                ),
+            ],
+            publication_sizes={10: 1},
+        )
+        assert plan.groups == ()
+        assert plan.detached == (2,)
+        assert plan.dissolved == ()
+
+    def test_une_these_d_exercice_au_doi_d_un_article_reste_hors_de_sa_publication(self):
+        """Une thèse d'exercice partage le DOI de l'article tiré de la thèse : l'article garde sa publication."""
+        key = [("doi", "10.1/a")]
+        plan = plan_reconciliation(
+            [
+                _m(1, 10, publication_doi="10.1/a", doi="10.1/a", tokens=key, doc_type="article"),
+                _m(2, None, tokens=key, in_perimeter=True, doc_type="practice_thesis"),
+            ]
+        )
+        assert _groups(plan) == {10: (1,)}
+        assert plan.detached == ()
+
+    def test_le_jumeau_openalex_d_un_echantillon_reste_sans_publication(self):
+        key = [("doi", "10.58006/bfbg-178393")]
+        plan = plan_reconciliation(
+            [
+                _m(1, None, doi="10.58006/bfbg-178393", tokens=key, doc_type="physical_object"),
+                _m(
+                    2,
+                    None,
+                    doi="10.58006/bfbg-178393",
+                    tokens=key,
+                    in_perimeter=True,
+                    doc_type="other",
+                    source="openalex",
+                ),
+            ]
+        )
+        assert plan.groups == ()
 
 
 class TestAssignmentOfOrphans:
