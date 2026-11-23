@@ -61,6 +61,16 @@ Mesures de la relecture de la file :
 - Sources des rejets (`sources_des_rejets.py`) : sur 943 paires rejetées, 156 des 159 rattachements par identifiant venaient de HAL ou de ScanR. Les 784 rattachements par le nom viennent surtout des grandes collaborations : 585 publications de plus de 100 contributions.
 - Décisions de l'administration sur la file (`decisions.py`) : les 17 groupes rejetés reposaient sur un identifiant de HAL ou de ScanR. 7 des 13 groupes confirmés comptaient des rattachements par le nom. Le jeu de validation compte deux homonymes du périmètre ; les autres confusions portent sur l'initiale du prénom.
 
+Mesures de la phase 5 (`phase5_*.py`), au 2026-11-23. Jeu : 838 contributions rejetées rattachées de nouveau à leur personne, face aux 61 621 contributions actuelles non épinglées et aux 659 épinglées.
+
+- Les clusters signalent 559 contributions rejetées et aucune contribution actuelle.
+- Contributions rejetées manquées : 250 sont non signalables, 12 sont dans un cluster trop petit, 17 dans le cluster principal. Les non signalables sont surtout des homonymes du périmètre (Muriel Bonnet : 134, Pierre Bonnet : 45) et des rattachements par le nom dans de petites publications, une ou deux par personne.
+- Items 1 et 2 comme indices des clusters (`phase5_resserrer.py`) : conductance relâchée ou taille minimale abaissée pour un cluster dont la moitié des publications signalables présentent le trait. Aucune contribution rejetée de plus, 3 à 109 contributions actuelles signalées.
+- Une adresse du périmètre protège seulement si elle désigne une structure RH de la personne : aucune contribution rejetée de plus.
+- Laboratoire d'adresse hors des structures RH, avec un ORCID autre que celui de la personne : 111 contributions rejetées de plus, dont 107 de Muriel Bonnet, 1 contribution actuelle.
+- ORCID d'une autre personne de la base : 139 contributions rejetées de plus, dont 129 de Muriel Bonnet, 13 contributions actuelles et 1 épinglée. 5 des 13 sont des ORCID d'un coauteur de la même publication.
+- Clusters des personnes sans fiche RH d'au moins six publications (`phase5_sans_rh.py`) : 3 621 personnes, 4 signalées, 12 publications.
+
 ## Décisions
 
 - Deux détections alimentent une seule file d'attributions suspectes :
