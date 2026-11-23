@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict hSLOSkAqZUPGyizDDofkNzme0odh5Fc9HRjKjrrKrJ4DWIPqhDYm0vYTCowZsSX
+\restrict u4MngzYd8nOyMSwS4aCAtTn0GTceBrPoAwOpymnhTMHBc4f2OcP438zLwzRNjHx
 
 -- Dumped from database version 18.7 (Ubuntu 18.7-1.pgdg22.04+5)
--- Dumped by pg_dump version 19.0 (Ubuntu 19.0-1.pgdg22.04+1)
+-- Dumped by pg_dump version 19.0 (Ubuntu 19.0-2.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -751,8 +751,9 @@ CREATE TABLE ops.config (
     description text,
     created_at timestamp with time zone DEFAULT now(),
     CONSTRAINT config_brand_hue_is_angle CHECK (((key <> 'brand_hue'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (0)::numeric) AND ((value)::numeric <= (359)::numeric)) AND ((value)::numeric = trunc((value)::numeric))))),
-    CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['doi_resolution_max_per_run'::text, 'fetch_missing_max_per_source'::text, 'sudoc_max_per_run'::text, 'unpaywall_max_per_run'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
-    CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'doi_resolution_recheck_after_days'::text, 'fetch_missing_retry_after_days'::text, 'fetch_stale_after_days'::text, 'issnl_table_refresh_after_days'::text, 'serial_openalex_recheck_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
+    CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['doi_resolution_max_per_run'::text, 'fetch_missing_max_per_source'::text, 'fetch_stale_max_per_source'::text, 'sudoc_max_per_run'::text, 'unpaywall_max_per_run'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
+    CONSTRAINT config_delay_by_source_is_object CHECK (((key <> 'fetch_stale_after_days'::text) OR (jsonb_typeof(value) = 'object'::text))),
+    CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'doi_resolution_recheck_after_days'::text, 'fetch_missing_retry_after_days'::text, 'issnl_table_refresh_after_days'::text, 'serial_openalex_recheck_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_institution_country_is_code CHECK (((key <> 'institution_country'::text) OR ((jsonb_typeof(value) = 'string'::text) AND ((value #>> '{}'::text[]) ~ '^[a-z]{2}$'::text) AND ((value #>> '{}'::text[]) <> 'xx'::text)))),
     CONSTRAINT config_site_title_is_text CHECK (((key <> 'site_title'::text) OR (jsonb_typeof(value) = 'string'::text))),
     CONSTRAINT config_year_is_in_range CHECK (((key <> 'pipeline_start_year_full'::text) OR (jsonb_typeof(value) = 'null'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (1970)::numeric) AND ((value)::numeric <= (2100)::numeric)) AND ((value)::numeric = trunc((value)::numeric)))))
@@ -6420,5 +6421,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hSLOSkAqZUPGyizDDofkNzme0odh5Fc9HRjKjrrKrJ4DWIPqhDYm0vYTCowZsSX
+\unrestrict u4MngzYd8nOyMSwS4aCAtTn0GTceBrPoAwOpymnhTMHBc4f2OcP438zLwzRNjHx
 

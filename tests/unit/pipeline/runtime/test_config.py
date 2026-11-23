@@ -19,4 +19,4 @@ class TestPanneDeLecture:
 
     def test_reglage_du_pipeline(self):
         with pytest.raises(SQLAlchemyError):
-            delay(_ConnEnPanne(), ConfigKey.FETCH_STALE_AFTER_DAYS)
+            delay(_ConnEnPanne(), ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)

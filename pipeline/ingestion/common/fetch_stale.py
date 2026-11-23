@@ -1,4 +1,4 @@
-"""Phase `fetch_stale` : nouvelle recherche des documents de `staging` non revus par le moissonnage depuis `fetch_stale_after_days` jours. Une tâche par source, en parallèle.
+"""Phase `fetch_stale` : nouvelle recherche des documents de `staging` non revus par le moissonnage depuis le délai de leur source (`fetch_stale_after_days`). Une tâche par source, en parallèle.
 
 Chaque document est cherché par son identifiant natif :
 
@@ -7,7 +7,7 @@ Chaque document est cherché par son identifiant natif :
 - absence confirmée (réponse valide, aucun document) → document marqué disparu ;
 - source indisponible (réseau, 429, réponse illisible) → nouvelle tentative au run suivant.
 
-Le délai étale la charge : chaque passe reprend seulement les documents qui viennent de le franchir.
+Le délai étale la charge : chaque passe reprend seulement les documents qui viennent de le franchir. Le plafond `fetch_stale_max_per_source` borne le nombre de documents cherchés par source. Les documents revus depuis le plus longtemps passent en premier.
 
 La recherche se borne aux années moissonnées par le run. Une thèse en cours est cherchée quelle que soit la fenêtre.
 """
@@ -22,7 +22,7 @@ from domain.sources.registry import Source, source_label
 from pipeline.graph import Block, Phase, Task
 from pipeline.ingestion.adapters import adapter
 from pipeline.ingestion.common.stale_refetch import refresh
-from pipeline.runtime.config import delay, window_years
+from pipeline.runtime.config import cap, delay_for_source, window_years
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import assemble_by_source
@@ -38,9 +38,18 @@ def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int]) -> PhaseM
     """Cherche de nouveau les documents anciens d'une source, sur sa propre connexion."""
     fetch_one = adapter(Source(target)).fetch_by_native_id
     with ctx.open_tx() as conn:
-        after_days = delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS)
+        after_days = delay_for_source(conn, ConfigKey.FETCH_STALE_AFTER_DAYS, target)
+        limit = cap(conn, ConfigKey.FETCH_STALE_MAX_PER_SOURCE)
         return asyncio.run(
-            refresh(conn, target, fetch_one, ctx.logger, after_days=after_days, years=years)
+            refresh(
+                conn,
+                target,
+                fetch_one,
+                ctx.logger,
+                after_days=after_days,
+                years=years,
+                limit=limit,
+            )
         )
 
 

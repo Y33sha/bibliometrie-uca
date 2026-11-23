@@ -40,6 +40,7 @@ from domain.config import (
     CAP_BOUNDS,
     CAP_KEYS,
     DELAY_BOUNDS,
+    DELAY_BY_SOURCE_KEYS,
     DELAY_KEYS,
     ConfigKey,
     integer_bounds,
@@ -169,6 +170,12 @@ config = Table(
         f"OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= {DELAY_BOUNDS[0]} "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_delay_is_positive_integer",
+    ),
+    # Le domaine contrôle les sources et les bornes de chaque délai.
+    CheckConstraint(
+        f"key NOT IN ({', '.join(repr(key) for key in sorted(DELAY_BY_SOURCE_KEYS))}) "
+        "OR jsonb_typeof(value) = 'object'",
+        name="config_delay_by_source_is_object",
     ),
     CheckConstraint(
         f"key <> '{ConfigKey.SITE_TITLE}' OR jsonb_typeof(value) = 'string'",

@@ -13,12 +13,14 @@ from domain.config import (
     start_year_value,
 )
 from domain.errors import NotFoundError, ValidationError
+from domain.sources.registry import Source
 
 MIN_YEAR, MAX_YEAR = integer_bounds(ConfigKey.PIPELINE_START_YEAR_FULL)
 
 _PLAFOND = "unpaywall_max_per_run"
 _ANNEE = "pipeline_start_year_full"
-_DELAI = "fetch_stale_after_days"
+_DELAI = "fetch_missing_retry_after_days"
+_DELAI_PAR_SOURCE = "fetch_stale_after_days"
 
 
 class TestPlafonds:
@@ -83,6 +85,28 @@ class TestDelais:
     def test_hors_bornes_ou_illisible_est_refuse(self, valeur):
         with pytest.raises(ValidationError, match="entier de 1 à 3650"):
             normalize_config_value(_DELAI, valeur)
+
+
+class TestDelaisParSource:
+    def test_une_source_absente_recoit_le_delai_par_defaut(self):
+        delais = normalize_config_value(_DELAI_PAR_SOURCE, {"crossref": "365"})
+        assert isinstance(delais, dict)
+        assert list(delais) == [s.value for s in Source]
+        assert (delais["crossref"], delais["hal"]) == (365, 90)
+
+    def test_une_source_inconnue_est_refusee(self):
+        with pytest.raises(ValidationError, match="sources inconnues"):
+            normalize_config_value(_DELAI_PAR_SOURCE, {"pubmed": 30})
+
+    @pytest.mark.parametrize("valeur", [0, 3651, "texte", None])
+    def test_un_delai_hors_bornes_ou_illisible_est_refuse(self, valeur):
+        with pytest.raises(ValidationError, match="entier de 1 à 3650"):
+            normalize_config_value(_DELAI_PAR_SOURCE, {"hal": valeur})
+
+    @pytest.mark.parametrize("valeur", [90, "90", [], None])
+    def test_une_valeur_autre_qu_un_objet_est_refusee(self, valeur):
+        with pytest.raises(ValidationError, match="délai par source"):
+            normalize_config_value(_DELAI_PAR_SOURCE, valeur)
 
 
 class TestTitre:
