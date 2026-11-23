@@ -57,6 +57,8 @@ Mesures de la relecture de la file :
   - part des coauteurs du périmètre : au moins 0,5 pour 6 fausses alertes, mais aussi pour 5 homonymes du périmètre ;
   - adresse rattachée au laboratoire de la fiche RH : écarte 4 fausses alertes, sans perdre aucune fausse attribution ni aucun groupe de rejets.
 - Ressemblance aux rejets sans l'indice des années d'activité (`sans_annees.py`) : même rappel, une fausse alerte de moins.
+- Sources des rejets (`sources_des_rejets.py`) : sur 943 paires rejetées, 156 des 159 rattachements par identifiant venaient de HAL ou de ScanR. Les 784 rattachements par le nom viennent surtout des grandes collaborations : 585 publications de plus de 100 contributions.
+- Décisions de l'administration sur la file (`decisions.py`) : les 17 groupes rejetés reposaient sur un identifiant de HAL ou de ScanR. 7 des 13 groupes confirmés comptaient des rattachements par le nom. Le jeu de validation compte deux homonymes du périmètre ; les autres confusions portent sur l'initiale du prénom.
 
 ## Décisions
 
@@ -68,6 +70,7 @@ Mesures de la relecture de la file :
 - Une personne exclue (fausse entité, hors périmètre) sort des deux détections.
 - Une contribution dont une adresse est rattachée à une structure de la fiche RH n'est jamais signalée, quelle que soit la source de l'adresse. Les structures HAL ne comptent pas : les sources les recopient.
 - La ressemblance aux rejets écarte l'indice des années d'activité.
+- Dans un cluster, seules sont signalables les contributions rattachées par IdRef ou idHAL, et celles rattachées par le nom dans une publication de plus de 100 contributions.
 - La partition utilise la bibliothèque `igraph`.
 - Une phase placée après `persons` recalcule à chaque run la table `persons.suspect_contributions` : contribution, personne, motif, cluster.
 - La détection signale à l'administration, qui décide. Aucun détachement automatique.
