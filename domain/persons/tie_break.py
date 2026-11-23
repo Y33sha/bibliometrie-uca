@@ -3,7 +3,7 @@
 Les indices s'examinent dans l'ordre de `_CASCADE`. Chaque indice compare la contribution aux autres publications de chaque personne candidate. Le premier indice partagé par une seule personne candidate la désigne. Sans indice décisif, la contribution reste sans personne.
 """
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 
 from domain.persons.contribution_matching import (
@@ -89,11 +89,14 @@ def break_tie(
     decision: ContributionDecision,
     context: ContributionContext,
     profiles: Mapping[int, Sequence[ContributionContext]],
+    *,
+    skipped: Collection[ContributionMatchReason] = (),
 ) -> ContributionDecision:
     """Rattache une contribution à forme de nom ambiguë à la personne candidate désignée par le premier indice décisif. Renvoie la décision inchangée pour une autre décision, ou sans indice décisif.
 
     Args:
         profiles: contextes des contributions de chaque personne candidate, hors rattachement par départage.
+        skipped: indices écartés de la cascade.
     """
     if decision.reason != ContributionSkipReason.AMBIGUOUS_NAME_FORM:
         return decision
@@ -107,6 +110,8 @@ def break_tie(
         for person_id in sorted(candidates)
     }
     for reason, shares in _CASCADE:
+        if reason in skipped:
+            continue
         sharing = [person_id for person_id, own in others.items() if shares(context, own)]
         if len(sharing) == 1:
             return ContributionDecision(

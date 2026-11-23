@@ -111,6 +111,13 @@ def test_une_publication_proche_des_publications_rejetees_leur_ressemble():
     assert not resembles_rejected(99, _context(6, persons={10}), own, rejected)
 
 
+def test_les_seules_annees_d_activite_ne_rapprochent_pas_des_publications_rejetees():
+    """Une personne sans autre publication comparable partage seulement ses années avec les rejets."""
+    rejected = [_context(2, persons={20}, year=2025)]
+
+    assert not resembles_rejected(99, _context(3, persons={30}, year=2026), [], rejected)
+
+
 def test_une_publication_sans_indice_decisif_ne_ressemble_pas_aux_publications_rejetees():
     own = [_context(1, persons={10})]
     rejected = [_context(2, persons={20})]

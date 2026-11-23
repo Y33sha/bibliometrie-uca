@@ -173,6 +173,11 @@ def signaled_clusters(
 _REJECTED_PROFILE = -1
 """Candidat fictif de la cascade de départage, porteur du profil des publications rejetées."""
 
+RESEMBLANCE_SKIPPED_REASONS: frozenset[ContributionMatchReason] = frozenset(
+    {ContributionMatchReason.ACTIVITY_YEARS}
+)
+"""Indices de la cascade écartés de la ressemblance avec les publications rejetées. Une personne sans autre publication comparable ressemblerait aux rejets par ses seules années."""
+
 
 def resembles_rejected(
     person_id: int,
@@ -180,11 +185,12 @@ def resembles_rejected(
     own_profile: Sequence[ContributionContext],
     rejected_profile: Sequence[ContributionContext],
 ) -> bool:
-    """Indique si la cascade de départage désigne le profil des publications rejetées pour la personne plutôt que son propre profil."""
+    """Indique si la cascade de départage, hors `RESEMBLANCE_SKIPPED_REASONS`, désigne le profil des publications rejetées pour la personne plutôt que son propre profil."""
     decision = ContributionDecision(
         ContributionOutcome.SKIP,
         reason=ContributionSkipReason.AMBIGUOUS_NAME_FORM,
         candidates=frozenset({person_id, _REJECTED_PROFILE}),
     )
     profiles = {person_id: own_profile, _REJECTED_PROFILE: rejected_profile}
-    return break_tie(decision, context, profiles).person_id == _REJECTED_PROFILE
+    decided = break_tie(decision, context, profiles, skipped=RESEMBLANCE_SKIPPED_REASONS)
+    return decided.person_id == _REJECTED_PROFILE
