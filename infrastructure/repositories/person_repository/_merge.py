@@ -122,6 +122,8 @@ MERGE_STEPS: dict[str, MergeStep] = {
         "persons", "last_name", "first_name", "last_name_normalized", "first_name_normalized"
     ),
     "created_at": untouched("persons", "created_at"),
+    # Table recalculée à chaque run : les lignes de l'absorbée disparaissent avec elle (`ON DELETE CASCADE`).
+    "suspect_contributions": untouched("suspect_contributions", "person_id"),
     "exclusion": MergeStep((("persons", "exclusion"),), _merge_exclusion, decision=True),
 }
 """Ordre d'exécution : les rejets et les confirmations sont transférés avant que le rejet l'emporte (`merge_into`)."""
