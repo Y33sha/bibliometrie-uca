@@ -9,7 +9,7 @@
 ARG ROOT_PATH=
 
 # ---- Étape 1 : build du frontend ----
-FROM node:26-slim@sha256:36793bcbb160a6a16cede1e62b93f84e26b78a972a8a4c0b879c1c12f22761ec AS frontend-build
+FROM node:26-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS frontend-build
 
 ARG ROOT_PATH
 ENV BASE_PATH=$ROOT_PATH
@@ -21,10 +21,10 @@ COPY interfaces/frontend/ .
 RUN npm run build
 
 # ---- Étape 2 : binaire uv ----
-FROM ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.9@sha256:d3b601f0c7b118bc1753febf7c41cc80981df678445e0254284eecf84db79a7d AS uv
 
 # ---- Étape 3 : image Python finale ----
-FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
+FROM python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f
 
 ARG ROOT_PATH
 ENV ROOT_PATH=$ROOT_PATH
