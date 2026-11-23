@@ -26,8 +26,6 @@ class SourceExtra(StrEnum):
     """Forme de présentation d'un `posted-content` (Crossref : `oral`, `pico`, `display`)."""
     REFERENCES_COUNT = "references_count"
     """Nombre de références (Crossref)."""
-    INDEXED = "indexed"
-    """Date d'indexation (Crossref)."""
     PROCEEDINGS = "proceedings"
     """Indicateur « avec actes » (HAL)."""
     SERIES = "series"

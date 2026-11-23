@@ -144,7 +144,7 @@ class TestExtractCrossrefMeta:
             "funder": [{"name": "ANR"}],
             "relation": {"is-supplemented-by": []},
             "references-count": 42,
-            "indexed": {"timestamp": 1234567890},
+            "indexed": {"timestamp": 1234567890},  # hors de la liste des champs conservés
             "title": ["ignored"],  # hors de la liste des champs conservés
             "license": [{"URL": "https://x"}],  # hors de la liste des champs conservés
         }
@@ -154,7 +154,6 @@ class TestExtractCrossrefMeta:
             "funder": [{"name": "ANR"}],
             "relation": {"is-supplemented-by": []},
             "references_count": 42,
-            "indexed": 1234567890,
         }
 
     def test_drops_zero_references_count(self):
@@ -163,10 +162,6 @@ class TestExtractCrossrefMeta:
 
     def test_keeps_a_single_reference(self):
         assert extract_crossref_source_extras({"references-count": 1}) == {"references_count": 1}
-
-    def test_falls_back_to_indexed_date_time(self):
-        meta = extract_crossref_source_extras({"indexed": {"date-time": "2024-01-01T00:00:00Z"}})
-        assert meta == {"indexed": "2024-01-01T00:00:00Z"}
 
     def test_returns_none_when_empty(self):
         assert extract_crossref_source_extras({}) is None

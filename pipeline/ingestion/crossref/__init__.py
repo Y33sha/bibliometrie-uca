@@ -9,6 +9,7 @@ from domain.documents.identifiers import DOI
 from domain.sources.registry import Source
 from domain.types import JsonValue, as_str
 from pipeline.ingestion.common.adapter import PayloadReader, RecordIdentity
+from pipeline.ingestion.crossref.hash_normalize import strip_volatile_for_hash
 
 
 def _identify(record: Mapping[str, JsonValue]) -> RecordIdentity | None:
@@ -20,4 +21,5 @@ def _identify(record: Mapping[str, JsonValue]) -> RecordIdentity | None:
 READER = PayloadReader(
     source=Source.CROSSREF,
     identify=_identify,
+    strip_volatile=strip_volatile_for_hash,
 )

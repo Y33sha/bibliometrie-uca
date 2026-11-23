@@ -120,7 +120,7 @@ def extract_crossref_updates(msg: Mapping[str, JsonValue]) -> dict[str, JsonValu
 
 
 def extract_crossref_source_extras(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
-    """Renvoie les champs propres à Crossref gardés dans `source_records.source_extras` : financeurs, relations, mises à jour, congrès, titre de groupe d'un `posted-content`, nombre de références s'il est positif, date d'indexation. Le reste du payload est écarté.
+    """Renvoie les champs propres à Crossref gardés dans `source_records.source_extras` : financeurs, relations, mises à jour, congrès, titre de groupe d'un `posted-content`, nombre de références s'il est positif. Le reste du payload est écarté.
 
     Les relations et les mises à jour servent à la phase `relations`.
     """
@@ -138,9 +138,4 @@ def extract_crossref_source_extras(msg: Mapping[str, JsonValue]) -> Mapping[str,
     refs_count = msg.get("references-count")
     if isinstance(refs_count, int) and refs_count > 0:
         source_extras[SourceExtra.REFERENCES_COUNT] = refs_count
-    indexed = msg.get("indexed") or {}
-    if isinstance(indexed, dict):
-        ts = indexed.get("timestamp") or indexed.get("date-time")
-        if ts:
-            source_extras[SourceExtra.INDEXED] = ts
     return source_extras or None
