@@ -34,6 +34,19 @@ _RETAINED_PERSONS = "SELECT id FROM persons WHERE exclusion IS NULL"
 """Personnes examinées : une personne exclue (fausse entité, hors périmètre) est écartée de la détection."""
 
 
+def _orcid_given_by(source_condition: str) -> str:
+    """Renvoie la condition SQL : une contribution source de la contribution `g`, de source `source_condition`, comporte un ORCID non rejeté de la personne."""
+    return f"""
+        EXISTS (SELECT 1 FROM aligned_source_contributions gm
+                JOIN source_contributions sc ON sc.id = gm.source_contribution_id
+                JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+                JOIN person_identifiers pi
+                  ON pi.person_id = g.person_id AND pi.id_type = 'orcid' AND pi.status::text <> 'rejected'
+                 AND ci.identifiers->>'orcid' = pi.id_value
+                WHERE gm.contribution_id = g.id AND sc.source::text {source_condition})
+    """
+
+
 def _subjects(vocabulary: str, level: int) -> str:
     return f"""
         ARRAY(SELECT ps.subject_id FROM publication_subjects ps JOIN subjects s ON s.id = ps.subject_id
@@ -50,6 +63,7 @@ _CLUES_SQL = f"""
                    JOIN address_structures ast ON ast.address_id = sca.address_id
                    JOIN hr_periods hp ON hp.structure_id = ast.structure_id AND hp.person_id = g.person_id
                    WHERE gm.contribution_id = g.id) AS confirmed,
+           {_orcid_given_by("= 'hal'")} AND NOT {_orcid_given_by("<> 'hal'")} AS orcid_from_hal_only,
            p.serial_id,
            ARRAY(SELECT o.person_id FROM contributions o
                  WHERE o.publication_id = g.publication_id AND o.id <> g.id
@@ -91,6 +105,7 @@ def fetch_publication_clues(conn: Connection) -> dict[int, list[PublicationClues
                 frozenset(clues),
                 contribution_count=r.contribution_count,
                 confirmed=r.confirmed,
+                orcid_from_hal_only=r.orcid_from_hal_only,
             )
         )
     return by_person

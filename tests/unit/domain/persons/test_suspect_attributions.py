@@ -113,6 +113,15 @@ def test_un_cluster_signale_omet_ses_publications_confirmees():
     assert clusters == [[5, 6, 7]]
 
 
+def test_un_orcid_donne_par_hal_seulement_vaut_un_identifiant_hal():
+    """Le cluster isolé, rattaché par un ORCID venu de HAL seulement, perd son ancrage et devient signalable."""
+    publications = _person(isolated_anchored=True)
+    publications[3] = replace(publications[3], orcid_from_hal_only=True)
+
+    assert not publications[3].anchored
+    assert signaled_clusters(publications, _FREQUENCIES, _labels(0, 0, 0, 1, 1, 1)) == [[4, 5, 6]]
+
+
 def test_un_rattachement_par_le_nom_n_est_pas_signale():
     publications = _person()
     publications[3] = replace(publications[3], mode=ContributionMatchReason.NAME)

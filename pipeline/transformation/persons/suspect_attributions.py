@@ -146,6 +146,8 @@ _CHILDREN = (
             "persons",
             "hr_records",
             "hr_periods",
+            "person_identifiers",
+            "source_contributions.source",
             "source_contribution_addresses",
             "address_structures",
             "rejected_contributions",

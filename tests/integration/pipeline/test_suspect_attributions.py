@@ -18,6 +18,7 @@ from tests.integration.helpers.persons import (
     insert_hr_period,
     insert_hr_record,
     insert_person,
+    insert_person_identifier,
     insert_rejected_contribution,
 )
 from tests.integration.helpers.publications import insert_publication
@@ -51,8 +52,8 @@ def _suspects(conn):
     ).all()
 
 
-def _isolated_cluster(conn):
-    """Sème une personne à fiche RH : trois publications ancrées dans une revue, trois autres dans une autre revue. Renvoie (personne, [(publication, contribution)] du cluster isolé)."""
+def _isolated_cluster(conn, mode="idref"):
+    """Sème une personne à fiche RH : trois publications ancrées dans une revue, trois autres dans une autre revue, rattachées par `mode`. Renvoie (personne, [(publication, contribution)] du cluster isolé)."""
     person = insert_person(conn, "Morel", first_name="Laurent")
     insert_hr_record(conn, person)
     own_serial = insert_serial(conn, "Biologie cellulaire")
@@ -62,8 +63,44 @@ def _isolated_cluster(conn):
     isolated = []
     for _ in range(3):
         publication = insert_publication(conn, serial_id=other_serial)
-        isolated.append((publication, _contribution(conn, publication, person, "idref")))
+        isolated.append((publication, _contribution(conn, publication, person, mode)))
     return person, isolated
+
+
+_ORCID = "0000-0002-1825-0097"
+
+
+def _orcid_given_by(conn, person, isolated, sources):
+    """Donne l'ORCID confirmé de la personne aux contributions du cluster isolé, par une contribution source de chaque source de `sources`."""
+    insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="confirmed")
+    for publication, contribution in isolated:
+        for source in sources:
+            source_record = insert_source_record(
+                conn, publication, source=source, source_id=f"{source}-{publication}"
+            )
+            source_contribution = insert_source_contribution(
+                conn, source_record, source=source, identifiers={"orcid": _ORCID}
+            )
+            add_aligned_source_contribution(conn, contribution, source_contribution, source_record)
+
+
+def test_un_orcid_donne_par_hal_seulement_est_signalable(sa_sync_conn):
+    """HAL donne l'ORCID du compte relié par HAL à la contribution : le rattachement vaut un idHAL."""
+    person, isolated = _isolated_cluster(sa_sync_conn, mode="orcid")
+    _orcid_given_by(sa_sync_conn, person, isolated, ["hal"])
+
+    detect(sa_sync_conn, _LOGGER)
+
+    assert _suspects(sa_sync_conn) == [(c, person, "cluster", 1) for _, c in isolated]
+
+
+def test_un_orcid_donne_aussi_par_une_autre_source_ancre_la_publication(sa_sync_conn):
+    person, isolated = _isolated_cluster(sa_sync_conn, mode="orcid")
+    _orcid_given_by(sa_sync_conn, person, isolated, ["hal", "openalex"])
+
+    detect(sa_sync_conn, _LOGGER)
+
+    assert _suspects(sa_sync_conn) == []
 
 
 def test_un_cluster_isole_d_une_personne_a_fiche_rh_est_signale(sa_sync_conn):

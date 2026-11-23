@@ -79,18 +79,27 @@ class PublicationClues:
     """Contributions de la publication."""
     confirmed: bool = False
     """Une adresse de la contribution est rattachée à une structure de la fiche RH de la personne."""
+    orcid_from_hal_only: bool = False
+    """Seul HAL donne l'ORCID du rattachement : il vient du compte HAL relié par HAL à la contribution, comme un idHAL."""
+
+    @property
+    def _hal_orcid(self) -> bool:
+        return self.mode == ContributionMatchReason.ORCID and self.orcid_from_hal_only
 
     @property
     def anchored(self) -> bool:
-        return self.mode in ANCHOR_MODES
+        """Vrai pour un rattachement par `ANCHOR_MODES`, hors ORCID donné par HAL seulement."""
+        return self.mode in ANCHOR_MODES and not self._hal_orcid
 
     @property
     def signalable(self) -> bool:
-        """Vrai pour une contribution non confirmée, rattachée par `SIGNALABLE_IDENTIFIER_MODES`, ou par le nom dans une grande collaboration."""
+        """Vrai pour une contribution non confirmée, rattachée par `SIGNALABLE_IDENTIFIER_MODES` ou par un ORCID donné par HAL seulement, ou par le nom dans une grande collaboration."""
         if self.confirmed:
             return False
-        return self.mode in SIGNALABLE_IDENTIFIER_MODES or (
-            self.mode in NAME_BASED_REASONS and self.contribution_count > LARGE_COLLABORATION
+        return (
+            self.mode in SIGNALABLE_IDENTIFIER_MODES
+            or self._hal_orcid
+            or (self.mode in NAME_BASED_REASONS and self.contribution_count > LARGE_COLLABORATION)
         )
 
 
