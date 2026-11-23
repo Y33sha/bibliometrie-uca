@@ -22,9 +22,28 @@ _PARENTHETICAL_RE = re.compile(r"\s*[(\[][^()\[\]]*[)\]]")
 """Segment entre parenthèses ou crochets d'un nom de personne."""
 
 
+_EXPANDED_INITIALS_RE = re.compile(r"((?:\b\w\.[\s-]*)+)\(([^()\[\]]+)\)")
+"""Initiales suivies d'un segment entre parenthèses : « T. (Truc) », « J.-P. (Jean-Pierre) »."""
+
+
+def _expand_initials(match: re.Match[str]) -> str:
+    """Renvoie le prénom complet entre parenthèses quand ses mots commencent par les initiales qui le précèdent, sinon le texte inchangé."""
+    initials = [c.lower() for c in match.group(1) if c.isalpha()]
+    full = match.group(2).strip()
+    words = full.replace("-", " ").split()
+    if (
+        words
+        and all(len(w.rstrip(".")) > 1 for w in words)
+        and [w[0].lower() for w in words] == initials
+    ):
+        return f"{full} "
+    return match.group(0)
+
+
 def _without_parentheses(name: str) -> str:
-    """Renvoie le nom sans ses segments entre parenthèses ou crochets : annotation (« Christophe (author) », « (†) »), redite de l'initiale (« Genova, F. (F.) »), surnom (« Wai Cheng (Mike) Thang »), nom de naissance (« Churakova (Sidorova) »). Un nom réduit à ces segments reste tel quel."""
-    return " ".join(_PARENTHETICAL_RE.sub(" ", name).split()) or name
+    """Renvoie le nom sans ses segments entre parenthèses ou crochets : annotation (« Christophe (author) », « (†) »), redite de l'initiale (« Genova, F. (F.) »), surnom (« Wai Cheng (Mike) Thang »), nom de naissance (« Churakova (Sidorova) »). Des initiales suivies du prénom complet entre parenthèses donnent le prénom complet : « Grivaux, S. (Sophie) » devient « Grivaux, Sophie ». Un nom réduit à ces segments reste tel quel."""
+    expanded = _EXPANDED_INITIALS_RE.sub(_expand_initials, name)
+    return " ".join(_PARENTHETICAL_RE.sub(" ", expanded).split()) or name
 
 
 def _is_placeholder_name(name: str) -> bool:
