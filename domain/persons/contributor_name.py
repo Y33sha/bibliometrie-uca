@@ -18,6 +18,15 @@ _PLACEHOLDER_RE = re.compile(
 """Mot écrit par une source à la place d'un nom absent : code DataCite de valeur inconnue (« (:unap) », « :unkn »), « None », « null »."""
 
 
+_PARENTHETICAL_RE = re.compile(r"\s*[(\[][^()\[\]]*[)\]]")
+"""Segment entre parenthèses ou crochets d'un nom de personne."""
+
+
+def _without_parentheses(name: str) -> str:
+    """Renvoie le nom sans ses segments entre parenthèses ou crochets : annotation (« Christophe (author) », « (†) »), redite de l'initiale (« Genova, F. (F.) »), surnom (« Wai Cheng (Mike) Thang »), nom de naissance (« Churakova (Sidorova) »). Un nom réduit à ces segments reste tel quel."""
+    return " ".join(_PARENTHETICAL_RE.sub(" ", name).split()) or name
+
+
 def _is_placeholder_name(name: str) -> bool:
     """Vrai si le nom se compose seulement de mots écrits à la place d'un nom absent (« (:Unap) », « None, None »). « Paolo None » est un nom réel."""
     words = [w for w in re.split(r"[\s,]+", name) if w]
@@ -70,16 +79,17 @@ class ContributorName:
         return cls(raw=raw)
 
     def split(self) -> tuple[str, str]:
-        """Renvoie le nom de famille et le prénom : ceux de la source, sinon un découpage de la chaîne brute. Un nom de famille réduit à des initiales passe en prénom."""
+        """Renvoie le nom de famille et le prénom, sans segments entre parenthèses (`_without_parentheses`) : ceux de la source, sinon un découpage de la chaîne brute. Un nom de famille réduit à des initiales passe en prénom."""
         if self.last_name is not None:
-            return orient_initials(self.last_name, self.first_name or "")
-        return parse_raw_author_name(self.raw)
+            first = _without_parentheses(self.first_name) if self.first_name else ""
+            return orient_initials(_without_parentheses(self.last_name), first)
+        return parse_raw_author_name(_without_parentheses(self.raw or ""))
 
     def splits(self) -> list[tuple[str, str]]:
-        """Renvoie les découpages possibles en nom de famille et prénom : celui de la source, sinon tous ceux de la chaîne brute."""
+        """Renvoie les découpages possibles en nom de famille et prénom, sans segments entre parenthèses : celui de la source, sinon tous ceux de la chaîne brute."""
         if self.last_name is not None:
             return [self.split()]
-        return family_name_splits(self.raw)
+        return family_name_splits(_without_parentheses(self.raw or ""))
 
     def first_name_for(self, last_name: str) -> str | None:
         """Renvoie le prénom du découpage de nom de famille `last_name`, `None` sans un tel découpage."""
