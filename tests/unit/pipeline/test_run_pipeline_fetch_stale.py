@@ -24,23 +24,30 @@ def _run_phase(options: RunOptions) -> PhaseMetrics:
     )
 
 
-def _called_targets(stack) -> MagicMock:
-    """Simule les entrées-sorties de la phase `fetch_stale` ; renvoie le mock de `_run_fetch_stale`, appelé pour chaque source rafraîchie."""
-    run_one = stack.enter_context(
-        patch.object(fetch_stale, "_run_fetch_stale", return_value=PhaseMetrics())
-    )
-    # Fenêtre d'années simulée : `window_years` lit la configuration en base.
+def _simulate_config(stack) -> None:
+    """Simule la base et les réglages lus dans la table `config` : fenêtre d'années, délai et plafond de chaque source."""
     stack.enter_context(
         patch("pipeline.runtime.execution.get_sync_engine", return_value=MagicMock())
     )
     stack.enter_context(
-        patch(
-            "pipeline.ingestion.common.fetch_stale.window_years",
+        patch.object(
+            fetch_stale,
+            "window_years",
             side_effect=lambda conn, years: (
                 list(range(years[0], years[1] + 1)) if years else [2024]
             ),
         )
     )
+    stack.enter_context(patch.object(fetch_stale, "delay_for_source", return_value=30))
+    stack.enter_context(patch.object(fetch_stale, "cap", return_value=None))
+
+
+def _called_targets(stack) -> MagicMock:
+    """Simule les entrées-sorties de la phase `fetch_stale` ; renvoie le mock de `_run_fetch_stale`, appelé pour chaque source rafraîchie."""
+    run_one = stack.enter_context(
+        patch.object(fetch_stale, "_run_fetch_stale", return_value=PhaseMetrics())
+    )
+    _simulate_config(stack)
     return run_one
 
 
@@ -105,18 +112,8 @@ def test_la_relecture_d_une_source_tourne_sous_son_circuit_breaker():
         return PhaseMetrics()
 
     with ExitStack() as stack:
-        stack.enter_context(patch("pipeline.ingestion.common.fetch_stale.refresh", new=refresh))
-        stack.enter_context(
-            patch("pipeline.runtime.execution.get_sync_engine", return_value=MagicMock())
-        )
-        stack.enter_context(
-            patch(
-                "pipeline.ingestion.common.fetch_stale.window_years",
-                side_effect=lambda conn, years: (
-                    list(range(years[0], years[1] + 1)) if years else [2024]
-                ),
-            )
-        )
+        stack.enter_context(patch.object(fetch_stale, "refresh", new=refresh))
+        _simulate_config(stack)
         _run_phase(RunOptions(sources={"hal"}))
 
     assert sources == ["hal"]
