@@ -52,10 +52,11 @@ Mesures de la phase 1 (`data/experiments/fausses-attributions/`). Jeu de validat
 Mesures de la relecture de la file :
 
 - Contradictions au rattachement (`contradictions.py`) : 154 contributions rattachées par IdRef et 175 par idHAL comportent un ORCID autre que celui de la personne, ou un prénom complet incompatible. Seules, ces contradictions sont surtout du bruit : noms d'usage, erreurs ponctuelles des sources, ORCID donné par HAL sur de vraies publications. Aucune règle au rattachement.
-- Contre-indices des clusters (`contre_indices.py`, `coauteurs_perimetre.py`, `labo_independant.py`), sur 17 fausses attributions confirmées, 11 fausses alertes et 12 groupes de rejets du jeu de validation :
+- Contre-indices des clusters (`contre_indices.py`, `coauteurs_perimetre.py`, `labo_independant.py`), sur 17 fausses attributions vérifiées, 11 fausses alertes et 12 groupes de rejets du jeu de validation :
   - coauteurs à fiche RH : présents dans les rejets des grandes collaborations, inutilisables ;
   - part des coauteurs du périmètre : au moins 0,5 pour 6 fausses alertes, mais aussi pour 5 homonymes du périmètre ;
   - adresse rattachée au laboratoire de la fiche RH : écarte 4 fausses alertes, sans perdre aucune fausse attribution ni aucun groupe de rejets.
+  - adresse rattachée à une structure du périmètre (`adresse_perimetre.py`) : écarte 3 clusters de plus, tous de la personne. Le jeu de validation perd 4 petits groupes de confusions d'initiale.
 - Ressemblance aux rejets sans l'indice des années d'activité (`sans_annees.py`) : même rappel, une fausse alerte de moins.
 - Sources des rejets (`sources_des_rejets.py`) : sur 943 paires rejetées, 156 des 159 rattachements par identifiant venaient de HAL ou de ScanR. Les 784 rattachements par le nom viennent surtout des grandes collaborations : 585 publications de plus de 100 contributions.
 - Décisions de l'administration sur la file (`decisions.py`) : les 17 groupes rejetés reposaient sur un identifiant de HAL ou de ScanR. 7 des 13 groupes confirmés comptaient des rattachements par le nom. Le jeu de validation compte deux homonymes du périmètre ; les autres confusions portent sur l'initiale du prénom.
@@ -68,7 +69,7 @@ Mesures de la relecture de la file :
 - Le profil de comparaison d'une personne réunit les publications rejetées pour elle, quel que soit le détenteur de la contribution à son nom. Il se calcule depuis les rejets.
 - Les rôles de jury de thèse restent hors du graphe. Une thèse dont la personne est l'auteur y figure.
 - Une personne exclue (fausse entité, hors périmètre) sort des deux détections.
-- Une contribution dont une adresse est rattachée à une structure de la fiche RH n'est jamais signalée, quelle que soit la source de l'adresse. Les structures HAL ne comptent pas : les sources les recopient.
+- Une contribution dont une adresse est rattachée à une structure du périmètre n'est pas signalée, quelle que soit la source de l'adresse. Les structures HAL ne comptent pas : les sources les recopient.
 - La ressemblance aux rejets écarte l'indice des années d'activité.
 - Dans un cluster, seules sont signalables les contributions rattachées par IdRef ou idHAL, et celles rattachées par le nom dans une publication de plus de 100 contributions.
 - Un rattachement par un ORCID donné par HAL seulement vaut un idHAL : il est signalable et n'ancre pas la publication. HAL donne l'ORCID du compte relié par HAL à la contribution.
