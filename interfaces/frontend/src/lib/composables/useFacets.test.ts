@@ -96,7 +96,7 @@ describe('useFacets', () => {
 
 	it('garde les options fixes, avant comme après le chargement', async () => {
 		apiResponse = {};
-		const fixed = [{ value: 'none', text: 'Retenue' }];
+		const fixed = [{ value: 'none', text: 'Valide' }];
 		const f = useFacets({
 			endpoint: '/x',
 			apiKey: 'k',

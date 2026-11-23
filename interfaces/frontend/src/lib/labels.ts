@@ -117,6 +117,9 @@ export const identifierTypeLabels: Record<string, string> = {
 	crossref_member: 'Membre Crossref'
 };
 
+/** Types d'identifiant d'une personne, dans l'ordre d'affichage. L'idHAL, le plus souvent absent, vient en dernier. */
+export const PERSON_IDENTIFIER_TYPES = ['orcid', 'idref', 'idhal'] as const;
+
 /** Libellé d'un type d'identifiant, sinon la valeur brute. */
 export function identifierTypeLabel(idType: string): string {
 	return identifierTypeLabels[idType] ?? idType;
@@ -140,9 +143,12 @@ export const resolutionModeLabels: Record<string, string> = {
 
 /** Libellés FR des motifs d'exclusion d'une personne — enum PG `person_exclusion`. */
 export const personExclusionLabels: Record<PersonExclusion, string> = {
-	not_a_person: 'Fausse entité',
+	not_a_person: 'Collectivité',
 	out_of_perimeter: 'Hors périmètre'
 };
+
+/** Libellé FR du statut d'une personne sans motif d'exclusion. */
+export const PERSON_VALID_LABEL = 'Valide';
 
 /** Libellés FR des catégories de personnel de l'export RH (`hr_records.staff_category`). Une catégorie absente s'affiche telle quelle. */
 export const staffCategoryLabels: Record<string, string> = {

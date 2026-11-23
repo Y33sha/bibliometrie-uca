@@ -1,9 +1,9 @@
 /**
- * Registre des filtres de l'annuaire des personnes. La session admin y gagne les filtres À confirmer et Exclusions ; hors session admin, l'annuaire retient les personnes non exclues.
+ * Registre des filtres de l'annuaire des personnes. La session admin y gagne les filtres À confirmer et Statut ; hors session admin, l'annuaire retient les personnes valides.
  */
 import type { FilterGroup, ListFilter } from '#lib/filterRegistry.js';
 import { IDENTIFIER_ITEMS, PENDING_ITEMS } from '#lib/filterItems.js';
-import { filterLabels, personExclusionLabels, staffCategoryLabels } from '#lib/labels.js';
+import { filterLabels, PERSON_VALID_LABEL, personExclusionLabels, staffCategoryLabels } from '#lib/labels.js';
 import { isAdmin } from '#lib/session.svelte.js';
 
 /** Rubriques du panneau des filtres des personnes, dans l'ordre d'affichage. */
@@ -78,14 +78,14 @@ export function personFilters(labId?: number, labHasMembers = true): ListFilter[
 		{
 			key: 'exclusion',
 			control: 'checkbox',
-			label: 'Exclusions',
+			label: 'Statut',
 			param: 'exclusion',
 			group: 'curation',
-			// `none` désigne les personnes retenues, comme dans le paramètre `exclusion` de l'API.
+			// `none` désigne les personnes valides, comme dans le paramètre `exclusion` de l'API.
 			facet: {
 				type: 'fixed',
 				options: [
-					{ value: 'none', text: 'Retenue' },
+					{ value: 'none', text: PERSON_VALID_LABEL },
 					...Object.entries(personExclusionLabels).map(([value, text]) => ({ value, text })),
 				],
 			},

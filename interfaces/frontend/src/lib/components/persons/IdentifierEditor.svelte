@@ -5,7 +5,7 @@
   import StatusToggles from "#lib/components/StatusToggles.svelte";
   import RejectedFold from "./RejectedFold.svelte";
   import { autofocus } from "#lib/actions/focus.js";
-  import { identifierTypeLabel } from "#lib/labels.js";
+  import { identifierTypeLabel, PERSON_IDENTIFIER_TYPES } from "#lib/labels.js";
   import type { IdFormState, Person, PersonIdentifier } from "./types";
   import IconButton from "#lib/components/IconButton.svelte";
 
@@ -83,7 +83,7 @@
 {#if form}
   <div class="id-form">
     <select class="select" aria-label="Type d'identifiant" bind:value={form.id_type}>
-      {#each ["orcid", "idhal", "idref"] as idType (idType)}
+      {#each PERSON_IDENTIFIER_TYPES as idType (idType)}
         <option value={idType}>{identifierTypeLabel(idType)}</option>
       {/each}
     </select>
