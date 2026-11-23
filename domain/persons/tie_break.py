@@ -3,7 +3,7 @@
 Les indices s'examinent dans l'ordre de `_CASCADE`. Chaque indice compare la contribution aux autres publications de chaque personne candidate. Le premier indice partagé par une seule personne candidate la désigne. Sans indice décisif, la contribution reste sans personne.
 """
 
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Hashable, Mapping, Sequence
 from dataclasses import dataclass, replace
 
 from domain.persons.contribution_matching import (
@@ -31,8 +31,8 @@ class ContributionContext:
     """Contexte d'une contribution dans sa publication."""
 
     publication_id: int
-    persons: frozenset[int]
-    """Personnes rattachées aux autres contributions de la publication, hors rattachement par départage."""
+    persons: frozenset[Hashable]
+    """Coauteurs de la publication : personnes rattachées aux autres contributions, hors rattachement par départage. La détection des attributions suspectes y place des clés de nom (`coauthor_key`)."""
     laboratories: frozenset[int]
     """Structures du référentiel de ses contributions sources, de type `TIE_BREAK_STRUCTURE_TYPES`."""
     hal_structures: frozenset[int]

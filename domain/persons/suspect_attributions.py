@@ -211,6 +211,11 @@ def signaled_clusters(
     return signaled
 
 
+def coauthor_key(last_name_normalized: str, first_name_normalized: str | None) -> tuple[str, str]:
+    """Renvoie la clé d'un coauteur dans la ressemblance aux rejets : nom de famille normalisé et initiale du prénom. La clé retrouve un coauteur d'une source à l'autre, prénom complet ou réduit à l'initiale."""
+    return (last_name_normalized, (first_name_normalized or "")[:1])
+
+
 _REJECTED_PROFILE = -1
 """Candidat fictif de la cascade de départage, porteur du profil des publications rejetées."""
 

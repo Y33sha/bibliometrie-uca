@@ -125,37 +125,63 @@ def test_une_publication_a_adresse_du_perimetre_n_est_pas_signalee(sa_sync_conn)
     assert _suspects(sa_sync_conn) == []
 
 
+def _authored(conn, coauthors, *, person=None, mode="name"):
+    """Sème une publication signée « Marie Durand » et les coauteurs `coauthors` (nom, prénom), dans un enregistrement source HAL. La contribution de Marie Durand est rattachée à `person` par `mode`, ou laissée sans personne. Renvoie (publication, contribution de Marie Durand)."""
+    publication = insert_publication(conn)
+    source_record = insert_source_record(conn, publication, source_id=f"hal-{publication}")
+    names = [("Durand", "Marie"), *coauthors]
+    source_contributions = [
+        insert_source_contribution(
+            conn,
+            source_record,
+            author_position=position,
+            raw_last_name=last,
+            raw_first_name=first,
+            contributor_information_id=upsert_split_contributor_information(
+                conn, last.lower(), first.lower()
+            ),
+        )
+        for position, (last, first) in enumerate(names)
+    ]
+    contribution = align_source_contributions(
+        conn, publication, [(source_contributions[0], source_record)]
+    )
+    if person is not None:
+        conn.execute(
+            text(
+                "UPDATE contributions SET person_id = :p, resolution_mode = CAST(:m AS resolution_mode) WHERE id = :g"
+            ),
+            {"p": person, "m": mode, "g": contribution},
+        )
+    return publication, contribution
+
+
 def _resembling_rejected(conn, *, exclusion=None):
     """Sème une personne, une publication rejetée pour elle et une publication qui partage un coauteur avec le rejet. Renvoie (personne, contribution de la publication proche du rejet)."""
     person = insert_person(conn, "Durand", first_name="Marie", exclusion=exclusion)
-    colleague, other_colleague, namesake_coauthor = (
-        insert_person(conn, name) for name in ("Collègue", "Autre", "Coauteur")
-    )
-    for coauthor in (colleague, other_colleague):
-        publication = insert_publication(conn)
-        _contribution(conn, publication, person, "orcid")
-        _contribution(conn, publication, coauthor)
-
-    rejected = insert_publication(conn)
-    source_record = insert_source_record(conn, rejected, source_id="hal-rejet")
-    namesake = insert_source_contribution(
-        conn,
-        source_record,
-        raw_last_name="Durand",
-        raw_first_name="Marie",
-        contributor_information_id=upsert_split_contributor_information(conn, "durand", "marie"),
-    )
-    align_source_contributions(conn, rejected, [(namesake, source_record)])
-    _contribution(conn, rejected, namesake_coauthor)
+    for colleague in (("Collègue", "Jean"), ("Autre", "Paul")):
+        _authored(conn, [colleague], person=person, mode="orcid")
+    rejected, _ = _authored(conn, [("Homonyme", "Coauteur")])
     insert_rejected_contribution(conn, rejected, person_id=person)
-
-    resembling = insert_publication(conn)
-    suspect = _contribution(conn, resembling, person, "name")
-    _contribution(conn, resembling, namesake_coauthor)
-    genuine = insert_publication(conn)
-    _contribution(conn, genuine, person, "name")
-    _contribution(conn, genuine, colleague)
+    _, suspect = _authored(conn, [("Homonyme", "Coauteur")], person=person)
+    _authored(conn, [("Collègue", "Jean")], person=person)
     return person, suspect
+
+
+def test_un_rejet_dont_la_publication_est_purgee_compte_encore(sa_sync_conn):
+    """L'enregistrement source rejeté a perdu sa publication : ses coauteurs nommés forment encore le profil des rejets."""
+    person, suspect = _resembling_rejected(sa_sync_conn)
+    sa_sync_conn.execute(
+        text(
+            "UPDATE source_records SET publication_id = NULL WHERE publication_id IN ("
+            "SELECT sr.publication_id FROM rejected_contributions rc "
+            "JOIN source_records sr ON sr.source = rc.source AND sr.source_id = rc.source_id)"
+        )
+    )
+
+    detect(sa_sync_conn, _LOGGER)
+
+    assert _suspects(sa_sync_conn) == [(suspect, person, "rejected_publications", None)]
 
 
 def test_une_publication_proche_des_publications_rejetees_est_signalee(sa_sync_conn):

@@ -1,26 +1,28 @@
-"""Accès SQL de la phase `suspect_attributions` : indices des publications des personnes à fiche RH, fréquence des indices, profils des publications rejetées, écriture de `suspect_contributions`."""
+"""Accès SQL de la phase `suspect_attributions` : indices des publications des personnes à fiche RH, fréquence des indices, profils de la ressemblance aux rejets, écriture de `suspect_contributions`."""
 
 from collections import defaultdict
-from collections.abc import Collection, Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 from domain.contributions.contribution_roles import THESIS_JURY_ROLES
-from domain.persons.contribution_matching import ContributionMatchReason
+from domain.persons.contribution_matching import TIE_BREAK_REASONS, ContributionMatchReason
 from domain.persons.name_matching import names_compatible
 from domain.persons.suspect_attributions import (
     CLUE_HAL_STRUCTURE_TYPES,
+    LARGE_COLLABORATION,
     ClueFamily,
     ClueFrequencies,
     PublicationClues,
     SuspectReason,
+    coauthor_key,
 )
 from domain.persons.tie_break import ContributionContext
 from domain.structures.perimeter_evidence import PerimeterEvidence
 from domain.structures.structure import StructureType
 from domain.subjects.subject import SubjectVocabulary
-from infrastructure.sql_fragments import REJECTED_PAIRS, in_clause
-from pipeline.transformation.persons.store import fetch_contribution_contexts
+from infrastructure.sql_fragments import in_clause
 
 _TOPIC = (SubjectVocabulary.OPENALEX, 4)
 _HAL_DOMAIN = (SubjectVocabulary.HAL_DOMAIN, 2)
@@ -150,54 +152,220 @@ def fetch_clue_frequencies(conn: Connection) -> ClueFrequencies:
     return ClueFrequencies(max(publication_count, 2), counts)
 
 
-_REJECTED_NAMED_SQL = f"""
-    WITH rejected AS MATERIALIZED (
-        SELECT DISTINCT publication_id, person_id FROM ({REJECTED_PAIRS}) rp
-        WHERE publication_id IS NOT NULL AND person_id IN ({_RETAINED_PERSONS})
-    )
-    SELECT r.publication_id, r.person_id, g.id AS contribution_id,
-           p.last_name_normalized AS person_last, p.first_name_normalized AS person_first,
-           ci.last_name_normalized AS last, coalesce(ci.first_name_normalized, '') AS first
-    FROM rejected r
-    JOIN persons p ON p.id = r.person_id
-    JOIN source_records sr ON sr.publication_id = r.publication_id
-    JOIN source_contributions sc ON sc.source_record_id = sr.id
-    JOIN contributor_information ci
-      ON ci.id = sc.contributor_information_id AND ci.last_name_normalized = p.last_name_normalized
-    JOIN aligned_source_contributions gm ON gm.source_contribution_id = sc.id
-    JOIN contributions g ON g.id = gm.contribution_id
-    WHERE g.person_id IS DISTINCT FROM r.person_id
+_REJECTED_RECORDS_SQL = f"""
+    SELECT rc.person_id, sr.id AS record, sr.publication_id, sr.title_normalized,
+           coalesce(sr.serial_id, p.serial_id) AS serial_id,
+           coalesce(sr.publication_year, p.publication_year) AS year
+    FROM rejected_contributions rc
+    JOIN source_records sr ON sr.source = rc.source AND sr.source_id = rc.source_id
+    LEFT JOIN publications p ON p.id = sr.publication_id
+    WHERE rc.person_id IN ({_RETAINED_PERSONS})
 """
+"""Enregistrements sources rejetés pour une personne retenue, avec ou sans publication."""
 
+_OWN_CONTRIBUTIONS_SQL = f"""
+    SELECT g.id, g.person_id, g.publication_id, p.serial_id, p.publication_year AS year,
+           g.resolution_mode::text IN {in_clause(TIE_BREAK_REASONS)} AS tie_break,
+           g.resolution_mode::text <> 'manual' AND {_OUTSIDE_THESIS_JURY} AS candidate,
+           ARRAY(SELECT gm.source_contribution_id FROM aligned_source_contributions gm
+                 WHERE gm.contribution_id = g.id) AS own_source_contributions
+    FROM contributions g JOIN publications p ON p.id = g.publication_id
+    WHERE g.person_id = ANY(:persons)
+"""
+"""Contributions des personnes à rejets : profil de la personne hors rattachement par départage, candidates hors épinglage et hors seuls rôles de jury de thèse."""
 
-def fetch_rejected_profiles(conn: Connection) -> dict[int, list[ContributionContext]]:
-    """Renvoie le profil des publications rejetées pour chaque personne retenue : dans chaque publication rejetée, la seule contribution au nom de la personne, quelle que soit sa personne."""
-    named: dict[tuple[int, int], set[int]] = defaultdict(set)
-    for r in conn.execute(text(_REJECTED_NAMED_SQL)):
-        if names_compatible(r.last, r.first, r.person_last, r.person_first):
-            named[(r.publication_id, r.person_id)].add(r.contribution_id)
-    unique = {next(iter(ids)): person for (_, person), ids in named.items() if len(ids) == 1}
-    contexts = fetch_contribution_contexts(conn, sorted(unique))
-    profiles: dict[int, list[ContributionContext]] = defaultdict(list)
-    for contribution_id, person_id in unique.items():
-        if contribution_id in contexts:
-            profiles[person_id].append(contexts[contribution_id])
-    return profiles
-
-
-def fetch_candidate_contributions(
-    conn: Connection, person_ids: Collection[int]
-) -> list[tuple[int, int]]:
-    """Renvoie les contributions `(contribution, personne)` des personnes, hors épinglage et hors contributions des seuls rôles de jury de thèse."""
-    rows = conn.execute(
-        text(f"""
-            SELECT g.id, g.person_id FROM contributions g
-            WHERE g.person_id = ANY(:persons) AND g.resolution_mode::text <> 'manual'
-              AND {_OUTSIDE_THESIS_JURY}
-        """),
-        {"persons": list(person_ids)},
+_SOURCE_CONTRIBUTIONS_SQL = """
+    WITH records AS MATERIALIZED (
+        SELECT id, publication_id FROM source_records
+        WHERE id = ANY(:records) OR publication_id = ANY(:publications)
+    ),
+    large AS MATERIALIZED (
+        SELECT sc.source_record_id FROM source_contributions sc
+        JOIN records r ON r.id = sc.source_record_id
+        GROUP BY 1 HAVING count(*) > :large
     )
-    return [(r.id, r.person_id) for r in rows]
+    SELECT sc.id, sr.id AS record, sr.publication_id,
+           ci.last_name_normalized AS last, coalesce(ci.first_name_normalized, '') AS first
+    FROM records sr
+    JOIN source_contributions sc ON sc.source_record_id = sr.id
+    JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+    WHERE sr.id NOT IN (SELECT source_record_id FROM large)
+       OR ci.last_name_normalized = ANY(:last_names)
+"""
+"""Noms des contributions sources des enregistrements rejetés et des publications : toutes pour un enregistrement d'au plus `LARGE_COLLABORATION` contributions sources, seulement celles au nom d'une personne examinée au-delà. Une grande collaboration n'apporte pas de coauteurs."""
+
+_STRUCTURES_SQL = """
+    SELECT scs.source_contribution_id, 'laboratory' AS kind, scs.structure_id AS structure
+    FROM source_contribution_structures scs JOIN structures s ON s.id = scs.structure_id
+    WHERE scs.source_contribution_id = ANY(:ids) AND s.structure_type::text = :labo
+    UNION ALL
+    SELECT sch.source_contribution_id, 'hal_structure', sch.hal_structure_id
+    FROM source_contribution_hal_structures sch
+    JOIN hal_structures h ON h.hal_structure_id = sch.hal_structure_id
+    WHERE sch.source_contribution_id = ANY(:ids) AND h.structure_type = ANY(:hal_types)
+"""
+"""Laboratoires et structures HAL des contributions sources de la personne."""
+
+
+@dataclass(frozen=True)
+class NameProfiles:
+    """Contextes de la ressemblance aux rejets, coauteurs décrits par leur clé de nom (`coauthor_key`)."""
+
+    own: dict[int, list[ContributionContext]]
+    """Profil de chaque personne : ses contributions, hors rattachement par départage."""
+    rejected: dict[int, list[ContributionContext]]
+    """Profil des publications rejetées pour chaque personne, publication purgée comprise."""
+    candidates: list[tuple[int, int, ContributionContext]]
+    """Contributions à juger : (contribution, personne, contexte)."""
+
+
+@dataclass(frozen=True)
+class _Document:
+    """Document à mettre en contexte : publication, ou titre d'enregistrements sources sans publication."""
+
+    document_id: int
+    person_id: int
+    source_contributions: list[Row[tuple[object, ...]]]
+    own: frozenset[int]
+    """Contributions sources de la personne."""
+    serial_id: int | None
+    year: int | None
+
+
+def _context(
+    document: _Document,
+    person_key: tuple[str, str],
+    structures: Mapping[int, list[tuple[str, int]]],
+) -> ContributionContext:
+    """Renvoie le contexte d'un document : coauteurs par clé de nom hors personne, laboratoires et structures HAL des contributions sources de la personne."""
+    coauthors = {
+        key
+        for sc in document.source_contributions
+        if sc.id not in document.own and (key := coauthor_key(sc.last, sc.first)) != person_key
+    }
+    owned = [s for sc_id in document.own for s in structures.get(sc_id, ())]
+    return ContributionContext(
+        document.document_id,
+        frozenset(coauthors),
+        frozenset(s for kind, s in owned if kind == "laboratory"),
+        frozenset(s for kind, s in owned if kind == "hal_structure"),
+        document.serial_id,
+        document.year,
+    )
+
+
+def fetch_name_profiles(conn: Connection) -> NameProfiles:
+    """Renvoie les profils des personnes à rejets et leurs contributions à juger, depuis les contributions sources. Un document rejeté est une publication, ou à défaut le titre normalisé d'enregistrements sources sans publication."""
+    rejected_rows = conn.execute(text(_REJECTED_RECORDS_SQL)).all()
+    person_ids = sorted({r.person_id for r in rejected_rows})
+    persons = {
+        r.id: r
+        for r in conn.execute(
+            text(
+                "SELECT id, last_name_normalized AS last, first_name_normalized AS first FROM persons WHERE id = ANY(:p)"
+            ),
+            {"p": person_ids},
+        )
+    }
+    own_rows = conn.execute(text(_OWN_CONTRIBUTIONS_SQL), {"persons": person_ids}).all()
+    by_record: dict[int, list[Row[tuple[object, ...]]]] = defaultdict(list)
+    by_publication: dict[int, list[Row[tuple[object, ...]]]] = defaultdict(list)
+    for sc in conn.execute(
+        text(_SOURCE_CONTRIBUTIONS_SQL),
+        {
+            "records": [r.record for r in rejected_rows],
+            "publications": sorted(
+                {r.publication_id for r in own_rows}
+                | {r.publication_id for r in rejected_rows if r.publication_id}
+            ),
+            "last_names": sorted({p.last for p in persons.values()}),
+            "large": LARGE_COLLABORATION,
+        },
+    ):
+        by_record[sc.record].append(sc)
+        if sc.publication_id is not None:
+            by_publication[sc.publication_id].append(sc)
+
+    # Documents rejetés : une publication, sinon le titre normalisé d'enregistrements sources sans publication.
+    rejected_documents: dict[tuple[int, object], _Document] = {}
+    pseudo_ids: dict[str, int] = {}
+    for r in rejected_rows:
+        if r.publication_id is not None:
+            key: tuple[int, object] = (r.person_id, r.publication_id)
+            if key not in rejected_documents:
+                rejected_documents[key] = _Document(
+                    r.publication_id,
+                    r.person_id,
+                    by_publication[r.publication_id],
+                    frozenset(),
+                    r.serial_id,
+                    r.year,
+                )
+        else:
+            key = (r.person_id, r.title_normalized)
+            if key not in rejected_documents:
+                pseudo = pseudo_ids.setdefault(r.title_normalized, -(len(pseudo_ids) + 1))
+                rejected_documents[key] = _Document(
+                    pseudo, r.person_id, [], frozenset(), r.serial_id, r.year
+                )
+            rejected_documents[key].source_contributions.extend(by_record[r.record])
+    documents = [
+        replace(
+            d,
+            own=frozenset(
+                sc.id
+                for sc in d.source_contributions
+                if names_compatible(
+                    sc.last, sc.first, persons[d.person_id].last, persons[d.person_id].first
+                )
+            ),
+        )
+        for d in rejected_documents.values()
+    ]
+    own_documents = [
+        (
+            r,
+            _Document(
+                r.publication_id,
+                r.person_id,
+                by_publication[r.publication_id],
+                frozenset(r.own_source_contributions),
+                r.serial_id,
+                r.year,
+            ),
+        )
+        for r in own_rows
+    ]
+
+    structures: dict[int, list[tuple[str, int]]] = defaultdict(list)
+    own_ids = sorted(
+        {i for d in documents for i in d.own} | {i for _, d in own_documents for i in d.own}
+    )
+    for s in conn.execute(
+        text(_STRUCTURES_SQL),
+        {
+            "ids": own_ids,
+            "labo": StructureType.LABO.value,
+            "hal_types": sorted(CLUE_HAL_STRUCTURE_TYPES),
+        },
+    ):
+        structures[s.source_contribution_id].append((s.kind, s.structure))
+
+    def key_of(person_id: int) -> tuple[str, str]:
+        return coauthor_key(persons[person_id].last, persons[person_id].first)
+
+    rejected: dict[int, list[ContributionContext]] = defaultdict(list)
+    for d in documents:
+        rejected[d.person_id].append(_context(d, key_of(d.person_id), structures))
+    own: dict[int, list[ContributionContext]] = defaultdict(list)
+    candidates: list[tuple[int, int, ContributionContext]] = []
+    for r, d in own_documents:
+        context = _context(d, key_of(r.person_id), structures)
+        if not r.tie_break:
+            own[r.person_id].append(context)
+        if r.candidate:
+            candidates.append((r.id, r.person_id, context))
+    return NameProfiles(dict(own), dict(rejected), candidates)
 
 
 def write_suspect_contributions(

@@ -1,6 +1,6 @@
 """Phase `suspect_attributions` : attributions suspectes, recalculées à chaque run dans `suspect_contributions`.
 
-Les publications des personnes à fiche RH forment des clusters par la partition de Leiden (`igraph`). Les clusters signalés par la règle du domaine (`signaled_clusters`) donnent le motif `cluster`. Pour les personnes ayant au moins un rejet, la cascade de départage désigne les publications proches des publications rejetées (`resembles_rejected`) : motif `rejected_publications`.
+Les publications des personnes à fiche RH forment des clusters par la partition de Leiden (`igraph`). Les clusters signalés par la règle du domaine (`signaled_clusters`) donnent le motif `cluster`. Pour les personnes ayant au moins un rejet, la cascade de départage désigne les publications proches des publications rejetées (`resembles_rejected`) : motif `rejected_publications`. Les deux profils comparés viennent des contributions sources (`fetch_name_profiles`), coauteurs décrits par leur nom : un rejet dont la publication a été purgée compte encore.
 """
 
 from __future__ import annotations
@@ -21,15 +21,10 @@ from pipeline.graph import Block, Phase, Task, in_transaction
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress, waiting
-from pipeline.transformation.persons.store import (
-    fetch_contribution_contexts,
-    fetch_person_profiles,
-)
 from pipeline.transformation.persons.suspect_store import (
-    fetch_candidate_contributions,
     fetch_clue_frequencies,
+    fetch_name_profiles,
     fetch_publication_clues,
-    fetch_rejected_profiles,
     write_suspect_contributions,
 )
 
@@ -80,25 +75,21 @@ def detect(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
     )
 
     with waiting(f"{LAST_BRANCH}publications proches des publications rejetées", logger) as line:
-        rejected_profiles = fetch_rejected_profiles(conn)
-        candidates = [
-            (c, p)
-            for c, p in fetch_candidate_contributions(conn, rejected_profiles)
-            if c not in in_clusters
-        ]
-        contexts = fetch_contribution_contexts(conn, [c for c, _ in candidates])
-        own_profiles = fetch_person_profiles(conn, rejected_profiles)
-        for contribution_id, person_id in candidates:
-            context = contexts.get(contribution_id)
-            if context is not None and resembles_rejected(
-                person_id, context, own_profiles.get(person_id, []), rejected_profiles[person_id]
+        profiles = fetch_name_profiles(conn)
+        candidates = [c for c in profiles.candidates if c[0] not in in_clusters]
+        for contribution_id, person_id, context in candidates:
+            if resembles_rejected(
+                person_id,
+                context,
+                profiles.own.get(person_id, []),
+                profiles.rejected.get(person_id, []),
             ):
                 rows.append((contribution_id, person_id, SuspectReason.REJECTED_PUBLICATIONS, None))
         resembling = len(rows) - cluster_rows
         line.conclude(
             f"{LAST_BRANCH}publications proches des publications rejetées :"
             f" {resembling} sur {quantity(len(candidates), 'publication')}"
-            f" de {quantity(len(rejected_profiles), 'personne')} à rejets"
+            f" de {quantity(len(profiles.rejected), 'personne')} à rejets"
         )
 
     write_suspect_contributions(conn, rows)
@@ -135,6 +126,9 @@ _CHILDREN = (
             "source_records.publication_id",
             "source_records.source",
             "source_records.source_id",
+            "source_records.serial_id",
+            "source_records.publication_year",
+            "source_records.title_normalized",
             "contributor_information",
             "publications.id",
             "publications.serial_id",
