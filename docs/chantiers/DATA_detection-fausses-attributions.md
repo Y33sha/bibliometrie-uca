@@ -123,4 +123,3 @@ Scripts de mesure dans `data/experiments/`, sans code du pipeline. Jeu de valida
 ## Questions ouvertes
 
 - Un chercheur pluridisciplinaire réunit des clusters distincts sans homonyme.
-- Le rattachement des personnes accorde au mode ORCID la même confiance quelle que soit la source de l'ORCID. Sur les contributions des personnes à fiche RH rattachées par ORCID, 17 392 sur 32 410 tiennent leur ORCID de HAL seulement. Chantier à planifier.
