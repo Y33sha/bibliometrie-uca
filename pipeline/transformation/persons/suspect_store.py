@@ -6,9 +6,9 @@ from collections.abc import Collection, Sequence
 from sqlalchemy import Connection, text
 
 from domain.contributions.contribution_roles import THESIS_JURY_ROLES
+from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.name_matching import names_compatible
 from domain.persons.suspect_attributions import (
-    ANCHOR_MODES,
     CLUE_HAL_STRUCTURE_TYPES,
     ClueFamily,
     ClueFrequencies,
@@ -43,7 +43,8 @@ def _subjects(vocabulary: str, level: int) -> str:
 
 
 _CLUES_SQL = f"""
-    SELECT g.id, g.person_id, g.resolution_mode::text IN {in_clause(ANCHOR_MODES)} AS anchored,
+    SELECT g.id, g.person_id, g.resolution_mode::text AS mode,
+           (SELECT count(*) FROM contributions o WHERE o.publication_id = g.publication_id) AS contribution_count,
            EXISTS (SELECT 1 FROM aligned_source_contributions gm
                    JOIN source_contribution_addresses sca ON sca.source_contribution_id = gm.source_contribution_id
                    JOIN address_structures ast ON ast.address_id = sca.address_id
@@ -84,7 +85,13 @@ def fetch_publication_clues(conn: Connection) -> dict[int, list[PublicationClues
         if r.serial_id is not None:
             clues.add((ClueFamily.SERIAL, r.serial_id))
         by_person[r.person_id].append(
-            PublicationClues(r.id, r.anchored, frozenset(clues), r.confirmed)
+            PublicationClues(
+                r.id,
+                ContributionMatchReason(r.mode),
+                frozenset(clues),
+                contribution_count=r.contribution_count,
+                confirmed=r.confirmed,
+            )
         )
     return by_person
 

@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from domain.persons.contribution_matching import (
+    NAME_BASED_REASONS,
     ContributionDecision,
     ContributionMatchReason,
     ContributionOutcome,
@@ -55,7 +56,15 @@ CLUE_HAL_STRUCTURE_TYPES: frozenset[str] = frozenset(
 ANCHOR_MODES: frozenset[ContributionMatchReason] = frozenset(
     {ContributionMatchReason.ORCID, ContributionMatchReason.MANUAL}
 )
-"""Modes de rattachement d'une contribution ancrée. ScanR attribue par IdRef et HAL par idHAL : ces modes sont sujets aux fausses attributions."""
+"""Modes de rattachement d'une contribution ancrée : la publication est sûrement de la personne."""
+
+SIGNALABLE_IDENTIFIER_MODES: frozenset[ContributionMatchReason] = frozenset(
+    {ContributionMatchReason.IDREF, ContributionMatchReason.HAL_PERSON_ID}
+)
+"""Rattachements par un identifiant de ScanR ou de HAL, sources de presque toutes les fausses attributions par identifiant."""
+
+LARGE_COLLABORATION = 100
+"""Contributions au-delà desquelles une publication est une grande collaboration : un rattachement par le nom y est signalable."""
 
 
 @dataclass(frozen=True)
@@ -63,11 +72,26 @@ class PublicationClues:
     """Indices d'une publication d'une personne, par sa contribution."""
 
     contribution_id: int
-    anchored: bool
-    """Contribution rattachée par un mode de `ANCHOR_MODES` : la publication est sûrement de la personne."""
+    mode: ContributionMatchReason
+    """Mode de rattachement de la contribution à la personne."""
     clues: frozenset[Clue]
+    contribution_count: int = 1
+    """Contributions de la publication."""
     confirmed: bool = False
-    """Une adresse de la contribution est rattachée à une structure de la fiche RH de la personne : la publication n'est jamais signalée."""
+    """Une adresse de la contribution est rattachée à une structure de la fiche RH de la personne."""
+
+    @property
+    def anchored(self) -> bool:
+        return self.mode in ANCHOR_MODES
+
+    @property
+    def signalable(self) -> bool:
+        """Vrai pour une contribution non confirmée, rattachée par `SIGNALABLE_IDENTIFIER_MODES`, ou par le nom dans une grande collaboration."""
+        if self.confirmed:
+            return False
+        return self.mode in SIGNALABLE_IDENTIFIER_MODES or (
+            self.mode in NAME_BASED_REASONS and self.contribution_count > LARGE_COLLABORATION
+        )
 
 
 @dataclass(frozen=True)
@@ -146,7 +170,7 @@ def signaled_clusters(
 ) -> list[list[int]]:
     """Renvoie les clusters signalés des publications d'une personne, par identifiant de contribution.
 
-    Le cluster principal réunit le plus de contributions ancrées, puis le plus de publications. Un autre cluster est signalé s'il est sans contribution ancrée, avec une conductance d'au plus `MAX_CONDUCTANCE`, et au moins `MIN_CLUSTER_SIZE` publications non confirmées. Seules ses publications non confirmées sont renvoyées.
+    Le cluster principal réunit le plus de contributions ancrées, puis le plus de publications. Un autre cluster est signalé s'il est sans contribution ancrée, avec une conductance d'au plus `MAX_CONDUCTANCE`, et au moins `MIN_CLUSTER_SIZE` publications signalables (`PublicationClues.signalable`). Seules ses publications signalables sont renvoyées.
     """
     if len(publications) < MIN_PUBLICATIONS:
         return []
@@ -170,11 +194,11 @@ def signaled_clusters(
             or conductance[k] > MAX_CONDUCTANCE
         ):
             continue
-        unconfirmed = [
-            publications[i].contribution_id for i in members if not publications[i].confirmed
+        signalable = [
+            publications[i].contribution_id for i in members if publications[i].signalable
         ]
-        if len(unconfirmed) >= MIN_CLUSTER_SIZE:
-            signaled.append(unconfirmed)
+        if len(signalable) >= MIN_CLUSTER_SIZE:
+            signaled.append(signalable)
     return signaled
 
 

@@ -1,6 +1,10 @@
 """Tests de la détection des attributions suspectes : poids des indices, clusters signalés, ressemblance avec les publications rejetées."""
 
+from dataclasses import replace
+
+from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.suspect_attributions import (
+    LARGE_COLLABORATION,
     ClueFamily,
     ClueFrequencies,
     PublicationClues,
@@ -16,8 +20,13 @@ _FREQUENCIES = ClueFrequencies(
 )
 
 
-def _publication(contribution_id, *clues, anchored=False):
-    return PublicationClues(contribution_id, anchored, frozenset(clues))
+def _publication(contribution_id, *clues, anchored=False, mode=None, contribution_count=1):
+    """Renvoie une publication rattachée par ORCID si `anchored`, sinon par IdRef ou par `mode`."""
+    if mode is None:
+        mode = ContributionMatchReason.ORCID if anchored else ContributionMatchReason.IDREF
+    return PublicationClues(
+        contribution_id, mode, frozenset(clues), contribution_count=contribution_count
+    )
 
 
 def _labels(*labels):
@@ -90,18 +99,36 @@ def test_le_cluster_principal_reunit_le_plus_de_contributions_ancrees():
 def test_une_publication_a_l_adresse_du_laboratoire_rh_n_est_pas_signalee():
     """Le cluster perd ses publications confirmées, puis passe sous la taille minimale."""
     publications = _person()
-    publications[3] = PublicationClues(4, False, publications[3].clues, confirmed=True)
+    publications[3] = replace(publications[3], confirmed=True)
 
     assert signaled_clusters(publications, _FREQUENCIES, _labels(0, 0, 0, 1, 1, 1)) == []
 
 
 def test_un_cluster_signale_omet_ses_publications_confirmees():
     publications = _person() + [_publication(7, _RARE_SERIAL)]
-    publications[3] = PublicationClues(4, False, publications[3].clues, confirmed=True)
+    publications[3] = replace(publications[3], confirmed=True)
 
     clusters = signaled_clusters(publications, _FREQUENCIES, _labels(0, 0, 0, 1, 1, 1, 1))
 
     assert clusters == [[5, 6, 7]]
+
+
+def test_un_rattachement_par_le_nom_n_est_pas_signale():
+    publications = _person()
+    publications[3] = replace(publications[3], mode=ContributionMatchReason.NAME)
+
+    assert signaled_clusters(publications, _FREQUENCIES, _labels(0, 0, 0, 1, 1, 1)) == []
+
+
+def test_un_rattachement_par_le_nom_dans_une_grande_collaboration_est_signale():
+    publications = _person()
+    publications[3] = replace(
+        publications[3],
+        mode=ContributionMatchReason.NAME,
+        contribution_count=LARGE_COLLABORATION + 1,
+    )
+
+    assert signaled_clusters(publications, _FREQUENCIES, _labels(0, 0, 0, 1, 1, 1)) == [[4, 5, 6]]
 
 
 def test_un_petit_cluster_n_est_pas_signale():
