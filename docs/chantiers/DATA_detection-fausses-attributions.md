@@ -49,6 +49,15 @@ Mesures de la phase 1 (`data/experiments/fausses-attributions/`). Jeu de validat
   - Témoins, tirés des clusters principaux : 1 ORCID différent et 14 adresses hors d'Auvergne sur 168 contributions.
   - La cascade de départage signale 3 publications des personnes du jeu de validation : 2 de la personne, 1 incertaine.
 
+Mesures de la relecture de la file :
+
+- Contradictions au rattachement (`contradictions.py`) : 154 contributions rattachées par IdRef et 175 par idHAL comportent un ORCID autre que celui de la personne, ou un prénom complet incompatible. Seules, ces contradictions sont surtout du bruit : noms d'usage, erreurs ponctuelles des sources, ORCID donné par HAL sur de vraies publications. Aucune règle au rattachement.
+- Contre-indices des clusters (`contre_indices.py`, `coauteurs_perimetre.py`, `labo_independant.py`), sur 17 fausses attributions confirmées, 11 fausses alertes et 12 groupes de rejets du jeu de validation :
+  - coauteurs à fiche RH : présents dans les rejets des grandes collaborations, inutilisables ;
+  - part des coauteurs du périmètre : au moins 0,5 pour 6 fausses alertes, mais aussi pour 5 homonymes du périmètre ;
+  - adresse rattachée au laboratoire de la fiche RH : écarte 4 fausses alertes, sans perdre aucune fausse attribution ni aucun groupe de rejets.
+- Ressemblance aux rejets sans l'indice des années d'activité (`sans_annees.py`) : même rappel, une fausse alerte de moins.
+
 ## Décisions
 
 - Deux détections alimentent une seule file d'attributions suspectes :
@@ -56,6 +65,9 @@ Mesures de la phase 1 (`data/experiments/fausses-attributions/`). Jeu de validat
   - personne ayant au moins un rejet : publications pour lesquelles la cascade de départage désigne le profil des publications rejetées plutôt que celui de la personne.
 - Le profil de comparaison d'une personne réunit les publications rejetées pour elle, quel que soit le détenteur de la contribution à son nom. Il se calcule depuis les rejets.
 - Les rôles de jury de thèse restent hors du graphe. Une thèse dont la personne est l'auteur y figure.
+- Une personne exclue (fausse entité, hors périmètre) sort des deux détections.
+- Une contribution dont une adresse est rattachée à une structure de la fiche RH n'est jamais signalée, quelle que soit la source de l'adresse. Les structures HAL ne comptent pas : les sources les recopient.
+- La ressemblance aux rejets écarte l'indice des années d'activité.
 - La partition utilise la bibliothèque `igraph`.
 - Une phase placée après `persons` recalcule à chaque run la table `persons.suspect_contributions` : contribution, personne, motif, cluster.
 - La détection signale à l'administration, qui décide. Aucun détachement automatique.
