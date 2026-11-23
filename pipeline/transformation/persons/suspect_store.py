@@ -16,6 +16,7 @@ from domain.persons.suspect_attributions import (
     SuspectReason,
 )
 from domain.persons.tie_break import ContributionContext
+from domain.structures.perimeter_evidence import PerimeterEvidence
 from domain.structures.structure import StructureType
 from domain.subjects.subject import SubjectVocabulary
 from infrastructure.sql_fragments import REJECTED_PAIRS, in_clause
@@ -59,10 +60,9 @@ _CLUES_SQL = f"""
     SELECT g.id, g.person_id, g.resolution_mode::text AS mode,
            (SELECT count(*) FROM contributions o WHERE o.publication_id = g.publication_id) AS contribution_count,
            EXISTS (SELECT 1 FROM aligned_source_contributions gm
-                   JOIN source_contribution_addresses sca ON sca.source_contribution_id = gm.source_contribution_id
-                   JOIN address_structures ast ON ast.address_id = sca.address_id
-                   JOIN hr_periods hp ON hp.structure_id = ast.structure_id AND hp.person_id = g.person_id
-                   WHERE gm.contribution_id = g.id) AS confirmed,
+                   JOIN source_contributions sc ON sc.id = gm.source_contribution_id
+                   WHERE gm.contribution_id = g.id
+                     AND '{PerimeterEvidence.ADDRESS}' = ANY(sc.perimeter_evidence)) AS perimeter_address,
            {_orcid_given_by("= 'hal'")} AND NOT {_orcid_given_by("<> 'hal'")} AS orcid_from_hal_only,
            p.serial_id,
            ARRAY(SELECT o.person_id FROM contributions o
@@ -88,7 +88,7 @@ _CLUES_SQL = f"""
 
 
 def fetch_publication_clues(conn: Connection) -> dict[int, list[PublicationClues]]:
-    """Renvoie les indices des publications de chaque personne à fiche RH retenue, hors contributions des seuls rôles de jury de thèse. Une contribution est confirmée quand une de ses adresses est rattachée à une structure de la fiche RH de la personne."""
+    """Renvoie les indices des publications de chaque personne à fiche RH retenue, hors contributions des seuls rôles de jury de thèse."""
     by_person: dict[int, list[PublicationClues]] = defaultdict(list)
     for r in conn.execute(text(_CLUES_SQL)):
         clues = {(ClueFamily.COAUTHOR, p) for p in r.coauthors}
@@ -104,7 +104,7 @@ def fetch_publication_clues(conn: Connection) -> dict[int, list[PublicationClues
                 ContributionMatchReason(r.mode),
                 frozenset(clues),
                 contribution_count=r.contribution_count,
-                confirmed=r.confirmed,
+                perimeter_address=r.perimeter_address,
                 orcid_from_hal_only=r.orcid_from_hal_only,
             )
         )

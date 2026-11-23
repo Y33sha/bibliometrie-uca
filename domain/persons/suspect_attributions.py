@@ -77,8 +77,8 @@ class PublicationClues:
     clues: frozenset[Clue]
     contribution_count: int = 1
     """Contributions de la publication."""
-    confirmed: bool = False
-    """Une adresse de la contribution est rattachée à une structure de la fiche RH de la personne."""
+    perimeter_address: bool = False
+    """Une adresse de la contribution est rattachée à une structure du périmètre."""
     orcid_from_hal_only: bool = False
     """Seul HAL donne l'ORCID du rattachement : il vient du compte HAL relié par HAL à la contribution, comme un idHAL."""
 
@@ -93,8 +93,8 @@ class PublicationClues:
 
     @property
     def signalable(self) -> bool:
-        """Vrai pour une contribution non confirmée, rattachée par `SIGNALABLE_IDENTIFIER_MODES` ou par un ORCID donné par HAL seulement, ou par le nom dans une grande collaboration."""
-        if self.confirmed:
+        """Vrai pour une contribution sans adresse du périmètre, rattachée par `SIGNALABLE_IDENTIFIER_MODES` ou par un ORCID donné par HAL seulement, ou par le nom dans une grande collaboration."""
+        if self.perimeter_address:
             return False
         return (
             self.mode in SIGNALABLE_IDENTIFIER_MODES
