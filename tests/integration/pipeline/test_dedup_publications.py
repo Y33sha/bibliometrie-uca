@@ -105,6 +105,10 @@ class TestRefreshFromSources:
 
     def test_copie_editeur_sous_licence_dans_une_revue_diamant(self, sa_sync_conn):
         serial = insert_serial(sa_sync_conn, "Revue diamant", oa_model="diamond")
+        # Revue née en open access intégral d'après OpenAlex : son modèle vaut pour toute année.
+        sa_sync_conn.execute(
+            text("UPDATE serials SET openalex_is_oa = TRUE WHERE id = :id"), {"id": serial}
+        )
         id1 = _insert_publication(sa_sync_conn, doi="10.1234/dia", oa_status="gold")
         record = _source_record(
             sa_sync_conn, id1, source="crossref", source_id="10.1234/dia", serial_id=serial
