@@ -63,41 +63,54 @@ def test_un_cluster_isole_d_une_personne_a_fiche_rh_est_signale(sa_sync_conn):
     assert metrics.extras["suspect_in_clusters"] == 3
 
 
-def test_une_publication_proche_des_publications_rejetees_est_signalee(sa_sync_conn):
-    person = insert_person(sa_sync_conn, "Durand", first_name="Marie")
+def _resembling_rejected(conn, *, exclusion=None):
+    """Sème une personne, une publication rejetée pour elle et une publication qui partage un coauteur avec le rejet. Renvoie (personne, contribution de la publication proche du rejet)."""
+    person = insert_person(conn, "Durand", first_name="Marie", exclusion=exclusion)
     colleague, other_colleague, namesake_coauthor = (
-        insert_person(sa_sync_conn, name) for name in ("Collègue", "Autre", "Coauteur")
+        insert_person(conn, name) for name in ("Collègue", "Autre", "Coauteur")
     )
     for coauthor in (colleague, other_colleague):
-        publication = insert_publication(sa_sync_conn)
-        _contribution(sa_sync_conn, publication, person, "orcid")
-        _contribution(sa_sync_conn, publication, coauthor)
+        publication = insert_publication(conn)
+        _contribution(conn, publication, person, "orcid")
+        _contribution(conn, publication, coauthor)
 
-    rejected = insert_publication(sa_sync_conn)
-    source_record = insert_source_record(sa_sync_conn, rejected, source_id="hal-rejet")
+    rejected = insert_publication(conn)
+    source_record = insert_source_record(conn, rejected, source_id="hal-rejet")
     namesake = insert_source_contribution(
-        sa_sync_conn,
+        conn,
         source_record,
         raw_last_name="Durand",
         raw_first_name="Marie",
-        contributor_information_id=upsert_split_contributor_information(
-            sa_sync_conn, "durand", "marie"
-        ),
+        contributor_information_id=upsert_split_contributor_information(conn, "durand", "marie"),
     )
-    align_source_contributions(sa_sync_conn, rejected, [(namesake, source_record)])
-    _contribution(sa_sync_conn, rejected, namesake_coauthor)
-    insert_rejected_contribution(sa_sync_conn, rejected, person_id=person)
+    align_source_contributions(conn, rejected, [(namesake, source_record)])
+    _contribution(conn, rejected, namesake_coauthor)
+    insert_rejected_contribution(conn, rejected, person_id=person)
 
-    resembling = insert_publication(sa_sync_conn)
-    suspect = _contribution(sa_sync_conn, resembling, person, "name")
-    _contribution(sa_sync_conn, resembling, namesake_coauthor)
-    genuine = insert_publication(sa_sync_conn)
-    _contribution(sa_sync_conn, genuine, person, "name")
-    _contribution(sa_sync_conn, genuine, colleague)
+    resembling = insert_publication(conn)
+    suspect = _contribution(conn, resembling, person, "name")
+    _contribution(conn, resembling, namesake_coauthor)
+    genuine = insert_publication(conn)
+    _contribution(conn, genuine, person, "name")
+    _contribution(conn, genuine, colleague)
+    return person, suspect
+
+
+def test_une_publication_proche_des_publications_rejetees_est_signalee(sa_sync_conn):
+    person, suspect = _resembling_rejected(sa_sync_conn)
 
     detect(sa_sync_conn, _LOGGER)
 
     assert _suspects(sa_sync_conn) == [(suspect, person, "rejected_publications", None)]
+
+
+def test_une_personne_exclue_n_est_pas_examinee(sa_sync_conn):
+    """Une personne hors périmètre n'est pas signalée : ses attributions sortent du périmètre."""
+    _resembling_rejected(sa_sync_conn, exclusion="out_of_perimeter")
+
+    detect(sa_sync_conn, _LOGGER)
+
+    assert _suspects(sa_sync_conn) == []
 
 
 def test_le_calcul_remplace_les_signalements_precedents(sa_sync_conn):

@@ -30,6 +30,9 @@ _OUTSIDE_THESIS_JURY = f"""
 """
 """Contribution hors des seuls rôles de jury de thèse."""
 
+_RETAINED_PERSONS = "SELECT id FROM persons WHERE exclusion IS NULL"
+"""Personnes examinées : une personne exclue (fausse entité, hors périmètre) est écartée de la détection."""
+
 
 def _subjects(vocabulary: str, level: int) -> str:
     return f"""
@@ -59,12 +62,13 @@ _CLUES_SQL = f"""
     FROM contributions g
     JOIN publications p ON p.id = g.publication_id
     WHERE g.person_id IN (SELECT person_id FROM hr_records)
+      AND g.person_id IN ({_RETAINED_PERSONS})
       AND {_OUTSIDE_THESIS_JURY}
 """
 
 
 def fetch_publication_clues(conn: Connection) -> dict[int, list[PublicationClues]]:
-    """Renvoie les indices des publications de chaque personne à fiche RH, hors contributions des seuls rôles de jury de thèse."""
+    """Renvoie les indices des publications de chaque personne à fiche RH retenue, hors contributions des seuls rôles de jury de thèse."""
     by_person: dict[int, list[PublicationClues]] = defaultdict(list)
     for r in conn.execute(text(_CLUES_SQL)):
         clues = {(ClueFamily.COAUTHOR, p) for p in r.coauthors}
@@ -120,7 +124,7 @@ def fetch_clue_frequencies(conn: Connection) -> ClueFrequencies:
 _REJECTED_NAMED_SQL = f"""
     WITH rejected AS MATERIALIZED (
         SELECT DISTINCT publication_id, person_id FROM ({REJECTED_PAIRS}) rp
-        WHERE publication_id IS NOT NULL
+        WHERE publication_id IS NOT NULL AND person_id IN ({_RETAINED_PERSONS})
     )
     SELECT r.publication_id, r.person_id, g.id AS contribution_id,
            p.last_name_normalized AS person_last, p.first_name_normalized AS person_first,
@@ -138,7 +142,7 @@ _REJECTED_NAMED_SQL = f"""
 
 
 def fetch_rejected_profiles(conn: Connection) -> dict[int, list[ContributionContext]]:
-    """Renvoie le profil des publications rejetées pour chaque personne : dans chaque publication rejetée, la seule contribution au nom de la personne, quelle que soit sa personne."""
+    """Renvoie le profil des publications rejetées pour chaque personne retenue : dans chaque publication rejetée, la seule contribution au nom de la personne, quelle que soit sa personne."""
     named: dict[tuple[int, int], set[int]] = defaultdict(set)
     for r in conn.execute(text(_REJECTED_NAMED_SQL)):
         if names_compatible(r.last, r.first, r.person_last, r.person_first):
