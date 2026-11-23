@@ -71,6 +71,7 @@ Mesures de la relecture de la file :
 - Une contribution dont une adresse est rattachée à une structure de la fiche RH n'est jamais signalée, quelle que soit la source de l'adresse. Les structures HAL ne comptent pas : les sources les recopient.
 - La ressemblance aux rejets écarte l'indice des années d'activité.
 - Dans un cluster, seules sont signalables les contributions rattachées par IdRef ou idHAL, et celles rattachées par le nom dans une publication de plus de 100 contributions.
+- Un rattachement par un ORCID donné par HAL seulement vaut un idHAL : il est signalable et n'ancre pas la publication. HAL donne l'ORCID du compte relié par HAL à la contribution.
 - La partition utilise la bibliothèque `igraph`.
 - Une phase placée après `persons` recalcule à chaque run la table `persons.suspect_contributions` : contribution, personne, motif, cluster.
 - La détection signale à l'administration, qui décide. Aucun détachement automatique.
@@ -122,3 +123,4 @@ Scripts de mesure dans `data/experiments/`, sans code du pipeline. Jeu de valida
 ## Questions ouvertes
 
 - Un chercheur pluridisciplinaire réunit des clusters distincts sans homonyme.
+- Le rattachement des personnes accorde au mode ORCID la même confiance quelle que soit la source de l'ORCID. Sur les contributions des personnes à fiche RH rattachées par ORCID, 17 392 sur 32 410 tiennent leur ORCID de HAL seulement. Chantier à planifier.
