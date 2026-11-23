@@ -357,14 +357,16 @@ class SuspectPublicationOut(Model):
     container_title: str | None
     doi: str | None
     resolution_mode: str
-    affiliated: bool
-    """Contribution affiliée au périmètre par une adresse, un ROR ou une structure HAL de ses contributions sources."""
+    address_structures: list[str]
+    """Structures rattachées aux adresses des contributions sources de la contribution."""
 
 
 class SuspectGroupOut(Model):
     """Attributions suspectes d'une personne, par motif : un cluster isolé, ou les publications proches des publications rejetées pour elle."""
 
     person: CurationPersonOut
+    hr_units: list[str]
+    """Unités des périodes RH de la personne."""
     reason: SuspectReason
     cluster: int | None
     publications: list[SuspectPublicationOut]

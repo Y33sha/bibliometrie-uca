@@ -8,7 +8,6 @@ from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
 from domain.persons.suspect_attributions import SuspectReason
-from domain.structures.perimeter_evidence import PerimeterEvidence
 from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from infrastructure.read_models.persons.models import (
     AmbiguousFormPersonOut,
@@ -45,17 +44,20 @@ from infrastructure.sql_fragments import (
 
 # ── File de triage : attributions suspectes ──────────────────────
 
-_SOURCE_AFFILIATION_EVIDENCE = ", ".join(
-    f"'{e}'"
-    for e in (PerimeterEvidence.ADDRESS, PerimeterEvidence.ROR, PerimeterEvidence.HAL_STRUCTURE)
-)
-
-_SUSPECT_ATTRIBUTIONS_SQL = f"""
+_SUSPECT_ATTRIBUTIONS_SQL = """
     SELECT sc.person_id, sc.reason::text AS reason, sc.cluster, g.id AS contribution_id,
            p.id AS publication_id, p.title, p.publication_year,
            coalesce(s.title, p.container_title) AS container_title, p.doi,
            g.resolution_mode::text AS resolution_mode,
-           g.perimeter_evidence && ARRAY[{_SOURCE_AFFILIATION_EVIDENCE}]::perimeter_evidence[] AS affiliated
+           ARRAY(
+               SELECT DISTINCT coalesce(st.acronym, st.name)
+               FROM aligned_source_contributions gm
+               JOIN source_contribution_addresses sca ON sca.source_contribution_id = gm.source_contribution_id
+               JOIN address_structures ast ON ast.address_id = sca.address_id
+               JOIN structures st ON st.id = ast.structure_id
+               WHERE gm.contribution_id = g.id
+               ORDER BY 1
+           ) AS address_structures
     FROM suspect_contributions sc
     JOIN contributions g
       ON g.id = sc.contribution_id AND g.person_id = sc.person_id
@@ -66,25 +68,27 @@ _SUSPECT_ATTRIBUTIONS_SQL = f"""
 """
 """Attributions suspectes en attente : contribution toujours rattachée à la personne signalée, hors épinglage."""
 
+_HR_UNITS_SQL = """
+    SELECT hp.person_id,
+           array_agg(DISTINCT coalesce(st.acronym, st.name, hp.unit_label) ORDER BY coalesce(st.acronym, st.name, hp.unit_label)) AS units
+    FROM hr_periods hp
+    LEFT JOIN structures st ON st.id = hp.structure_id
+    WHERE hp.person_id = ANY(:ids)
+    GROUP BY hp.person_id
+"""
+"""Unités des périodes RH de chaque personne."""
+
 
 _SuspectKey = tuple[int, str, int | None]
 """Groupe d'attributions suspectes : personne, motif, cluster."""
 
 
 def _suspect_groups(conn: Connection) -> list[tuple[_SuspectKey, list[Row[tuple[object, ...]]]]]:
-    """Renvoie les attributions suspectes en attente, groupées par (personne, motif, cluster). Les groupes sans contribution affiliée au périmètre viennent en tête, puis les plus grands."""
+    """Renvoie les attributions suspectes en attente, groupées par (personne, motif, cluster), des plus grands groupes aux plus petits."""
     groups: dict[_SuspectKey, list[Row[tuple[object, ...]]]] = defaultdict(list)
     for r in conn.execute(text(_SUSPECT_ATTRIBUTIONS_SQL)):
         groups[(r.person_id, r.reason, r.cluster)].append(r)
-    return sorted(
-        groups.items(),
-        key=lambda g: (
-            sum(r.affiliated for r in g[1]) / len(g[1]),
-            -len(g[1]),
-            g[0][0],
-            g[0][2] or 0,
-        ),
-    )
+    return sorted(groups.items(), key=lambda g: (-len(g[1]), g[0][0], g[0][2] or 0))
 
 
 # ── File de triage : formes de nom ambiguës ──────────────────────
@@ -531,10 +535,16 @@ class PersonAdminQueries:
         groups = _suspect_groups(self._conn)
         offset = (page - 1) * per_page
         page_groups = groups[offset : offset + per_page]
-        persons = _curation_persons(self._conn, sorted({key[0] for key, _ in page_groups}))
+        person_ids = sorted({key[0] for key, _ in page_groups})
+        persons = _curation_persons(self._conn, person_ids)
+        hr_units = {
+            r.person_id: list(r.units)
+            for r in self._conn.execute(text(_HR_UNITS_SQL), {"ids": person_ids})
+        }
         items = [
             SuspectGroupOut(
                 person=persons[person_id],
+                hr_units=hr_units.get(person_id, []),
                 reason=SuspectReason(reason),
                 cluster=cluster,
                 publications=[
@@ -546,7 +556,7 @@ class PersonAdminQueries:
                         container_title=r.container_title,
                         doi=r.doi,
                         resolution_mode=r.resolution_mode,
-                        affiliated=r.affiliated,
+                        address_structures=list(r.address_structures),
                     )
                     for r in rows
                 ],

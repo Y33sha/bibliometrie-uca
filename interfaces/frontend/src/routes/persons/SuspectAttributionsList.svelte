@@ -107,7 +107,8 @@
             {titleCase(group.person.first_name)}
           </button>
           {#if group.person.has_rh}<RhCheck />{/if}
-          {#each group.person.labs as lab (lab)}<span class="tag tag-pill tag-accent">{lab}</span>{/each}
+          <span class="muted-small">Fiche RH :</span>
+          {#each group.hr_units as unit (unit)}<span class="tag tag-pill tag-accent">{unit}</span>{:else}<span class="muted-small">aucune unité</span>{/each}
           <span class="tag">{reasonLabel(group)}</span>
           <span class="muted-small">{formatCount(group.publications.length, "publication")}</span>
           <span class="group-actions">
@@ -151,9 +152,9 @@
               >
               {#if publication.container_title}<span class="muted-small">{publication.container_title}</span>{/if}
               <span class="tag">{resolutionModeLabels[publication.resolution_mode] ?? publication.resolution_mode}</span>
-              {#if publication.affiliated}
-                <span class="tag" use:tooltip={"Adresse, ROR ou structure HAL du périmètre"}>affiliée</span>
-              {/if}
+              {#each publication.address_structures as structure (structure)}
+                <span class="tag tag-pill" use:tooltip={"Structure rattachée à une adresse de la publication"}>{structure}</span>
+              {/each}
             </li>
           {/each}
         </ul>

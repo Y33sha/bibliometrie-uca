@@ -1263,7 +1263,7 @@ export interface paths {
          * Suspect Attributions
          * @description Liste par page les attributions suspectes en attente, groupées par personne et par motif : cluster isolé de ses publications, ou publications proches des publications rejetées pour elle.
          *
-         *     Les groupes sans contribution affiliée au périmètre viennent en tête. L'administration rejette un groupe (`detach-contributions`) ou le confirme par l'épinglage de ses contributions (`/contributions/orphans/batch-assign`).
+         *     Chaque groupe donne les unités de la fiche RH de la personne, et chaque publication les structures rattachées à ses adresses. L'administration rejette un groupe (`detach-contributions`) ou le confirme par l'épinglage de ses contributions (`/contributions/orphans/batch-assign`).
          */
         get: operations["suspect_attributions_api_persons_suspect_attributions_get"];
         put?: never;
@@ -6685,6 +6685,11 @@ export interface components {
          */
         SuspectGroupOut: {
             person: components["schemas"]["CurationPersonOut"];
+            /**
+             * Hr Units
+             * @description Unités des périodes RH de la personne.
+             */
+            hr_units: string[];
             reason: components["schemas"]["SuspectReason"];
             /** Cluster */
             cluster: number | null;
@@ -6763,10 +6768,10 @@ export interface components {
             /** Resolution Mode */
             resolution_mode: string;
             /**
-             * Affiliated
-             * @description Contribution affiliée au périmètre par une adresse, un ROR ou une structure HAL de ses contributions sources.
+             * Address Structures
+             * @description Structures rattachées aux adresses des contributions sources de la contribution.
              */
-            affiliated: boolean;
+            address_structures: string[];
         };
         /**
          * SuspectReason

@@ -243,7 +243,7 @@ def suspect_attributions(
 ) -> SuspectAttributionsResponse:
     """Liste par page les attributions suspectes en attente, groupées par personne et par motif : cluster isolé de ses publications, ou publications proches des publications rejetées pour elle.
 
-    Les groupes sans contribution affiliée au périmètre viennent en tête. L'administration rejette un groupe (`detach-contributions`) ou le confirme par l'épinglage de ses contributions (`/contributions/orphans/batch-assign`).
+    Chaque groupe donne les unités de la fiche RH de la personne, et chaque publication les structures rattachées à ses adresses. L'administration rejette un groupe (`detach-contributions`) ou le confirme par l'épinglage de ses contributions (`/contributions/orphans/batch-assign`).
     """
     return queries.suspect_attributions(page=page, per_page=per_page)
 
