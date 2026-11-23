@@ -1,11 +1,13 @@
-# STATUS: oneshot (2026-10-06)
-"""Rattache à leurs informations du contributeur corrigées les contributions sources dont le nom de famille se réduit à des initiales.
+# STATUS: maintenance
+"""Rattache à leurs informations du contributeur corrigées les contributions sources dont le découpage du nom change, après une modification de `ContributorName.split`.
 
-Le découpage retenu d'une contribution source (`ContributorName.split`) place en prénom des initiales données comme nom de famille par la source : « Del Buono L. », « C., Küll », surname « M. » et forename « Brigante ». Ce script recalcule le découpage des contributions sources dont les informations du contributeur ont un nom fait d'initiales, et rattache chacune aux informations du contributeur de son découpage. Il précède toute normalisation de leurs enregistrements sources : la synchronisation retrouve les contributions sources en base par leurs informations du contributeur. Les lignes de `contributor_information` devenues orphelines sont purgées. Idempotent.
+Le script recalcule le découpage des contributions sources dont le nom déclenche une règle de découpage (`_CANDIDATES_SQL`) : nom de famille fait d'initiales (« Del Buono L. »), segment entre parenthèses (« Corona, Christophe (author) »). Il rattache chacune aux informations du contributeur de son découpage. Il précède toute normalisation de leurs enregistrements sources : la synchronisation retrouve les contributions sources en base par leurs informations du contributeur. Les lignes de `contributor_information` devenues orphelines sont purgées. Idempotent.
+
+Une règle de découpage ajoutée ajoute sa condition à `_CANDIDATES_SQL`.
 
 Usage :
-    uv run python -m interfaces.cli.oneshot.backfill_initials_split            # exécution
-    uv run python -m interfaces.cli.oneshot.backfill_initials_split --dry-run  # rapport seul
+    uv run python -m interfaces.cli.maintenance.resplit_contributor_names            # exécution
+    uv run python -m interfaces.cli.maintenance.resplit_contributor_names --dry-run  # rapport seul
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ from pipeline.ingestion.common.source_contribution_store import (
 )
 from pipeline.ingestion.common.source_contributions import contributor_name_fields
 
-log = setup_logger("backfill_initials_split", os.path.dirname(__file__))
+log = setup_logger("resplit_contributor_names", os.path.dirname(__file__))
 
 _CANDIDATES_SQL = text(r"""
     SELECT sc.id, sc.raw_author_name, sc.raw_last_name, sc.raw_first_name,
@@ -34,7 +36,9 @@ _CANDIDATES_SQL = text(r"""
     FROM source_contributions sc
     JOIN contributor_information ci ON ci.id = sc.contributor_information_id
     WHERE ci.last_name_normalized ~ '^([a-z] )*[a-z]$'
+       OR concat_ws(' ', sc.raw_author_name, sc.raw_last_name, sc.raw_first_name) ~ '[(\[]'
 """)
+"""Contributions sources dont le nom déclenche une règle de découpage : nom de famille fait d'initiales, segment entre parenthèses ou crochets."""
 
 _UPSERT_CONTRIBUTOR_INFORMATION_SQL = text(f"""
     INSERT INTO contributor_information ({", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)})
@@ -58,7 +62,7 @@ _REPOINT_SQL = text(
 ).bindparams(bindparam("payload", type_=Jsonb))
 
 
-def backfill(conn: Connection, *, apply: bool) -> int:
+def resplit(conn: Connection, *, apply: bool) -> int:
     """Rattache les contributions sources dont le découpage change. Renvoie leur nombre."""
     payload = []
     for row in conn.execute(_CANDIDATES_SQL):
@@ -90,7 +94,7 @@ def main() -> int:
     )
     apply = not parser.parse_args().dry_run
     with get_sync_engine().connect() as conn:
-        changed = backfill(conn, apply=apply)
+        changed = resplit(conn, apply=apply)
         log.info("contributions sources au découpage corrigé : %d", changed)
         if apply:
             log.info(
@@ -98,7 +102,7 @@ def main() -> int:
                 delete_orphan_contributor_information(conn),
             )
             conn.commit()
-            log.info("✓ backfill appliqué")
+            log.info("✓ découpage appliqué")
         else:
             log.info("DRY-RUN — aucune écriture")
     return 0
