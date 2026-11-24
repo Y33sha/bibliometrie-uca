@@ -43,7 +43,9 @@ Mesure exploratoire du 2026-11-24 (`data/experiments/fausses-attributions/embedd
   | Ni coauteur à fiche RH cosignant une autre publication de la personne, ni revue partagée | 45 | 9 | 6 |
 
   - Le score seul n'a pas de seuil fiable. Coauteurs et revue écartent 16 alertes, dont un seul homonyme.
-  - Les 9 fausses alertes restantes sont des publications hors de la discipline de la personne, sans coauteur ni revue habituels : vulgarisation, enseignement, géographie des diplômés.
+  - Les 9 fausses alertes restantes sont des publications éloignées des autres publications de la personne, sans coauteur ni revue habituels.
+  - Score thématique (`embeddings_sujets.py`) : similarité maximale entre la publication et les libellés des 15 thèmes OpenAlex les plus fréquents chez la personne, encodés par le même modèle. Médiane de 0,20 pour les homonymes, de 0,37 pour les publications de la personne. Un seuil à 0,33 ramène les 60 alertes restantes à 50 : 42 homonymes, 4 publications de la personne, 4 incertaines. Le seuil est choisi sur ces mêmes alertes.
+  - Sur tout le jeu, le score thématique seul sépare les rejetées des actuelles avec une AUC de 0,93, contre 0,98 pour la comparaison aux publications voisines.
   - 16 des 46 homonymes sont rattachés par un ORCID donné par HAL seul.
   - Les verdicts sont copiés dans `data/experiments/fausses-attributions/embeddings_verdicts/`. Ils forment un premier jeu d'évaluation du modèle.
 - Un modèle d'embeddings statiques (`potion-multilingual-128M`) calcule ces 41 699 publications en 3 minutes. Sur 1 394 personnes, il retrouve 5 % des rejetées quand 1 % des actuelles sont signalées. Ses publications les plus isolées sont des titres génériques : actes de colloque, éditoriaux, réponses.
