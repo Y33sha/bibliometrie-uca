@@ -96,6 +96,7 @@ Mesures d'indices supplémentaires (`phase5_*.py`), au 2026-11-23. Jeu : 838 con
 - Une contribution dont une adresse est rattachée à une structure du périmètre n'est pas signalée, quelle que soit la source de l'adresse. Les structures HAL ne comptent pas : les sources les recopient.
 - La ressemblance aux rejets écarte l'indice des années d'activité.
 - Dans un cluster, seules sont signalables les contributions rattachées par IdRef ou idHAL, et celles rattachées par le nom dans une publication de plus de 100 contributions.
+- Un cluster signalé compte au moins deux publications signalables. Une personne examinée compte au moins quatre publications.
 - Un rattachement par un ORCID donné par HAL seulement vaut un idHAL : il est signalable et n'ancre pas la publication. HAL donne l'ORCID du compte relié par HAL à la contribution.
 - La partition utilise la bibliothèque `igraph`.
 - Une phase placée après `persons` recalcule à chaque run la table `persons.suspect_contributions` : contribution, personne, motif, cluster.
@@ -137,8 +138,4 @@ Scripts de mesure dans `data/experiments/`, sans code du pipeline. Jeu de valida
 
 ### Phase 5 — Documentation
 
-- [ ] Mise à jour de la documentation du pipeline, du rattachement des personnes et de l'administration, et de la liste des phases de `CLAUDE.md`.
-
-## Questions ouvertes
-
-- Un chercheur pluridisciplinaire réunit des clusters distincts sans homonyme.
+- [x] Mise à jour de la documentation du pipeline, du rattachement des personnes et de l'administration, et de la liste des phases de `CLAUDE.md`.

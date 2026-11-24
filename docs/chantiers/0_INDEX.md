@@ -5,7 +5,6 @@
 ### En cours
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
-- [Détection des fausses attributions](DATA_detection-fausses-attributions.md)
 - [Modèle open access des revues](DATA_modele-open-access-des-revues.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 
@@ -20,6 +19,7 @@
 
 ## Chantiers archivés
 
+- 2026-11-24 — [Détection des fausses attributions](archived/2026-11-24_DATA_detection-fausses-attributions.md)
 - 2026-11-24 — [Réduction des contributions orphelines](archived/2026-11-24_DATA_reduction-contributions-orphelines.md)
 - 2026-11-20 — [Réorganisation du pipeline selon ses dépendances](archived/2026-11-20_CODE_reorganisation-du-pipeline.md)
 - 2026-11-17 — [Refactorisation : fin du moissonnage](archived/2026-11-17_CODE_refacto-fin-du-moissonnage.md)
