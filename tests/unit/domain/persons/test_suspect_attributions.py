@@ -99,7 +99,8 @@ def test_le_cluster_principal_reunit_le_plus_de_contributions_ancrees():
 def test_une_publication_a_adresse_du_perimetre_n_est_pas_signalee():
     """Le cluster perd ses publications à adresse du périmètre, puis passe sous la taille minimale."""
     publications = _person()
-    publications[3] = replace(publications[3], perimeter_address=True)
+    for i in (3, 4):
+        publications[i] = replace(publications[i], perimeter_address=True)
 
     assert signaled_clusters(publications, _FREQUENCIES, _labels(0, 0, 0, 1, 1, 1)) == []
 
@@ -126,7 +127,7 @@ def test_un_rattachement_par_le_nom_n_est_pas_signale():
     publications = _person()
     publications[3] = replace(publications[3], mode=ContributionMatchReason.NAME)
 
-    assert signaled_clusters(publications, _FREQUENCIES, _labels(0, 0, 0, 1, 1, 1)) == []
+    assert signaled_clusters(publications, _FREQUENCIES, _labels(0, 0, 0, 1, 1, 1)) == [[5, 6]]
 
 
 def test_un_rattachement_par_le_nom_dans_une_grande_collaboration_est_signale():
@@ -141,13 +142,19 @@ def test_un_rattachement_par_le_nom_dans_une_grande_collaboration_est_signale():
 
 
 def test_un_petit_cluster_n_est_pas_signale():
-    publications = _person()
+    """La publication 7, sans indice, forme seule un cluster isolé."""
+    publications = _person() + [_publication(7)]
 
-    assert signaled_clusters(publications, _FREQUENCIES, _labels(0, 0, 0, 0, 1, 1)) == []
+    clusters = signaled_clusters(publications, _FREQUENCIES, _labels(0, 0, 0, 1, 1, 1, 2))
+
+    assert clusters == [[4, 5, 6]]
 
 
 def test_une_personne_a_peu_de_publications_n_est_pas_examinee():
-    assert signaled_clusters(_person()[:5], _FREQUENCIES, _labels(0, 0, 0, 1, 1)) == []
+    publications = _person()
+    few = [publications[0], publications[3], publications[4]]
+
+    assert signaled_clusters(few, _FREQUENCIES, _labels(0, 1, 1)) == []
 
 
 def _context(publication_id, *, persons=(), laboratories=(), year=None):

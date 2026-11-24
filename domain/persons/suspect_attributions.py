@@ -126,7 +126,7 @@ Partition = Callable[[int, Mapping[tuple[int, int], float], float], Sequence[int
 RESOLUTION = 0.2
 """Résolution de la partition : basse, elle évite de découper les publications d'une personne en plusieurs clusters."""
 
-MIN_CLUSTER_SIZE = 3
+MIN_CLUSTER_SIZE = 2
 """Publications minimales d'un cluster signalé. Une publication isolée ressemble autant à une publication de la personne qu'à celle d'un homonyme."""
 
 MIN_PUBLICATIONS = 2 * MIN_CLUSTER_SIZE
