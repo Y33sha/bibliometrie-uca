@@ -203,7 +203,7 @@ _DUP_WHERE = """
         AND EXISTS (SELECT 1 FROM hr_records WHERE person_id = p2.id)
     )
 """
-"""Paires candidates : quatre requêtes larges, resserrées par `names_compatible` (comparaison des mots du nom). Les personnes exclues, les paires distinctes et les paires de deux fiches RH sont écartées."""
+"""Paires candidates : requêtes larges, resserrées par `names_compatible` (comparaison des mots du nom). Les personnes exclues, les paires distinctes et les paires de deux fiches RH sont écartées."""
 
 PERSON_DUP_QUERIES = [
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
@@ -244,6 +244,18 @@ PERSON_DUP_QUERIES = [
               OR p1.first_name_normalized LIKE p2.first_name_normalized || ' %%'
               OR p2.first_name_normalized LIKE p1.first_name_normalized || ' %%'
           )
+        {_DUP_WHERE}
+        ORDER BY p1.id, p2.id""",
+    # Noms de famille identiques hors espaces et tirets (« Le Roy », « Leroy »).
+    f"""SELECT p1.id AS id_a, p2.id AS id_b,
+               p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
+               p2.last_name_normalized AS ln2, p2.first_name_normalized AS fn2
+        FROM persons p1
+        JOIN persons p2 ON p1.id < p2.id
+          AND TRANSLATE(p1.last_name_normalized, ' -', '') = TRANSLATE(p2.last_name_normalized, ' -', '')
+          AND p1.last_name_normalized <> p2.last_name_normalized
+          AND p1.last_name_normalized <> ''
+          AND LEFT(p1.first_name_normalized, 1) = LEFT(p2.first_name_normalized, 1)
         {_DUP_WHERE}
         ORDER BY p1.id, p2.id""",
     f"""SELECT p1.id AS id_a, p2.id AS id_b,
@@ -313,8 +325,16 @@ def _overlap_sets(conn: Connection, sql: str, ids: list[int]) -> dict[int, set[i
     return out
 
 
+def _joined(last_name: str) -> str:
+    """Renvoie le nom de famille sans espaces ni tirets."""
+    return last_name.replace(" ", "").replace("-", "")
+
+
 def _name_duplicate_candidates(conn: Connection) -> list[tuple[int, int]]:
-    """Renvoie les paires de personnes aux noms compatibles, sans recouvrements de réseau. Étape la moins coûteuse, suffisante pour le badge."""
+    """Renvoie les paires de personnes aux noms compatibles, sans recouvrements de réseau. Étape la moins coûteuse, suffisante pour le badge.
+
+    Les noms se comparent tels quels, puis avec des noms de famille sans espaces ni tirets : « Le Roy » et « Leroy » sont compatibles.
+    """
     seen: set[tuple[int, int]] = set()
     candidates: list[tuple[int, int]] = []
     for sql in PERSON_DUP_QUERIES:
@@ -323,7 +343,10 @@ def _name_duplicate_candidates(conn: Connection) -> list[tuple[int, int]]:
             if key in seen:
                 continue
             seen.add(key)
-            if names_compatible(r.ln1 or "", r.fn1 or "", r.ln2 or "", r.fn2 or ""):
+            ln1, fn1, ln2, fn2 = r.ln1 or "", r.fn1 or "", r.ln2 or "", r.fn2 or ""
+            if names_compatible(ln1, fn1, ln2, fn2) or names_compatible(
+                _joined(ln1), fn1, _joined(ln2), fn2
+            ):
                 candidates.append((r.id_a, r.id_b))
     return candidates
 

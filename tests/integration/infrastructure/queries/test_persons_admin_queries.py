@@ -289,6 +289,12 @@ class TestNameDuplicates:
 
         self._pair(PersonsQueries(sa_sync_conn).name_duplicates(page=1, per_page=50), a, b)
 
+    def test_last_name_split_by_a_space_pairs_with_its_joined_form(self, sa_sync_conn):
+        a = insert_person(sa_sync_conn, "Le Roy", first_name="Pierre")
+        b = insert_person(sa_sync_conn, "Leroy", first_name="P")
+
+        self._pair(PersonsQueries(sa_sync_conn).name_duplicates(page=1, per_page=50), a, b)
+
     def test_excluded_person_excluded(self, sa_sync_conn):
         a = insert_person(sa_sync_conn, "Bekono", first_name="Nina")
         b = insert_person(sa_sync_conn, "Bekono", first_name="N", exclusion="not_a_person")
