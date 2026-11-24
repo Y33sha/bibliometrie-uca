@@ -18,6 +18,19 @@ Ce chantier dépend du chantier [résolution des personnes par groupe](archived/
 
 La table des paires est du dérivé recalculable. C'est la sortie d'un modèle probabiliste comme de règles déterministes.
 
+Mesure exploratoire du 2026-11-24 (`data/experiments/fausses-attributions/embeddings_*.py`) : embedding du titre et du début du résumé, modèle `paraphrase-multilingual-MiniLM-L12-v2`. Jeu : 52 personnes ayant des rejets, 3 153 publications actuelles, 852 publications rejetées. Score d'une publication : similarité moyenne avec ses cinq plus proches voisines parmi les publications actuelles de la personne.
+
+| Score | AUC | Rappel des rejetées, 1 % des actuelles signalées | Rappel des rejets isolés (41, personnes à 3 rejets au plus) |
+|---|---|---|---|
+| Embeddings | 0,986 | 0,80 | 0,88 |
+| Sous-champs OpenAlex | 0,979 | 0,73 | 0,63 |
+
+- Les embeddings couvrent toutes les publications ; 5 des 41 rejets isolés sont sans sous-champ OpenAlex.
+- Comparées entre elles, les publications rejetées d'un même homonyme se ressemblent : AUC de 0,40 quand le voisinage réunit publications actuelles et rejetées. Les clusters couvrent ce cas.
+- Publications actuelles les plus isolées, relues à vue : des homonymes probables, comme la karstification chez un physicien d'ALICE ou la valve aortique chez une généticienne animale. Les fausses alertes sont des articles d'instrumentation d'ALICE chez des physiciens d'ALICE, des titres génériques (« Guest Editor introduction », « Data integration ») et des titres en français.
+- Le calcul prend environ 11 publications par seconde sur le CPU, soit environ une heure pour les publications des personnes à fiche RH.
+- Un modèle d'embeddings statiques (`potion-multilingual-128M`) calcule ces 41 699 publications en 3 minutes. Sur 1 394 personnes, il retrouve 5 % des rejetées quand 1 % des actuelles sont signalées. Ses publications les plus isolées sont des titres génériques : actes de colloque, éditoriaux, réponses.
+
 ## Décisions
 
 - La méthode se choisit d'après des essais hors pipeline, évalués sur les verdicts humains, comme dans le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs.md).
@@ -28,6 +41,7 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 
 - [ ] Modèle probabiliste sur le résidu de la cascade par groupe, évalué sur le jeu d'évaluation.
 - [ ] Modèle sans les identifiants : le nom et les indices du départage des noms ambigus (coauteurs, laboratoire, structure HAL, revue, années d'activité). Le poids des identifiants écraserait les autres indices.
+- [ ] Similarité d'embeddings du titre et du résumé comme indice de discipline, à la place des sous-champs OpenAlex : publication isolée dans la production d'une personne, comparaison d'une publication aux profils des personnes candidates.
 - [ ] Identifiants comme second signal. Un désaccord entre le modèle et les identifiants signale une erreur d'identifiant ou une fausse attribution, présentée à l'administration.
 
 ### Phase 2 — Choix de la méthode
