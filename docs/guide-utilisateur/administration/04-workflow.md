@@ -108,6 +108,10 @@ La file des doublons par nom, dans la liste des personnes, présente les paires 
 
 Une publication attribuée à la mauvaise personne se détache depuis le volet de la personne, par la forme de nom concernée. La contribution détachée rejoint les [contributions orphelines](#contributions-orphelines).
 
+#### Attributions suspectes
+
+L'onglet « Attributions suspectes » de la liste des personnes présente les publications probablement signées par un homonyme, groupées par personne ([détection](../../pipeline/09-persons.md#attributions-suspectes-suspect_attributions)). On rejette ou on confirme un groupe entier, ou une publication. Le rejet détache la publication de la personne, et nourrit la détection des publications proches. La confirmation épingle la publication sur la personne, et le groupe sort de la file. La file est recalculée à chaque run.
+
 #### Vérification des identifiants de personne
 
 La [résolution des personnes](../../pipeline/09-persons.md) rattache aux personnes les identifiants (ORCID, IdRef, idHAL) présents dans les publications.

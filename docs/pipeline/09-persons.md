@@ -53,6 +53,15 @@ Les saisies manuelles (épinglage d'une contribution source, formes de nom confi
 
 Une personne sans contribution du périmètre est supprimée, sauf si elle est présente dans le référentiel RH ou fait l'objet d'une décision humaine. Ses contributions perdent leur personne.
 
+## Attributions suspectes (`suspect_attributions`)
+
+La phase `suspect_attributions` suit `persons`. Elle recalcule à chaque run la file des attributions suspectes (`suspect_contributions`), soumise à l'administration. Deux motifs :
+
+- **cluster isolé** : les publications d'une personne à fiche RH forment un graphe. Deux publications sont reliées par leurs indices partagés : coauteurs, laboratoires, structures HAL, revue, thèmes OpenAlex, domaines HAL. Chaque indice est pondéré par sa rareté. La partition de Leiden découpe le graphe en clusters. Un cluster est signalé hors du cluster principal, sans contribution ancrée (ORCID, épinglage), avec peu de liens vers le reste, et au moins deux publications signalables ;
+- **ressemblance aux rejets** : pour une personne ayant au moins un rejet, la cascade de départage compare chaque publication au profil de la personne et au profil de ses publications rejetées. Une publication désignée par le profil des rejets est signalée.
+
+Sont signalables les contributions rattachées par IdRef, idHAL ou un ORCID donné par HAL seul, et celles rattachées par le nom dans une publication de plus de 100 contributions. Une adresse rattachée à une structure du périmètre protège la contribution. L'administration tranche : le rejet détache la contribution, la confirmation l'épingle (`domain/persons/suspect_attributions.py`).
+
 ## Arbitrage des identifiants (`normalize.arbitrate_identifiers`)
 
 La tâche clôt la normalisation, avant le périmètre et l'alignement des auteurs. Une valeur d'identifiant (ORCID, IdRef, `hal_person_id`) contenue dans des contributions sources sous des noms différents va au nom majoritaire. Les contributions sources qui la contiennent sous un autre nom la neutralisent : la valeur ne rattache plus la contribution à une personne, et ne la fait plus entrer dans le périmètre. Les collectifs et les doublons d'auteur ne votent pas.
