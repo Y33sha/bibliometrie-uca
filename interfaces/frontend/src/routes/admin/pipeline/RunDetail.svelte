@@ -116,7 +116,7 @@
   </div>
   <div class="meta-row">
     <span class="meta-label">Début</span>
-    <span class="meta-value">{fmtDate(detail.started_at)}</span>
+    <span class="meta-value nowrap">{fmtDate(detail.started_at)}</span>
   </div>
   <div class="meta-row">
     <span class="meta-label">Durée totale</span>
@@ -259,9 +259,9 @@
 <style>
   .run-meta {
     display: grid;
-    grid-template-columns: 160px 1fr;
+    grid-template-columns: minmax(160px, max-content) 1fr;
     row-gap: 4px;
-    column-gap: 12px;
+    column-gap: 32px;
     margin-bottom: 16px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--border);
@@ -278,6 +278,9 @@
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+  .meta-value.nowrap {
+    white-space: nowrap;
   }
   .dot {
     width: 10px;

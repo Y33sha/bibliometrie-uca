@@ -121,11 +121,13 @@
     color: var(--muted);
     font-size: var(--fs-sm);
     font-family: var(--mono);
+    white-space: nowrap;
   }
   .run-duration {
     margin-left: auto;
     font-size: var(--fs-sm);
     font-family: var(--mono);
+    white-space: nowrap;
   }
   .run-sub {
     display: flex;
