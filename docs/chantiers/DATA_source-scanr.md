@@ -98,3 +98,4 @@ Règles propres à ScanR hors de `pipeline/ingestion/scanr/` :
 
 - Justesse des rattachements par l'IdRef ScanR seul, dans les quelque 595 publications du périmètre par la fiche RH : échantillon à relire.
 - Usage des 2 010 résumés et des 22 617 listes de mots-clés fournis par ScanR seul.
+- Les enregistrements sources ScanR rattachés à un enregistrement source INSPIRE-HEP sont-ils aussi sans contributions sources, comme ceux d'OpenAlex ? Ces publications contiennent 110 339 contributions sources ScanR. 95 contributions du périmètre reposent sur ScanR seul ; l'échantillon du 2026-11-07 en juge 13, toutes fausses.
