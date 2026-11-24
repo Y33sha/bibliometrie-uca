@@ -27,6 +27,8 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 ### Phase 1 — Essais
 
 - [ ] Modèle probabiliste sur le résidu de la cascade par groupe, évalué sur le jeu d'évaluation.
+- [ ] Modèle sans les identifiants : le nom et les indices du départage des noms ambigus (coauteurs, laboratoire, structure HAL, revue, années d'activité). Le poids des identifiants écraserait les autres indices.
+- [ ] Identifiants comme second signal. Un désaccord entre le modèle et les identifiants signale une erreur d'identifiant ou une fausse attribution, présentée à l'administration.
 
 ### Phase 2 — Choix de la méthode
 
