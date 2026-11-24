@@ -61,7 +61,7 @@ Mesures de la relecture de la file :
 - Sources des rejets (`sources_des_rejets.py`) : sur 943 paires rejetées, 156 des 159 rattachements par identifiant venaient de HAL ou de ScanR. Les 784 rattachements par le nom viennent surtout des grandes collaborations : 585 publications de plus de 100 contributions.
 - Décisions de l'administration sur la file (`decisions.py`) : les 17 groupes rejetés reposaient sur un identifiant de HAL ou de ScanR. 7 des 13 groupes confirmés comptaient des rattachements par le nom. Le jeu de validation compte deux homonymes du périmètre ; les autres confusions portent sur l'initiale du prénom.
 
-Mesures de la phase 5 (`phase5_*.py`), au 2026-11-23. Jeu : 838 contributions rejetées rattachées de nouveau à leur personne, face aux 61 621 contributions actuelles non épinglées et aux 659 épinglées.
+Mesures d'indices supplémentaires (`phase5_*.py`), au 2026-11-23. Jeu : 838 contributions rejetées rattachées de nouveau à leur personne, face aux 61 621 contributions actuelles non épinglées et aux 659 épinglées.
 
 - Les clusters signalent 559 contributions rejetées et aucune contribution actuelle.
 - Contributions rejetées manquées : 250 sont non signalables, 12 sont dans un cluster trop petit, 17 dans le cluster principal. Les non signalables sont surtout des homonymes du périmètre (Muriel Bonnet : 134, Pierre Bonnet : 45) et des rattachements par le nom dans de petites publications, une ou deux par personne.
@@ -119,15 +119,9 @@ Scripts de mesure dans `data/experiments/`, sans code du pipeline. Jeu de valida
 - [x] Attribution d'une contribution déjà rattachée à la personne visée : épinglage.
 - [x] API : compteur et liste de la file, par personne puis par cluster, groupes sans contribution affiliée au périmètre en tête.
 - [x] Onglet « Attributions suspectes » des files de triage des personnes : rejet ou confirmation d'un cluster ou d'une publication.
-- [ ] Mesure sur le stock, puis relecture des alertes.
+- [x] Mesure sur le stock, puis relecture des alertes.
 
-### Phase 5 — Indices supplémentaires
-
-- [ ] Contribution sans affiliation au périmètre, ou à adresse hors périmètre, rattachée seulement par IdRef ou idHAL.
-- [ ] Contribution à prénom réduit à l'initiale, rattachée par IdRef ou idHAL.
-- [ ] Clusters des personnes sans fiche RH, à partir d'un nombre minimal de publications.
-
-### Phase 6 — Documentation
+### Phase 5 — Documentation
 
 - [ ] Mise à jour de la documentation du pipeline, du rattachement des personnes et de l'administration, et de la liste des phases de `CLAUDE.md`.
 
