@@ -14,7 +14,7 @@ from pipeline.transformation.dois.lookups import DOI_ORG, UNPAYWALL, Answer, Doi
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import queued
 from tests.integration.helpers.serials import insert_doi_prefix
-from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
+from tests.integration.helpers.sources import insert_source_record
 
 STALENESS = 30  # seuil de péremption arbitraire pour ces tests
 
@@ -68,41 +68,18 @@ def _to_query(conn, service=UNPAYWALL) -> set[str]:
     return set(DoiAnswerStore(conn).fetch_dois_to_query(service, staleness_days=STALENESS))
 
 
-class TestCandidateDois:
-    """Unpaywall reçoit les DOI candidats, selon la règle des ancres : DOI `primary` ou `derived`, ou seul DOI de l'enregistrement source."""
+class TestPublicationDois:
+    """Unpaywall reçoit le DOI de chaque publication."""
 
-    def test_le_seul_doi_d_un_enregistrement_source_est_candidat(self, sa_sync_conn):
+    def test_le_doi_d_une_publication_est_interroge(self, sa_sync_conn):
+        insert_publication(sa_sync_conn, doi="10.1/publication")
+
+        assert "10.1/publication" in _to_query(sa_sync_conn)
+
+    def test_un_doi_absent_des_publications_est_ecarte(self, sa_sync_conn):
         _record_with_dois(sa_sync_conn, insert_publication(sa_sync_conn), "10.1/seul")
 
-        assert "10.1/seul" in _to_query(sa_sync_conn)
-
-    def test_un_doi_secondaire_parmi_d_autres_est_ecarte(self, sa_sync_conn):
-        _record_with_dois(sa_sync_conn, insert_publication(sa_sync_conn), "10.1/a", "10.1/b")
-
-        assert not {"10.1/a", "10.1/b"} & _to_query(sa_sync_conn)
-
-    def test_un_doi_qui_a_une_cible_est_ecarte(self, sa_sync_conn):
-        _candidate(sa_sync_conn, "10.5281/zenodo.2")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO doi_targets (doi, target_doi, rule)"
-                " VALUES ('10.5281/zenodo.2', '10.5281/zenodo.1', 'concept')"
-            )
-        )
-
-        assert "10.5281/zenodo.2" not in _to_query(sa_sync_conn)
-
-    def test_un_enregistrement_source_orphelin_compte_seulement_dans_le_perimetre(
-        self, sa_sync_conn
-    ):
-        _record_with_dois(sa_sync_conn, None, "10.1/hors")
-        in_perimeter = _record_with_dois(sa_sync_conn, None, "10.1/dans")
-        insert_source_contribution(sa_sync_conn, in_perimeter, source="hal", in_perimeter=True)
-
-        dois = _to_query(sa_sync_conn)
-
-        assert "10.1/dans" in dois
-        assert "10.1/hors" not in dois
+        assert "10.1/seul" not in _to_query(sa_sync_conn)
 
 
 class TestKnownDois:

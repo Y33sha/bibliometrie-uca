@@ -6,7 +6,7 @@ Deux caches dénormalisés, en cascade :
 
 La consolidation des publications calcule `publications.countries`. Deux portées partagent l'agrégation :
 
-- les contributions sources à recalculer (`refresh`, tâche `affiliations.refresh_source_record_countries`). Les publications des enregistrements sources modifiés entrent dans la file `publications_queue`.
+- les contributions sources à recalculer (`refresh`, tâche `countries.refresh_source_record_countries`). Les publications des enregistrements sources modifiés entrent dans la file `publications_queue`.
 - les contributions sources d'un lot d'adresses (`CountryRecompute`, appelé par l'API après une saisie manuelle). Les publications sont recalculées aussitôt.
 
 Une contribution source est à recalculer quand elle est dans la file `source_contribution_countries_queue`, ou liée à une adresse de la file `address_countries_queue`. `create_dirty_scope` relève les deux files, puis ces contributions sources, dans des tables temporaires lues par les trois étapes :

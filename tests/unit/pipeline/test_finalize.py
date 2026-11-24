@@ -19,6 +19,8 @@ _SUPPRESSIONS = {
     "delete_empty_serials": "serials",
     "delete_empty_publishers": "publishers",
 }
+_RECORDED = {**_SUPPRESSIONS, "count_subject_usage": "sujets"}
+"""Tâches remplacées par un enregistreur de leur appel."""
 
 
 class _FakePurgeQueries:
@@ -62,7 +64,7 @@ def _suppression(appels: list[str], nom: str, n: int = 0):
 
 
 def _finalize(appels: list[str], suppressions: dict[str, int] | None = None) -> Phase:
-    """Renvoie la phase `finalize`, ses suppressions de référentiels vides remplacées par des enregistreurs."""
+    """Renvoie la phase `finalize`, ses suppressions de référentiels vides et le décompte des sujets remplacés par des enregistreurs."""
     suppressions = suppressions or {}
 
     def run(nom: str):
@@ -71,7 +73,7 @@ def _finalize(appels: list[str], suppressions: dict[str, int] | None = None) -> 
     return dataclasses.replace(
         _FINALIZE,
         children=tuple(
-            dataclasses.replace(t, run=run(_SUPPRESSIONS[t.name])) if t.name in _SUPPRESSIONS else t
+            dataclasses.replace(t, run=run(_RECORDED[t.name])) if t.name in _RECORDED else t
             for t in _FINALIZE.tasks
         ),
     )
@@ -114,7 +116,7 @@ def test_purge_par_lots_jusqu_a_epuisement(open_tx, contexte):
     assert rendu.details["summary"]["publications_purged"] == 10120
     assert purge.limites == [5000] * 4  # trois lots pleins, puis l'appel qui renvoie zéro
     assert open_tx.conn.commits == 3  # un commit par lot supprimé, aucun pour le lot vide
-    assert publication_counts.appels[-3:] == ["adresses", "revues", "éditeurs"]
+    assert publication_counts.appels[-4:] == ["adresses", "revues", "éditeurs", "sujets"]
 
 
 def test_rien_a_purger(open_tx, contexte):
@@ -127,8 +129,8 @@ def test_rien_a_purger(open_tx, contexte):
 def test_chaque_tache_dans_sa_transaction(open_tx, contexte):
     _run(contexte, [10])
 
-    # purge, périmètre des publications, vues matérialisées, éditeur des revues, une suppression par référentiel vide, puis un décompte par famille : adresses, revues, éditeurs
-    assert open_tx.transactions == 10
+    # purge, périmètre des publications, vues matérialisées, éditeur des revues, une suppression par référentiel vide, un décompte par famille (adresses, revues, éditeurs), puis l'usage des sujets
+    assert open_tx.transactions == 11
 
 
 def test_la_synchronisation_rend_les_contributions_du_perimetre(contexte):

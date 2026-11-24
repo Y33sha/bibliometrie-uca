@@ -54,8 +54,13 @@ _COLLECTIVE_WORDS: frozenset[str] = frozenset(
         "society",
         "study",
         "team",
+        "universidad",
+        "universidade",
+        "universita",
         "universitat",
         "universite",
+        "universiteit",
+        "universitet",
         "university",
     }
 )

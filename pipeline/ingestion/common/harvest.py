@@ -90,7 +90,7 @@ _CHILDREN = tuple(
             "pipeline_phase_executions",
         ),
         writes=("staging", "staging_normalization_queue"),
-        previous_run=("staging", "pipeline_phase_executions"),
+        previous_runs=("staging", "pipeline_phase_executions"),
         network=source,
         parallel_group="sources",
         run=_harvest(source),
@@ -115,4 +115,5 @@ PHASE = Phase(
     Block.HARVESTING,
     check=check_extraction_perimeter,
     assemble=assemble,
+    total_line=True,
 )

@@ -59,5 +59,5 @@ Schéma PostgreSQL `sources`.
 - La phase [`affiliations`](../pipeline/04-affiliations.md) écrit les indices de périmètre des contributions sources.
 - La phase [`publications`](../pipeline/07-publications.md) rattache chaque enregistrement source à sa publication.
 - La phase [`author_grouping`](../pipeline/08-author-grouping.md) marque les doublons d'auteur.
-- Les phases `normalize` et [`persons`](../pipeline/09-persons.md) neutralisent des identifiants.
-- Les [enrichissements](../pipeline/11-enrichissements.md) écrivent les pays et `dois`.
+- La phase `normalize` neutralise des identifiants : identifiant partagé dans une liste d'auteurs, [arbitrage des identifiants](../pipeline/09-persons.md#arbitrage-des-identifiants-normalizearbitrate_identifiers).
+- La phase [`countries`](../pipeline/04-affiliations.md#pays-countries) écrit les pays. Les phases [`dois`](../pipeline/05-publishing.md#référentiel-des-doi-dois) et [`open_access`](../pipeline/11-enrichissements.md#statut-open-access-open_access) écrivent `dois`.

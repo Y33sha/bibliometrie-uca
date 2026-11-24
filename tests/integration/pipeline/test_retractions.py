@@ -1,4 +1,4 @@
-"""Indicateur « Rétracté » des publications, écrit par la tâche `retracted` de la phase `relations`."""
+"""Indicateur « Rétracté » des publications, écrit par la tâche `flag_retracted_publications` de la phase `relations`."""
 
 import logging
 

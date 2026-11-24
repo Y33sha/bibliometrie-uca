@@ -154,16 +154,27 @@ _WITHHOLD_SQL = text(
         WHERE sr.id IN (SELECT source_record_id FROM deleted) AND sr.publication_id IS NOT NULL
         """,
     )
+    + """), countries_marked AS ("""
+    + enqueue_sql(
+        Queue.PUBLICATIONS,
+        """
+        SELECT publication_id FROM source_records
+        WHERE id = ANY(:ids) AND countries IS NOT NULL AND publication_id IS NOT NULL
+        """,
+    )
     + """), reset AS (
         UPDATE source_records
-        SET authors_hash = NULL, author_count = 0, distinct_author_count = 0
+        SET authors_hash = NULL, author_count = 0, distinct_author_count = 0, countries = NULL
         WHERE id = ANY(:ids)
-          AND (authors_hash IS NOT NULL OR author_count <> 0 OR distinct_author_count <> 0)
+          AND (
+              authors_hash IS NOT NULL OR author_count <> 0 OR distinct_author_count <> 0
+              OR countries IS NOT NULL
+          )
     )
     SELECT count(*) FROM deleted
     """
 )
-"""Suppression des contributions sources des enregistrements sources `:ids` (`SourceContributionStore.withhold_source_contributions`)."""
+"""Suppression des contributions sources des enregistrements sources `:ids` (`SourceContributionStore.withhold_source_contributions`). Toutes les sous-requêtes lisent l'état antérieur à la suppression."""
 
 
 def mark_source_contributions_to_resync(conn: Connection, source: str) -> int:
@@ -420,7 +431,7 @@ class SourceContributionStore:
     def withhold_source_contributions(self, source_record_ids: list[int]) -> int:
         """Supprime les contributions sources des enregistrements sources donnés, et renvoie leur nombre.
 
-        L'enregistrement source perd son empreinte de bloc auteurs : sa prochaine normalisation synchronise ses contributions sources. Ses nombres d'auteurs passent à zéro. Sa publication est marquée pour le groupement des auteurs.
+        L'enregistrement source perd son empreinte de bloc auteurs : sa prochaine normalisation synchronise ses contributions sources. Ses nombres d'auteurs passent à zéro et ses pays sont vidés. Sa publication est marquée pour le groupement des auteurs, et pour sa consolidation si l'enregistrement source avait des pays.
         """
         if not source_record_ids:
             return 0

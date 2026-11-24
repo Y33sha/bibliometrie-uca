@@ -1,11 +1,11 @@
-"""Réponses de doi.org et d'Unpaywall sur les DOI (`sources.dois`), tâches de la phase `dois`.
+"""Réponses de doi.org et d'Unpaywall sur les DOI (`sources.dois`).
 
 Deux tâches interrogent chacune un service sur ses DOI jamais interrogés ou périmés, et écrivent chaque réponse :
 
-- `resolve_dois` demande à l'API des handles de doi.org l'existence et l'URL de résolution de chaque DOI connu (`_KNOWN_DOIS`).
-- `verify_unpaywall` demande à Unpaywall le statut open access de chaque DOI candidat au DOI d'une publication (`_CANDIDATE_DOIS`), hors DOI DataCite. Un DOI absent d'Unpaywall reçoit un verdict nul.
+- `resolve_dois` (phase `dois`) demande à l'API des handles de doi.org l'existence et l'URL de résolution de chaque DOI connu (`_KNOWN_DOIS`). Les publications d'un DOI dont la réponse change entrent dans la file `publications_queue` : leur consolidation recalcule leur URL d'accès.
+- `verify_unpaywall` (phase `open_access`) demande à Unpaywall le statut open access du DOI de chaque publication, hors DOI DataCite. Un DOI absent d'Unpaywall reçoit un verdict nul. La tâche `recompute_oa_status` reporte ensuite les verdicts sur le statut des publications.
 
-Quand le service est indisponible, le DOI est reporté au run suivant. Les publications d'un DOI dont la réponse change entrent dans la file `publications_queue` : leur consolidation recalcule leur URL d'accès et leur statut open access.
+Quand le service est indisponible, le DOI est reporté au run suivant.
 
 Un délai de péremption et un plafond par run bornent chaque tâche. Les DOI au-delà du plafond sont traités aux runs suivants. L'accès à Unpaywall exige l'adresse du polite pool.
 """
@@ -71,22 +71,8 @@ _KNOWN_DOIS = f"""
 """
 """DOI connus (vue `known_dois` : DOI actifs des enregistrements sources, cibles des relations), et forme sans version de chaque DOI à suffixe de version. `fetch_missing` cherche aussi ces formes."""
 
-_CANDIDATE_DOIS = """
-    SELECT DISTINCT d.doi
-    FROM (
-        SELECT sri.id_value AS doi, sri.role, sri.source_record_id,
-               count(*) OVER (PARTITION BY sri.source_record_id) AS record_dois
-        FROM source_record_identifiers sri
-        WHERE sri.id_type = 'doi' AND sri.removed_by IS NULL
-    ) d
-    JOIN source_records sr ON sr.id = d.source_record_id
-    WHERE (d.role IN ('primary', 'derived') OR d.record_dois = 1)
-      AND (sr.publication_id IS NOT NULL
-           OR EXISTS (SELECT 1 FROM source_contributions sc
-                      WHERE sc.source_record_id = sr.id AND sc.in_perimeter))
-      AND NOT EXISTS (SELECT 1 FROM doi_targets t WHERE t.doi = d.doi)
-"""
-"""DOI candidats au DOI d'une publication, selon la règle des ancres (`domain.source_records.keys.doi_anchors`) : DOI actifs de rôle `primary` ou `derived`, ou seul DOI actif de leur enregistrement source. L'enregistrement source est rattaché à une publication ou doté d'une contribution source du périmètre. Les DOI qui ont une cible sont écartés."""
+_PUBLICATION_DOIS = "SELECT DISTINCT doi FROM publications WHERE doi IS NOT NULL"
+"""DOI des publications."""
 
 
 class DoiService(NamedTuple):
@@ -101,10 +87,17 @@ class DoiService(NamedTuple):
     """Requête des DOI interrogés, à une colonne `doi`."""
     found_column: str | None = None
     """Colonne recevant `Answer.found`. `None` : un DOI inconnu du service reçoit une réponse nulle."""
+    requeues: bool = True
+    """Les publications d'un DOI dont la réponse change entrent dans `publications_queue`."""
 
 
 UNPAYWALL = DoiService(
-    "unpaywall_oa_status", "oa_type", "unpaywall_checked_at", True, _CANDIDATE_DOIS
+    "unpaywall_oa_status",
+    "oa_type",
+    "unpaywall_checked_at",
+    True,
+    _PUBLICATION_DOIS,
+    requeues=False,
 )
 DOI_ORG = DoiService("registered_url", "text", "resolved_at", False, _KNOWN_DOIS, "registered")
 
@@ -245,7 +238,7 @@ async def _look_up(
     staleness_days: int,
     max_per_run: int | None,
 ) -> PhaseMetrics:
-    """Interroge le service pour les DOI à interroger, écrit les réponses, met en file de consolidation les publications des DOI dont la réponse change, puis renvoie les métriques du run, avec son bilan dans `details`."""
+    """Interroge le service pour les DOI à interroger, écrit les réponses, puis renvoie les métriques du run, avec son bilan dans `details`."""
     dois = store.fetch_dois_to_query(task.service, limit=max_per_run, staleness_days=staleness_days)
     stale_total = store.count_dois_to_query(task.service, staleness_days=staleness_days)
     counts: Counter[str] = Counter()
@@ -350,9 +343,10 @@ async def _query_service(
     ]
     if counts["unavailable"]:
         summary.append(quantity(counts["unavailable"], "reporté"))
-    summary.append(
-        quantity(counts["queued"], "publication à recalculer", "publications à recalculer")
-    )
+    if task.service.requeues:
+        summary.append(
+            quantity(counts["queued"], "publication à recalculer", "publications à recalculer")
+        )
     logger.info("%s%s", LAST_BRANCH, ", ".join(summary))
 
 
@@ -362,7 +356,7 @@ def _apply_answers(
     answers: list[Answer],
     counts: Counter[str],
 ) -> None:
-    """Classe les réponses par rapport à celles en table, les écrit, puis met en file de consolidation les publications des DOI dont la réponse change."""
+    """Classe les réponses par rapport à celles en table et les écrit. Avec `DoiService.requeues`, met en file de consolidation les publications des DOI dont la réponse change."""
     stored = store.fetch_answers(service, [a.doi for a in answers])
     for a in answers:
         if not a.found:
@@ -375,7 +369,7 @@ def _apply_answers(
             counts["unchanged"] += 1
     store.record_answers(service, answers)
     changed = [a.doi for a in answers if a.doi not in stored or stored[a.doi] != a.value]
-    if changed:
+    if changed and service.requeues:
         counts["queued"] += store.enqueue_publications(changed)
 
 
@@ -436,50 +430,42 @@ def _verify_unpaywall(ctx: PhaseContext) -> PhaseMetrics:
     ).run(ctx)
 
 
-TASKS = (
-    Task(
-        "resolve_dois",
-        reads=(
-            *_LOOKUP_READS,
-            "publication_relations.target_doi",
-            "dois.registered_url",
-            "dois.resolved_at",
-            "dois.registered",
-        ),
-        writes=(
-            "dois.doi",
-            "dois.registered_url",
-            "dois.resolved_at",
-            "dois.registered",
-            "publications_queue",
-        ),
-        previous_run=_LOOKUP_PREVIOUS_RUN,
-        network=registry.DOI_ORG,
-        run=_resolve_dois,
-        section="URL de résolution des DOI sur doi.org",
+RESOLVE_DOIS = Task(
+    "resolve_dois",
+    reads=(
+        *_LOOKUP_READS,
+        "publication_relations.target_doi",
+        "dois.registered_url",
+        "dois.resolved_at",
+        "dois.registered",
     ),
-    Task(
-        "verify_unpaywall",
-        reads=(
-            *_LOOKUP_READS,
-            "source_contributions.in_perimeter",
-            "doi_targets",
-            "dois.unpaywall_oa_status",
-            "dois.unpaywall_checked_at",
-            "doi_prefixes.ra",
-        ),
-        writes=(
-            "dois.doi",
-            "dois.unpaywall_oa_status",
-            "dois.unpaywall_checked_at",
-            "publications_queue",
-        ),
-        # Agence d'un préfixe inconnu de doi.org, trouvée par l'édition chez Crossref ou DataCite.
-        previous_run=(*_LOOKUP_PREVIOUS_RUN, "doi_prefixes.ra"),
-        network="unpaywall",
-        run=_verify_unpaywall,
-        section="Vérification du statut open access sur Unpaywall",
+    writes=(
+        "dois.doi",
+        "dois.registered_url",
+        "dois.resolved_at",
+        "dois.registered",
+        "publications_queue",
     ),
+    previous_runs=_LOOKUP_PREVIOUS_RUN,
+    network=registry.DOI_ORG,
+    run=_resolve_dois,
+    section="URL de résolution des DOI sur doi.org",
+)
+
+VERIFY_UNPAYWALL = Task(
+    "verify_unpaywall",
+    reads=(
+        "publications.doi",
+        "dois.doi",
+        "dois.unpaywall_oa_status",
+        "dois.unpaywall_checked_at",
+        "doi_prefixes.ra",
+        "config",
+    ),
+    writes=("dois.doi", "dois.unpaywall_oa_status", "dois.unpaywall_checked_at"),
+    network="unpaywall",
+    run=_verify_unpaywall,
+    section="Vérification du statut open access sur Unpaywall",
 )
 
 

@@ -78,11 +78,11 @@ def assign_orphan_contribution(
     body: AssignOrphanContribution,
     contributions: ContributionService = Depends(contribution_service),
 ) -> OrphanAssignResponse:
-    """Attribue une contribution orpheline à une personne, désignée ou créée par la requête.
+    """Attribue une contribution orpheline à une personne, désignée ou créée par la requête. Une contribution déjà rattachée à la personne désignée est épinglée sur elle.
 
     Renvoie 422 sans `person_id` ni `create_person`, et sans nom de famille à la création (`assign_orphan_contribution_to_new_person`). Renvoie 404 sur une personne ou une contribution introuvable.
 
-    Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), sauf si `force` retire le rejet au passage. Renvoie aussi 409 sur une contribution déjà rattachée à une personne, et quand la personne a déjà une contribution manuelle dans la publication.
+    Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), sauf si `force` retire le rejet au passage. Renvoie aussi 409 sur une contribution rattachée à une autre personne, et quand la personne a déjà une contribution manuelle dans la publication.
     """
     if body.create_person is not None:
         person_id = contributions.assign_orphan_contribution_to_new_person(
@@ -106,9 +106,9 @@ def batch_assign_orphan_contributions(
     body: BatchAssignOrphanContributions,
     contributions: ContributionService = Depends(contribution_service),
 ) -> OrphanBatchAssignResponse:
-    """Attribue plusieurs contributions orphelines à une personne existante.
+    """Attribue plusieurs contributions orphelines à une personne existante. Les contributions déjà rattachées à la personne sont épinglées sur elle.
 
-    Les contributions absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte renvoyé compte les contributions rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, sauf si `force` retire les rejets au passage.
+    Les contributions absentes ou rattachées à une autre personne sont écartées du lot et journalisées ; le décompte renvoyé compte les contributions rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, sauf si `force` retire les rejets au passage.
     """
     if not body.contribution_ids:
         return OrphanBatchAssignResponse(assigned=0)

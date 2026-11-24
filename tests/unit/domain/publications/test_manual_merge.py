@@ -39,8 +39,9 @@ def test_the_doi_of_a_zenodo_dataset_counts():
         check_mergeable([*_articles("10.1/x"), PublicationDoi("10.5281/zenodo.1", "dataset")])
 
 
-def test_priority_follows_the_order_of_the_decision():
-    assert MATCH_REASON_PRIORITY == (
+def test_priority_ranks_every_mode_in_the_order_of_the_decision():
+    assert set(MATCH_REASON_PRIORITY) == set(ContributionMatchReason)
+    assert MATCH_REASON_PRIORITY[:6] == (
         ContributionMatchReason.MANUAL,
         ORCID,
         ContributionMatchReason.HAL_PERSON_ID,

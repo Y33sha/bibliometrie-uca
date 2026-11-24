@@ -9,11 +9,10 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 def build_metrics(
     *,
     resolution: Mapping[str, int],
-    arbitration: Mapping[str, int],
     name_forms: Mapping[str, int],
     purge: Mapping[str, int],
 ) -> PhaseMetrics:
-    """Assemble les métriques de la phase depuis les compteurs du rattachement des contributions (`resolve_contributions`), de l'arbitrage des identifiants, de la régénération des formes de nom et de la purge.
+    """Assemble les métriques de la phase depuis les compteurs du rattachement des contributions (`resolve_contributions`), de la régénération des formes de nom et de la purge.
 
     `details.table` compte les contributions rattachées pendant le run, par mode de résolution (`ContributionMatchReason`), et celles qui fondent une personne (`created`). Le mode `manual` réunit les épinglages appliqués et les décisions par épinglage.
     """
@@ -35,7 +34,6 @@ def build_metrics(
     }
     metrics.details["summary"] = {
         **resolution,
-        "identifiers_neutralized": arbitration.get("neutralized", 0),
         "ambiguous_marked": purge.get("ambiguous_marked", 0),
         "deleted_attributions": purge.get("deleted_attributions", 0),
         "deleted_persons": purge.get("deleted_persons", 0),

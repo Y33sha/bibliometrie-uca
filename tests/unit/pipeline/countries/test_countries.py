@@ -1,6 +1,6 @@
-"""Étape des pays de la phase `affiliations` : enchaînement des tâches et entonnoir.
+"""Phase `countries` : enchaînement des tâches et entonnoir.
 
-L'étape relève deux bilans, avant la détection et après le choix du pays, et en tire un entonnoir : adresses sans pays au départ, adresses dotées d'un pays par la passe, adresses restantes. Les tâches ont leurs propres tests.
+La phase relève deux bilans, avant la détection et après le choix du pays, et en tire un entonnoir : adresses sans pays au départ, adresses dotées d'un pays par la passe, adresses restantes. Les tâches ont leurs propres tests.
 """
 
 import dataclasses
@@ -28,7 +28,7 @@ class _FakeCountryQueries:
         return self._bilans.pop(0)
 
     def install(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Simule les accès SQL de l'étape : bilans, résolution."""
+        """Simule les accès SQL de la phase : bilans, résolution."""
         monkeypatch.setattr(step, "count_address_country_status", self.count_address_country_status)
         monkeypatch.setattr(step, "resolve_queued_addresses", lambda conn: 3)
 
@@ -36,7 +36,7 @@ class _FakeCountryQueries:
 def _run(contexte) -> dict[str, PhaseMetrics]:
     tasks = tuple(
         dataclasses.replace(t, run=_PLACE_NAMES) if t.name == "detect_by_place_name" else t
-        for t in step.STEP.tasks
+        for t in step.PHASE.tasks
     )
     return execute_tasks(tasks, contexte(mode="daily"))
 

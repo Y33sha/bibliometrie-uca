@@ -8,7 +8,6 @@ from typing import NamedTuple
 from domain.normalize import to_plain_text
 from domain.serials.containers import SeriesDescription, VolumeDescription
 from domain.serials.issns import IssnSupport, SerialIssn
-from domain.serials.serial import OaModel
 from domain.types import JsonValue
 
 
@@ -37,7 +36,6 @@ class JournalKey(StrEnum):
     ISSNS = "issns"
     """Liste d'ISSN, clés `IssnKey`."""
     OPENALEX_ID = "openalex_id"
-    OA_MODEL = "oa_model"
 
 
 class MonographKey(StrEnum):
@@ -83,7 +81,6 @@ def _journal_biblio(series: SeriesDescription) -> dict[str, JsonValue] | None:
             (JournalKey.TITLE, series.title),
             (JournalKey.ISSNS, issns),
             (JournalKey.OPENALEX_ID, series.openalex_id),
-            (JournalKey.OA_MODEL, series.oa_model),
         )
         if value
     }
@@ -175,12 +172,10 @@ def journal_series(biblio: Mapping[str, object] | None) -> SeriesDescription | N
     )
     title = journal.get(JournalKey.TITLE)
     openalex_id = journal.get(JournalKey.OPENALEX_ID)
-    oa_model = journal.get(JournalKey.OA_MODEL)
     return SeriesDescription(
         title=str(title) if title else None,
         issns=issns,
         openalex_id=str(openalex_id) if openalex_id else None,
-        oa_model=OaModel(oa_model) if oa_model else None,
     )
 
 

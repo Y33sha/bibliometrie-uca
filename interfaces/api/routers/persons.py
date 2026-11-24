@@ -30,6 +30,7 @@ from infrastructure.read_models.persons.models import (
     PersonSort,
     PersonThesesResponse,
     SharingPersonOut,
+    SuspectAttributionsResponse,
 )
 from infrastructure.read_models.persons.queries import PersonsQueries
 from infrastructure.read_models.subjects.models import SubjectFrequency
@@ -224,6 +225,27 @@ def name_duplicates(
     Les doublons probables viennent en tête, les homonymes en fin.
     """
     return queries.name_duplicates(page=page, per_page=per_page)
+
+
+@router.get("/suspect-attributions/count", response_model=TotalCountResponse)
+def suspect_attributions_count(
+    queries: PersonsQueries = Depends(persons_queries),
+) -> TotalCountResponse:
+    """Renvoie le compteur de l'onglet « Attributions suspectes » (badge)."""
+    return TotalCountResponse(total=queries.suspect_attributions_count())
+
+
+@router.get("/suspect-attributions", response_model=SuspectAttributionsResponse)
+def suspect_attributions(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    queries: PersonsQueries = Depends(persons_queries),
+) -> SuspectAttributionsResponse:
+    """Liste par page les attributions suspectes en attente, groupées par personne et par motif : cluster isolé de ses publications, ou publications proches des publications rejetées pour elle.
+
+    Chaque groupe donne les unités de la fiche RH de la personne, et chaque publication les structures rattachées à ses adresses. L'administration rejette un groupe (`detach-contributions`) ou le confirme par l'épinglage de ses contributions (`/contributions/orphans/batch-assign`).
+    """
+    return queries.suspect_attributions(page=page, per_page=per_page)
 
 
 @router.post("/mark-distinct", response_model=OkResponse)

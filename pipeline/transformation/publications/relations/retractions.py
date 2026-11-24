@@ -1,4 +1,4 @@
-"""Phase `relations`, tâche `retracted` : indicateur « Rétracté » des publications (`publications.is_retracted`).
+"""Phase `relations`, tâche `flag_retracted_publications` : indicateur « Rétracté » des publications (`publications.is_retracted`).
 
 Une publication est rétractée sur l'un de ces signaux :
 
@@ -73,7 +73,7 @@ def mark_retracted(conn: Connection, _logger: logging.Logger) -> PhaseMetrics:
 
 TASKS = (
     Task(
-        "retracted",
+        "flag_retracted_publications",
         reads=(
             "publication_relations",
             *(
@@ -89,6 +89,12 @@ TASKS = (
             "publications.is_retracted",
         ),
         writes=("publications.is_retracted",),
+        previous_runs=(
+            # Publications et relations supprimées, enregistrements sources détachés par `finalize.purge_publications`.
+            "publications.is_retracted",
+            "publication_relations",
+            "source_records.publication_id",
+        ),
         run=in_transaction(mark_retracted),
         label="Publications rétractées",
     ),

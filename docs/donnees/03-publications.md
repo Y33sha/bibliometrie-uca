@@ -47,4 +47,4 @@ Une métadonnée fausse se corrige par une règle de [correction](../pipeline/06
 
 - La phase [`publications`](../pipeline/07-publications.md) regroupe les enregistrements sources en publications, puis recalcule les métadonnées de chaque publication touchée. Une publication réunie à une autre est supprimée : son identifiant redirige vers la publication conservée.
 - La phase [`finalize`](../pipeline/10-finalize.md) reporte le périmètre sur les publications et supprime les publications sans contribution rattachée.
-- Les [enrichissements](../pipeline/11-enrichissements.md) écrivent les relations, les sujets, les pays et le statut d'accès.
+- Les phases [`open_access`](../pipeline/11-enrichissements.md#statut-open-access-open_access), [`relations`](../pipeline/11-enrichissements.md#relations-entre-publications-relations) et [`subjects`](../pipeline/11-enrichissements.md#sujets-subjects) écrivent le statut open access, les relations et les sujets.

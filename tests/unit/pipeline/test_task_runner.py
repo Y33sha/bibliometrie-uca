@@ -217,7 +217,7 @@ def test_une_phase_ecartee_par_sa_condition_le_signale_sans_executer_ses_taches(
     assert [record.getMessage() for record in caplog.records] == ["  └─ Sautée"]
 
 
-def test_une_phase_de_moissonnage_ecrit_le_total_de_plusieurs_taches_executees(contexte, caplog):
+def test_une_phase_a_ligne_de_total_ecrit_le_total_de_plusieurs_taches_executees(contexte, caplog):
     """Le total d'une seule tâche exécutée redirait sa ligne de bilan : la phase l'omet."""
     une_seule = (
         _TACHES[0],
@@ -225,8 +225,8 @@ def test_une_phase_de_moissonnage_ecrit_le_total_de_plusieurs_taches_executees(c
     )
 
     with caplog.at_level(logging.INFO, logger="test"):
-        run_phase(Phase("essai", "Essai", une_seule, Block.HARVESTING), contexte())
+        run_phase(Phase("essai", "Essai", une_seule, Block.HARVESTING, total_line=True), contexte())
         assert not any(r.getMessage().startswith("Total") for r in caplog.records)
-        run_phase(Phase("essai", "Essai", _TACHES, Block.HARVESTING), contexte())
+        run_phase(Phase("essai", "Essai", _TACHES, Block.HARVESTING, total_line=True), contexte())
 
     assert caplog.records[-1].getMessage() == "Total : 3 nouveaux"

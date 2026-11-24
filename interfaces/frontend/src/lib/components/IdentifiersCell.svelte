@@ -1,5 +1,6 @@
 <script lang="ts">
 	import IdentifierLink from './IdentifierLink.svelte';
+	import { PERSON_IDENTIFIER_TYPES } from '#lib/labels.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Identifier = components['schemas']['PersonIdentifierOut'];
@@ -27,12 +28,10 @@
 		}
 		return Array.from(byValue, ([value, confirmed]) => ({ value, confirmed }));
 	}
-
-	const types = ['orcid', 'idhal', 'idref'] as const;
 </script>
 
 <span class="id-cell">
-	{#each types as type (type)}
+	{#each PERSON_IDENTIFIER_TYPES as type (type)}
 		{@const values = grouped(type)}
 		{#if values.length}
 			{#each values as id (id.value)}

@@ -1,6 +1,6 @@
 # Normalisation
 
-*À jour le 2026-10-26.*
+*À jour le 2026-11-20.*
 
 La phase `normalize` transforme les données moissonnées (`staging`) en [enregistrements sources](../donnees/02-sources.md) et en contributions sources. Elle écrit aussi les localisations, les adresses et les [sujets](../donnees/03-publications.md#sujets), et crée ou reconnaît les monographies, les éditeurs et les plateformes. L'enregistrement source décrit sa série (`biblio.journal`) ; la phase [`publishing`](05-publishing.md) le rattache à sa publication en série. Une série qui désigne une plateforme est écartée : source OpenAlex de la liste des plateformes connues, ou titre qui nomme le serveur de preprints du DOI.
 
@@ -14,7 +14,9 @@ Le type de document et la langue de la source sont traduits dans le vocabulaire 
 
 Chaque normaliseur pose aussi la licence de l'enregistrement source (`source_records.license`), ramenée au vocabulaire fermé de `domain/documents/licenses.py`.
 
-En fin de phase, les `source_records` d'un document marqué `disappeared_at` par [`fetch_stale`](02-harvest.md#documents-périmés-et-disparus-fetch_stale) sont supprimées ; leurs `source_contributions` sont supprimées en cascade. La ligne de `staging` reste, avec sa marque.
+En fin de phase, la tâche `prune_disappeared` supprime les `source_records` d'un document marqué `disappeared_at` par [`fetch_stale`](02-harvest.md#documents-périmés-et-disparus-fetch_stale) ; leurs `source_contributions` sont supprimées en cascade. La ligne de `staging` reste, avec sa marque.
+
+Les tâches `cleanup_orphan_contributor_information` et `cleanup_orphan_addresses` suppriment ensuite les informations du contributeur sans contribution source, et les adresses sans contribution source ni décision de l'administration.
 
 En fin de phase, le `raw_data` de `staging` est vidé.
 
@@ -26,7 +28,7 @@ Une contribution source retrouvée avec d'autres informations du contributeur (i
 
 Un enregistrement source garde ses contributions sources en l'état si la partie auteurs de son payload est inchangée depuis la dernière normalisation. L'option `--normalize-full` vide l'empreinte de cette partie pour tous les enregistrements sources des sources normalisées : leurs contributions sources se resynchronisent à leur prochaine normalisation.
 
-## Listes d'auteurs d'INSPIRE-HEP
+## Listes d'auteurs d'INSPIRE-HEP (`withhold_openalex_authors`)
 
 Un enregistrement source OpenAlex du même document qu'un enregistrement source INSPIRE-HEP est sans contributions sources. Les affiliations d'OpenAlex sont souvent fausses, et [INSPIRE-HEP](../sources/12-inspire.md) vérifie ses listes d'auteurs. Les deux enregistrements sources partagent un DOI, un DOI arXiv, un hal-id ou un numéro de fiche CDS, de rôle autre que `related`.
 

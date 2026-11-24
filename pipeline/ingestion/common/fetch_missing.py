@@ -86,7 +86,7 @@ def _channel(
     name: str,
     *,
     reads: tuple[str, ...] = (),
-    previous_run: tuple[str, ...] = (),
+    previous_runs: tuple[str, ...] = (),
     network: str,
     identifier: str,
     run: ChannelRun,
@@ -109,13 +109,13 @@ def _channel(
             *reads,
         ),
         writes=("staging", "staging_normalization_queue", "failed_lookups"),
-        previous_run=(
+        previous_runs=(
             "staging",
             "failed_lookups",
             "source_records",
             "source_record_identifiers",
             "publications.in_perimeter",
-            *previous_run,
+            *previous_runs,
         ),
         network=network,
         parallel_group="sources",
@@ -130,14 +130,15 @@ def _by_doi(target: Source) -> Task:
     """Renvoie la recherche par DOI dans `target`, source interrogeable par DOI."""
     return _channel(
         f"doi.{target}",
-        # DOI candidats de la vue `candidate_dois`, bornés à la fenêtre d'années du run par les enregistrements sources de leur publication, et agence d'enregistrement pour Crossref et DataCite.
+        # DOI candidats de la vue `candidate_dois`, bornés à la fenêtre d'années du run par les enregistrements sources de leur publication, privés des DOI inconnus de doi.org, et agence d'enregistrement pour Crossref et DataCite.
         reads=(
             "source_record_identifiers",
             "source_records.publication_year",
             "publication_relations",
+            "dois.registered",
             *(("doi_prefixes.ra",) if PROFILES[target].registration_agency else ()),
         ),
-        previous_run=("doi_prefixes", "publication_relations"),
+        previous_runs=("doi_prefixes", "publication_relations", "dois"),
         network=target,
         identifier="DOI",
         run=lambda ctx, scope: _run_fetch_missing_doi(ctx, scope, target),
@@ -159,7 +160,7 @@ _CHILDREN = (
             _channel(
                 "hal_by_nnt",
                 reads=("publications.doc_type",),
-                previous_run=("publications.doc_type",),
+                previous_runs=("publications.doc_type",),
                 network="hal",
                 identifier="NNT",
                 run=_by_identifier(fetch_missing_hal_by_nnt),
@@ -241,4 +242,5 @@ PHASE = Phase(
     _CHILDREN,
     Block.HARVESTING,
     assemble=assemble,
+    total_line=True,
 )

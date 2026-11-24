@@ -111,3 +111,22 @@ def test_enregistrements_openalex_du_meme_document_sans_contributions_sources(
     assert _authors(conn, other) == ("h", 2, 2)
     assert queued(conn, Queue.PUBLICATION_CONTRIBUTIONS) == {publication}
     assert withhold_covered_source_contributions(conn, log) == 0
+
+
+def test_enregistrement_openalex_prive_de_contributions_sources_perd_ses_pays(sa_sync_conn):
+    conn = sa_sync_conn
+    publication = insert_publication(conn)
+    record = _openalex(conn, "W1", SourceIdentifier(_DOI, _ARTICLE_DOI, _SECONDARY), publication)
+    conn.execute(
+        text("UPDATE source_records SET countries = ARRAY['fr', 'ch'] WHERE id = :id"),
+        {"id": record},
+    )
+    clear(conn, Queue.PUBLICATIONS)
+
+    SourceContributionStore(conn).withhold_source_contributions([record])
+
+    countries = conn.execute(
+        text("SELECT countries FROM source_records WHERE id = :id"), {"id": record}
+    ).scalar_one()
+    assert countries is None
+    assert queued(conn, Queue.PUBLICATIONS) == {publication}

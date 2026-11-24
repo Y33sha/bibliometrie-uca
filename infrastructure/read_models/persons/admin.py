@@ -1,12 +1,13 @@
-"""Lectures d'administration des personnes : contributions par forme de nom, files de triage des formes et des identifiants."""
+"""Lectures d'administration des personnes : contributions par forme de nom, files de triage des formes, des identifiants et des attributions suspectes."""
 
 from collections import defaultdict
 
-from sqlalchemy import Connection, bindparam, text
+from sqlalchemy import Connection, Row, bindparam, text
 
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
+from domain.persons.suspect_attributions import SuspectReason
 from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from infrastructure.read_models.persons.models import (
     AmbiguousFormPersonOut,
@@ -24,6 +25,9 @@ from infrastructure.read_models.persons.models import (
     OtherPersonOut,
     OverlapCountsOut,
     SharingPersonOut,
+    SuspectAttributionsResponse,
+    SuspectGroupOut,
+    SuspectPublicationOut,
 )
 from infrastructure.read_models.sql_fragments import (
     current_unit,
@@ -37,6 +41,55 @@ from infrastructure.sql_fragments import (
     is_laboratory,
     pending_name_form,
 )
+
+# ── File de triage : attributions suspectes ──────────────────────
+
+_SUSPECT_ATTRIBUTIONS_SQL = """
+    SELECT sc.person_id, sc.reason::text AS reason, sc.cluster, g.id AS contribution_id,
+           p.id AS publication_id, p.title, p.publication_year,
+           coalesce(s.title, p.container_title) AS container_title, p.doi,
+           g.resolution_mode::text AS resolution_mode,
+           ARRAY(
+               SELECT DISTINCT coalesce(st.acronym, st.name)
+               FROM aligned_source_contributions gm
+               JOIN source_contribution_addresses sca ON sca.source_contribution_id = gm.source_contribution_id
+               JOIN address_structures ast ON ast.address_id = sca.address_id
+               JOIN structures st ON st.id = ast.structure_id
+               WHERE gm.contribution_id = g.id
+               ORDER BY 1
+           ) AS address_structures
+    FROM suspect_contributions sc
+    JOIN contributions g
+      ON g.id = sc.contribution_id AND g.person_id = sc.person_id
+     AND g.resolution_mode::text <> 'manual'
+    JOIN publications p ON p.id = g.publication_id
+    LEFT JOIN serials s ON s.id = p.serial_id
+    ORDER BY p.publication_year DESC NULLS LAST, p.title
+"""
+"""Attributions suspectes en attente : contribution toujours rattachée à la personne signalée, hors épinglage."""
+
+_HR_UNITS_SQL = """
+    SELECT hp.person_id,
+           array_agg(DISTINCT coalesce(st.acronym, st.name, hp.unit_label) ORDER BY coalesce(st.acronym, st.name, hp.unit_label)) AS units
+    FROM hr_periods hp
+    LEFT JOIN structures st ON st.id = hp.structure_id
+    WHERE hp.person_id = ANY(:ids)
+    GROUP BY hp.person_id
+"""
+"""Unités des périodes RH de chaque personne."""
+
+
+_SuspectKey = tuple[int, str, int | None]
+"""Groupe d'attributions suspectes : personne, motif, cluster."""
+
+
+def _suspect_groups(conn: Connection) -> list[tuple[_SuspectKey, list[Row[tuple[object, ...]]]]]:
+    """Renvoie les attributions suspectes en attente, groupées par (personne, motif, cluster), des plus grands groupes aux plus petits."""
+    groups: dict[_SuspectKey, list[Row[tuple[object, ...]]]] = defaultdict(list)
+    for r in conn.execute(text(_SUSPECT_ATTRIBUTIONS_SQL)):
+        groups[(r.person_id, r.reason, r.cluster)].append(r)
+    return sorted(groups.items(), key=lambda g: (-len(g[1]), g[0][0], g[0][2] or 0))
+
 
 # ── File de triage : formes de nom ambiguës ──────────────────────
 
@@ -472,6 +525,48 @@ class PersonAdminQueries:
             if id_a in persons and id_b in persons
         ]
         return NameDuplicatesResponse(total=total, page=page, per_page=per_page, pairs=items)
+
+    def suspect_attributions_count(self) -> int:
+        """Renvoie le nombre de groupes d'attributions suspectes en attente (badge de l'onglet)."""
+        return len(_suspect_groups(self._conn))
+
+    def suspect_attributions(self, *, page: int, per_page: int) -> SuspectAttributionsResponse:
+        """Renvoie les groupes d'attributions suspectes en attente, paginés, avec la vue allégée de la personne et ses publications suspectes. L'administration rejette ou confirme chaque groupe."""
+        groups = _suspect_groups(self._conn)
+        offset = (page - 1) * per_page
+        page_groups = groups[offset : offset + per_page]
+        person_ids = sorted({key[0] for key, _ in page_groups})
+        persons = _curation_persons(self._conn, person_ids)
+        hr_units = {
+            r.person_id: list(r.units)
+            for r in self._conn.execute(text(_HR_UNITS_SQL), {"ids": person_ids})
+        }
+        items = [
+            SuspectGroupOut(
+                person=persons[person_id],
+                hr_units=hr_units.get(person_id, []),
+                reason=SuspectReason(reason),
+                cluster=cluster,
+                publications=[
+                    SuspectPublicationOut(
+                        contribution_id=r.contribution_id,
+                        publication_id=r.publication_id,
+                        title=r.title,
+                        publication_year=r.publication_year,
+                        container_title=r.container_title,
+                        doi=r.doi,
+                        resolution_mode=r.resolution_mode,
+                        address_structures=list(r.address_structures),
+                    )
+                    for r in rows
+                ],
+            )
+            for (person_id, reason, cluster), rows in page_groups
+            if person_id in persons
+        ]
+        return SuspectAttributionsResponse(
+            total=len(groups), page=page, per_page=per_page, groups=items
+        )
 
     def distinct_persons(self, person_id: int) -> list[DistinctPersonOut]:
         """Renvoie les personnes déclarées distinctes de `person_id` (`distinct_persons`)."""

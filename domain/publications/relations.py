@@ -70,7 +70,7 @@ NOTICE_SUBJECT_RELATIONS = frozenset(
 NOTICE_RELATION_TYPES = NOTICE_SUBJECT_RELATIONS | frozenset(
     {RelationType.HAS_CORRECTION, RelationType.HAS_RETRACTION, RelationType.HAS_CONCERN}
 )
-"""Relations d'une publication avec un erratum ou un avis : correction, rétractation, préoccupation. La tâche `notices` de la phase `relations` les écrit, la tâche `rebuild` écrit les autres."""
+"""Relations d'une publication avec un erratum ou un avis : correction, rétractation, préoccupation. La tâche `link_notices` de la phase `relations` les écrit, la tâche `rebuild_publication_relations` écrit les autres."""
 
 RELATION_PAIR_LABELS: dict[RelationType, str] = {
     **{relation: label for a, b, label in _PAIRS for relation in (a, b)},

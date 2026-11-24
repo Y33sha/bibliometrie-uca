@@ -78,6 +78,8 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "publisher": untouched("serials", "publisher_id"),
     "openalex_id": fill_empty_unique("serials", "openalex_id"),
     "openalex_checked_at": MergeStep((("serials", "openalex_checked_at"),), _recheck_in_openalex),
+    # Réécrit par la recherche suivante dans OpenAlex.
+    "openalex_open_access": untouched("serials", "openalex_is_oa", "openalex_oa_flip_year"),
     "oa_model": _fill_empty_with_marker(ManualField.OA_MODEL, ("oa_model",), "t.oa_model IS NULL"),
     "serial_type": _fill_empty_with_marker(
         ManualField.SERIAL_TYPE,

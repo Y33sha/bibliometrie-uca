@@ -11,6 +11,8 @@
  * Une phase sans entrée ici retombe sur l'affichage générique des compteurs `PhaseMetrics` (total / new / updated / unchanged / errors / extras).
  */
 
+import { resolutionModeLabels } from '#lib/labels.js';
+
 export type SummaryItem = { key: string; label: string };
 export type TableColumn = {
   key: string;
@@ -70,6 +72,22 @@ const DOI_SERVICES_TABLE: TableView = {
     { key: "updated", label: "Modifiés" },
     { key: "unchanged", label: "Inchangés" },
     { key: "not_found", label: "Non trouvés" },
+  ],
+};
+
+/** Vue de la phase `open_access`, et de la phase `oa_status` des runs passés. */
+const OA_STATUS_VIEW: PhaseView = {
+  tables: [
+    DOI_SERVICES_TABLE,
+    {
+      source: "table",
+      firstColumnLabel: "Statut OA",
+      columns: [
+        { key: "count", label: "Nombre", pct: true },
+        { key: "delta", label: "Δ", sign: true },
+      ],
+      total: true,
+    },
   ],
 };
 
@@ -135,6 +153,10 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     ],
   },
   normalize: {
+    summary: [
+      { key: "identifiers_neutralized", label: "Identifiants portés sous le nom d'une autre personne, neutralisés" },
+      { key: "marked_contributions", label: "Contributions à redécider (identifiant neutralisé)" },
+    ],
     tables: [
       {
         source: "table",
@@ -167,10 +189,12 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
           check_serials_in_openalex: "revues cherchées dans OpenAlex",
           type_proceedings_serials: "revues typées recueils d'actes",
           type_journal_serials: "entrées typées revues",
-          learn_serial_doi_namespaces: "DOI → espaces de noms des revues",
+          model_serials: "modèles open access des revues modifiés",
           attach_monographs: "enregistrements sources rattachés aux monographies",
           link_monographs_to_collections: "monographies rattachées à leur collection",
           type_proceedings_volumes: "monographies retypées (actes ou livre)",
+          learn_serial_doi_namespaces: "DOI → espaces de noms des revues",
+          serial_by_doi: "enregistrements sources rattachés à une revue par le DOI",
         },
         columns: [
           { key: "traités", label: "Traités" },
@@ -184,16 +208,20 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     summary: [
       { key: "adresses", label: "Adresses traitées" },
       { key: "in_perimeter", label: "Adresses dans le périmètre" },
-      { key: "cited_addresses", label: "Adresses citées par une publication" },
-      { key: "without_country_initial", label: "Adresses citées sans pays avant le run" },
-      { key: "without_country_pct", label: "Part des adresses citées sans pays avant le run (%)" },
-      { key: "country_newly_attached", label: "Adresses dotées d'un pays par le run" },
-      { key: "without_country_remaining", label: "Adresses citées sans pays après le run" },
       {
         key: "source_contributions_entered",
         label: "Contributions sources entrées dans le périmètre",
       },
       { key: "source_contributions_left", label: "Contributions sources sorties du périmètre" },
+    ],
+  },
+  countries: {
+    summary: [
+      { key: "cited_addresses", label: "Adresses citées par une publication" },
+      { key: "without_country_initial", label: "Adresses citées sans pays avant le run" },
+      { key: "without_country_pct", label: "Part des adresses citées sans pays avant le run (%)" },
+      { key: "country_newly_attached", label: "Adresses dotées d'un pays par le run" },
+      { key: "without_country_remaining", label: "Adresses citées sans pays après le run" },
     ],
   },
   publications: {
@@ -220,11 +248,10 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
         { key: "corrected", label: "Mis à jour" },
       ],
       rows: [
-        { key: "serial_by_doi", label: "Rattachement à la publication en série (par DOI)" },
-        { key: "unary", label: "Corrections à l'unité" },
+        { key: "correct_source_records", label: "Corrections à l'unité" },
         { key: "doi_targets", label: "Cibles des DOI de formes secondaires" },
         { key: "remove_identifiers", label: "Retraits de DOI par confrontation de documents" },
-        { key: "matchable", label: "Mise à l'écart de la réconciliation" },
+        { key: "decide_matchability", label: "Mise à l'écart de la réconciliation" },
       ],
     },
     tables: [
@@ -272,7 +299,6 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "skip:creation_not_allowed", label: "Contributions sans personne (rôles de jury seuls)" },
       { key: "skip:out_of_perimeter", label: "Contributions sans personne (hors périmètre)" },
       { key: "first_names_completed", label: "Prénoms complétés" },
-      { key: "identifiers_neutralized", label: "Identifiants portés sous le nom d'une autre personne, neutralisés" },
       { key: "ambiguous_marked", label: "Contributions à redécider (nom devenu ambigu)" },
       { key: "deleted_attributions", label: "Attributions d'identifiant supprimées" },
       { key: "deleted_persons", label: "Personnes supprimées" },
@@ -285,12 +311,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
         source: "table",
         firstColumnLabel: "Mode de rattachement",
         rowLabels: {
-          manual: "Épinglage",
-          orcid: "ORCID",
-          hal_person_id: "Compte HAL",
-          idref: "IdRef",
-          name: "Nom sans homonymie",
-          compatible_name: "Initiales compatibles",
+          ...resolutionModeLabels,
           created: "Personne créée",
         },
         columns: [{ key: "count", label: "Contributions rattachées", pct: true }],
@@ -304,32 +325,12 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "total_in_perimeter", label: "Contributions du périmètre" },
     ],
   },
-  countries: {
-    lines: [
-      "{total} adresses",
-      "{without_initial} sans pays ({without_pct} %)",
-      "{newly_attached} pays nouvellement rattachés",
-      "Reste {remaining} sans pays",
-    ],
-  },
   subjects: {
     lines: [
       "{subjects_added} sujets ajoutés (nouveau total : {subjects_total})",
       "{publications_updated} publications mises à jour",
     ],
   },
-  oa_status: {
-    tables: [
-      DOI_SERVICES_TABLE,
-      {
-        source: "table",
-        firstColumnLabel: "Statut OA",
-        columns: [
-          { key: "count", label: "Nombre", pct: true },
-          { key: "delta", label: "Δ", sign: true },
-        ],
-        total: true,
-      },
-    ],
-  },
+  oa_status: OA_STATUS_VIEW,
+  open_access: OA_STATUS_VIEW,
 };

@@ -1232,6 +1232,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/persons/suspect-attributions/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suspect Attributions Count
+         * @description Renvoie le compteur de l'onglet « Attributions suspectes » (badge).
+         */
+        get: operations["suspect_attributions_count_api_persons_suspect_attributions_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/suspect-attributions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suspect Attributions
+         * @description Liste par page les attributions suspectes en attente, groupées par personne et par motif : cluster isolé de ses publications, ou publications proches des publications rejetées pour elle.
+         *
+         *     Chaque groupe donne les unités de la fiche RH de la personne, et chaque publication les structures rattachées à ses adresses. L'administration rejette un groupe (`detach-contributions`) ou le confirme par l'épinglage de ses contributions (`/contributions/orphans/batch-assign`).
+         */
+        get: operations["suspect_attributions_api_persons_suspect_attributions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/persons/mark-distinct": {
         parameters: {
             query?: never;
@@ -1705,11 +1747,11 @@ export interface paths {
         put?: never;
         /**
          * Assign Orphan Contribution
-         * @description Attribue une contribution orpheline à une personne, désignée ou créée par la requête.
+         * @description Attribue une contribution orpheline à une personne, désignée ou créée par la requête. Une contribution déjà rattachée à la personne désignée est épinglée sur elle.
          *
          *     Renvoie 422 sans `person_id` ni `create_person`, et sans nom de famille à la création (`assign_orphan_contribution_to_new_person`). Renvoie 404 sur une personne ou une contribution introuvable.
          *
-         *     Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), sauf si `force` retire le rejet au passage. Renvoie aussi 409 sur une contribution déjà rattachée à une personne, et quand la personne a déjà une contribution manuelle dans la publication.
+         *     Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), sauf si `force` retire le rejet au passage. Renvoie aussi 409 sur une contribution rattachée à une autre personne, et quand la personne a déjà une contribution manuelle dans la publication.
          */
         post: operations["assign_orphan_contribution_api_contributions_orphans_assign_post"];
         delete?: never;
@@ -1729,9 +1771,9 @@ export interface paths {
         put?: never;
         /**
          * Batch Assign Orphan Contributions
-         * @description Attribue plusieurs contributions orphelines à une personne existante.
+         * @description Attribue plusieurs contributions orphelines à une personne existante. Les contributions déjà rattachées à la personne sont épinglées sur elle.
          *
-         *     Les contributions absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte renvoyé compte les contributions rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, sauf si `force` retire les rejets au passage.
+         *     Les contributions absentes ou rattachées à une autre personne sont écartées du lot et journalisées ; le décompte renvoyé compte les contributions rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, sauf si `force` retire les rejets au passage.
          */
         post: operations["batch_assign_orphan_contributions_api_contributions_orphans_batch_assign_post"];
         delete?: never;
@@ -6624,6 +6666,36 @@ export interface components {
             /** Vocabularies */
             vocabularies: components["schemas"]["FacetOption"][];
         };
+        /** SuspectAttributionsResponse */
+        SuspectAttributionsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Groups */
+            groups: components["schemas"]["SuspectGroupOut"][];
+            /** Pages */
+            readonly pages: number;
+        };
+        /**
+         * SuspectGroupOut
+         * @description Attributions suspectes d'une personne, par motif : un cluster isolé, ou les publications proches des publications rejetées pour elle.
+         */
+        SuspectGroupOut: {
+            person: components["schemas"]["CurationPersonOut"];
+            /**
+             * Hr Units
+             * @description Unités des périodes RH de la personne.
+             */
+            hr_units: string[];
+            reason: components["schemas"]["SuspectReason"];
+            /** Cluster */
+            cluster: number | null;
+            /** Publications */
+            publications: components["schemas"]["SuspectPublicationOut"][];
+        };
         /**
          * SuspectMergeOut
          * @description Publication de la file des fusions suspectes : moins de la moitié de ses contributions sources d'auteur ont un correspondant dans un autre enregistrement source.
@@ -6676,6 +6748,37 @@ export interface components {
             /** Pages */
             readonly pages: number;
         };
+        /**
+         * SuspectPublicationOut
+         * @description Publication d'une attribution suspecte, par la contribution de la personne.
+         */
+        SuspectPublicationOut: {
+            /** Contribution Id */
+            contribution_id: number;
+            /** Publication Id */
+            publication_id: number;
+            /** Title */
+            title: string;
+            /** Publication Year */
+            publication_year: number | null;
+            /** Container Title */
+            container_title: string | null;
+            /** Doi */
+            doi: string | null;
+            /** Resolution Mode */
+            resolution_mode: string;
+            /**
+             * Address Structures
+             * @description Structures rattachées aux adresses des contributions sources de la contribution.
+             */
+            address_structures: string[];
+        };
+        /**
+         * SuspectReason
+         * @description Motif du signalement d'une contribution, valeur de `suspect_contributions.reason`.
+         * @enum {string}
+         */
+        SuspectReason: "cluster" | "rejected_publications";
         /** ThesesContributionOut */
         ThesesContributionOut: {
             /** Id */
@@ -8939,6 +9042,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NameDuplicatesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suspect_attributions_count_api_persons_suspect_attributions_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    suspect_attributions_api_persons_suspect_attributions_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuspectAttributionsResponse"];
                 };
             };
             /** @description Validation Error */

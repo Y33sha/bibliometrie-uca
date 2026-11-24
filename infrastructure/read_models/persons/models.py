@@ -7,6 +7,7 @@ from typing import Literal
 from application.ports.model import Model
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
+from domain.persons.suspect_attributions import SuspectReason
 from infrastructure.read_models._common import (
     FacetOption,
     PaginatedResponse,
@@ -344,6 +345,35 @@ class NameDuplicatePairOut(Model):
 
 class NameDuplicatesResponse(PaginatedResponse):
     pairs: list[NameDuplicatePairOut]
+
+
+class SuspectPublicationOut(Model):
+    """Publication d'une attribution suspecte, par la contribution de la personne."""
+
+    contribution_id: int
+    publication_id: int
+    title: str
+    publication_year: int | None
+    container_title: str | None
+    doi: str | None
+    resolution_mode: str
+    address_structures: list[str]
+    """Structures rattachées aux adresses des contributions sources de la contribution."""
+
+
+class SuspectGroupOut(Model):
+    """Attributions suspectes d'une personne, par motif : un cluster isolé, ou les publications proches des publications rejetées pour elle."""
+
+    person: CurationPersonOut
+    hr_units: list[str]
+    """Unités des périodes RH de la personne."""
+    reason: SuspectReason
+    cluster: int | None
+    publications: list[SuspectPublicationOut]
+
+
+class SuspectAttributionsResponse(PaginatedResponse):
+    groups: list[SuspectGroupOut]
 
 
 class DistinctPersonOut(Model):

@@ -36,6 +36,14 @@ OUT_OF_SCOPE_DOC_TYPES = frozenset(
 - `erratum`, `retraction` : erratum et avis de rétractation. La publication concernée les relie par leur DOI.
 """
 
+PARTITIONED_OUT_OF_SCOPE_DOC_TYPES = frozenset(
+    {DocType.PRACTICE_THESIS, DocType.MEMOIR, DocType.PHYSICAL_OBJECT, DocType.JOURNAL_ISSUE}
+)
+"""Types exclus qui entrent dans les partitions de la réconciliation. Une partition faite seulement de ces types et d'enregistrements d'agrégateurs de types génériques (`GENERIC_DOC_TYPES`) reste sans publication. Dans une autre partition, ces enregistrements sources restent hors de la publication. Un enregistrement OpenAlex jumeau d'une thèse d'exercice DUMAS ou d'un échantillon DataCite reste ainsi sans publication."""
+
+GENERIC_DOC_TYPES = frozenset({DocType.THESIS, DocType.OTHER})
+"""Types peu précis donnés par un agrégateur à un document d'un type exclu : `thesis` pour une thèse d'exercice, `other` pour un échantillon ou un numéro de revue. Donné par une autre source, `thesis` désigne une thèse de doctorat."""
+
 _EXCLUDED_DOI_PREFIXES = frozenset({"10.60692"})
 """Préfixes DOI dont les enregistrements sources sont écartés de la réconciliation.
 

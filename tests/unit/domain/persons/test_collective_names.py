@@ -29,6 +29,8 @@ from domain.persons.collective_names import is_collective_name
         "École Normale Supérieure de Lyon",
         "Université Clermont Auvergne",
         "Universität Hamburg, Germany",
+        "Universidad de Alicante (España)",
+        "Università di Bologna",
         "Rutherford Appleton Laboratory",
         "The PLOS ONE Editors",
         "FACE BD Grp",

@@ -83,6 +83,9 @@ MAX_CONCURRENT: dict[str, int] = {
 }
 """Requêtes simultanées consenties à chaque accès, sous son plafond."""
 
+CROSSREF_SEARCH_MAX_CONCURRENT = 1
+"""Requêtes simultanées consenties à la recherche Crossref par ORCID (`GET /works?filter=`). Les en-têtes annoncent 3 requêtes simultanées et 3 req/s (`x-api-pool: polite-array`), mais Crossref répond 429 dès 2 requêtes simultanées."""
+
 
 MAX_PER_SECOND: dict[str, float] = {
     # Aucun seuil publié.

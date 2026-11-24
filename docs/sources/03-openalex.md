@@ -14,7 +14,7 @@ https://developers.openalex.org/
 - [Moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : filtre sur l'ORCID déposé (`raw_orcid`) d'un lot de 50 personnes RH
 - Pagination par cursor. Taille de page et débit : `pipeline/ingestion/api_params.py`
 
-**Sources API** (https://api.openalex.org/sources) — interrogée par ISSN, ou par identifiant OpenAlex pour une revue sans ISSN, par `check_serials_in_openalex` dans la phase [`publishing`](../pipeline/05-publishing.md). Donne l'identifiant OpenAlex, le type et les listes de revues (`listed_in`) de chaque revue.
+**Sources API** (https://api.openalex.org/sources) — interrogée par ISSN, ou par identifiant OpenAlex pour une revue sans ISSN, par `check_serials_in_openalex` dans la phase [`publishing`](../pipeline/05-publishing.md). Donne l'identifiant OpenAlex, le type, les listes de revues (`listed_in`), l'open access intégral (`is_oa`) et l'année du passage à l'open access intégral (`oa_flip_year`) de chaque revue.
 
 **Source lists API** (https://api.openalex.org/source-lists) — organisme, URL et édition chargée de chaque liste de revues.
 
@@ -28,7 +28,7 @@ https://developers.openalex.org/
 - **Localisations** (`source_record_locations`) : chaque copie du document, avec son URL, son PDF, son identifiant OAI-PMH, sa version, sa licence et son accès. La source d'une copie de type `repository` donne sa plateforme (`platforms`), sous le nom qu'OpenAlex lui donne.
 - **Auteurs** : nom brut, auteur correspondant, ORCID si présent.
 - **Affiliations** : adresse textuelle + identifiants OpenAlex des institutions
-- **Revues et éditeurs** : titre, ISSN, eISSN, ISSN-L, type, modèle OA, identifiants OpenAlex du journal et de l'éditeur
+- **Revues et éditeurs** : titre, ISSN, eISSN, ISSN-L, type, identifiants OpenAlex du journal et de l'éditeur
 
 ## Exemple de payload
 

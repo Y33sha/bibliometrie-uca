@@ -6,6 +6,7 @@ from typing import NamedTuple
 
 from domain.countries import normalize_country_code
 from domain.errors import NotFoundError, ValidationError
+from domain.sources.registry import Source
 from domain.structures.structure import StructureType
 from domain.types import JsonValue
 
@@ -19,12 +20,14 @@ class ConfigKey(StrEnum):
     """Nombre de DOI vérifiés auprès d'Unpaywall par run."""
     FETCH_MISSING_MAX_PER_SOURCE = "fetch_missing_max_per_source"
     """Nombre de DOI interrogés par source cible à la recherche par DOI (phase `fetch_missing`)."""
+    FETCH_STALE_MAX_PER_SOURCE = "fetch_stale_max_per_source"
+    """Nombre de documents non revus cherchés de nouveau par source (phase `fetch_stale`)."""
     SUDOC_MAX_PER_RUN = "sudoc_max_per_run"
     """Nombre d'ISSN vérifiés dans le Sudoc par run."""
     DOI_RESOLUTION_MAX_PER_RUN = "doi_resolution_max_per_run"
     """Nombre de DOI dont l'URL de résolution est lue chez doi.org par run."""
     FETCH_STALE_AFTER_DAYS = "fetch_stale_after_days"
-    """Âge au-delà duquel un enregistrement source est interrogé de nouveau à sa source."""
+    """Âge au-delà duquel un document de `staging` est interrogé de nouveau à sa source, par source."""
     FETCH_MISSING_RETRY_AFTER_DAYS = "fetch_missing_retry_after_days"
     """Délai avant de chercher de nouveau un identifiant resté introuvable dans une source."""
     UNPAYWALL_RECHECK_AFTER_DAYS = "unpaywall_recheck_after_days"
@@ -99,6 +102,18 @@ def _delay(key: str, value: JsonValue) -> JsonValue:
     return _bounded_int(key, value)
 
 
+def _delay_by_source(key: str, value: JsonValue) -> JsonValue:
+    """Délai de réinterrogation de chaque source, en jours, dans les bornes de la clé, dans l'ordre de `Source`. Une source absente reçoit le délai par défaut de la clé."""
+    if not isinstance(value, dict):
+        raise ValidationError(f"`{key}` attend un délai par source ; reçu : {value!r}")
+    inconnues = [s for s in value if s not in set(Source)]
+    if inconnues:
+        raise ValidationError(f"`{key}` : sources inconnues : {inconnues!r}")
+    default = SETTINGS[ConfigKey(key)].default
+    assert isinstance(default, dict), key
+    return {s.value: _bounded_int(key, value.get(s.value, default[s.value])) for s in Source}
+
+
 def _laboratory_types(key: str, value: JsonValue) -> JsonValue:
     """Liste non vide de types de structure, sans doublon, dans l'ordre de `StructureType`."""
     if not isinstance(value, list) or not value:
@@ -154,9 +169,12 @@ SETTINGS: dict[ConfigKey, ConfigSetting] = {
     ConfigKey.PIPELINE_START_YEAR_FULL: ConfigSetting(_year, bounds=(1970, 2100)),
     ConfigKey.UNPAYWALL_MAX_PER_RUN: ConfigSetting(_cap, 10_000, bounds=CAP_BOUNDS),
     ConfigKey.FETCH_MISSING_MAX_PER_SOURCE: ConfigSetting(_cap, 0, bounds=CAP_BOUNDS),
+    ConfigKey.FETCH_STALE_MAX_PER_SOURCE: ConfigSetting(_cap, 0, bounds=CAP_BOUNDS),
     ConfigKey.SUDOC_MAX_PER_RUN: ConfigSetting(_cap, 10_000, bounds=CAP_BOUNDS),
     ConfigKey.DOI_RESOLUTION_MAX_PER_RUN: ConfigSetting(_cap, 10_000, bounds=CAP_BOUNDS),
-    ConfigKey.FETCH_STALE_AFTER_DAYS: ConfigSetting(_delay, 90, bounds=DELAY_BOUNDS),
+    ConfigKey.FETCH_STALE_AFTER_DAYS: ConfigSetting(
+        _delay_by_source, {s.value: 90 for s in Source}, bounds=DELAY_BOUNDS
+    ),
     ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS: ConfigSetting(_delay, 30, bounds=DELAY_BOUNDS),
     ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS: ConfigSetting(_delay, 15, bounds=DELAY_BOUNDS),
     ConfigKey.DOI_RESOLUTION_RECHECK_AFTER_DAYS: ConfigSetting(_delay, 180, bounds=DELAY_BOUNDS),
@@ -191,6 +209,9 @@ CAP_KEYS = _keys_normalized_by(_cap)
 
 DELAY_KEYS = _keys_normalized_by(_delay)
 """Clés des délais de réinterrogation."""
+
+DELAY_BY_SOURCE_KEYS = _keys_normalized_by(_delay_by_source)
+"""Clés des délais de réinterrogation par source."""
 
 PUBLIC_CONFIG_KEYS = frozenset(key.value for key, s in SETTINGS.items() if s.public)
 """Clés lisibles sans session."""

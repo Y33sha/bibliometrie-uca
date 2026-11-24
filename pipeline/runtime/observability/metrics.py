@@ -64,6 +64,18 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     "resolved": "résolu",
     "skipped": "sauté",
     "sudoc_found": ("présent dans le Sudoc", "présents dans le Sudoc"),
+    "suspect_in_clusters": (
+        "publication suspecte en cluster isolé",
+        "publications suspectes en clusters isolés",
+    ),
+    "suspect_persons": (
+        "personne à attributions suspectes",
+        "personnes à attributions suspectes",
+    ),
+    "suspect_resembling_rejected": (
+        "publication proche des publications rejetées",
+        "publications proches des publications rejetées",
+    ),
     "unmatched": "non retrouvé",
     "unresolved": "non résolu",
     "withheld": (

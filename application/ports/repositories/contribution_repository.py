@@ -26,7 +26,7 @@ class ContributionRepository(Protocol):
     # ── Contributions ─────────────
 
     def mark_contributions_for_name_form(self, person_id: int, name_form: str) -> int:
-        """Marque pour redécision les contributions de la personne rattachées par le nom (`name`, `compatible_name`), à contribution source contenant la forme de nom. Renvoie le nombre de contributions marquées."""
+        """Marque pour redécision les contributions de la personne rattachées par le nom ou par départage d'un nom ambigu (`NAME_BASED_REASONS`), à contribution source contenant la forme de nom. Renvoie le nombre de contributions marquées."""
         ...
 
     def find_contributions(self, contribution_ids: list[int]) -> list[ContributionRow]:

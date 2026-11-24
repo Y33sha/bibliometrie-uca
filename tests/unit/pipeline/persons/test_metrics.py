@@ -13,10 +13,10 @@ def _metrics():
             "match:orcid": 4,
             "match:manual": 1,
             "match:name": 1,
+            "match:coauthors": 2,
             "skip:ambiguous_name_form": 3,
             "create": 1,
         },
-        arbitration={"neutralized": 5, "marked_contributions": 2},
         name_forms={"inserted": 7},
         purge={"reorphaned": 2, "deleted_attributions": 0, "deleted_persons": 3},
     )
@@ -31,6 +31,11 @@ def test_la_table_compte_les_rattachements_par_mode_epinglages_compris():
         "idref": 0,
         "name": 1,
         "compatible_name": 0,
+        "coauthors": 2,
+        "laboratory": 0,
+        "hal_structure": 0,
+        "serial": 0,
+        "activity_years": 0,
         "created": 0,
     }
 
@@ -40,7 +45,6 @@ def test_le_resume_garde_les_compteurs_du_rattachement_et_des_autres_taches():
     assert summary["written"] == 6
     assert summary["skip:ambiguous_name_form"] == 3
     assert summary["create"] == 1
-    assert summary["identifiers_neutralized"] == 5
     assert summary["deleted_persons"] == 3
     assert summary["name_forms_inserted"] == 7
 

@@ -5,12 +5,13 @@ Une contribution réunit les contributions sources d'un même auteur dans une pu
 1. épinglage d'une contribution source par l'administration ;
 2. identifiants fiables des contributions sources (ORCID déposé par l'auteur, compte HAL, IdRef), chacun corroboré par le nom de la contribution source qui le contient ; hors périmètre, seulement un identifiant à attribution confirmée ou authentifiée ;
 3. forme de nom, seulement pour une contribution du périmètre ;
-4. création d'une personne, pour une contribution du périmètre au nom inconnu.
+4. départage d'une forme de nom ambiguë par le contexte de la contribution (`domain.persons.tie_break`) ;
+5. création d'une personne, pour une contribution du périmètre au nom inconnu.
 
 À chaque niveau, les candidats de la contribution sont l'intersection des candidats non vides de ses contributions sources. Les candidats d'une contribution source par identifiant réunissent les personnes désignées par chacun de ses identifiants. Une intersection vide ou de plusieurs personnes laisse la contribution sans personne. Les personnes rejetées pour la publication sont écartées des candidats à chaque niveau. Dans une publication, une personne revient à une seule contribution (`settle_publication`).
 """
 
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -68,10 +69,27 @@ class ContributionMatchReason(StrEnum):
     IDREF = "idref"
     NAME = "name"
     COMPATIBLE_NAME = "compatible_name"
+    COAUTHORS = "coauthors"
+    LABORATORY = "laboratory"
+    HAL_STRUCTURE = "hal_structure"
+    SERIAL = "serial"
+    ACTIVITY_YEARS = "activity_years"
 
 
 NAME_MATCH_REASONS = (ContributionMatchReason.NAME, ContributionMatchReason.COMPATIBLE_NAME)
 """Signaux qui rattachent une contribution à une personne par le nom."""
+
+TIE_BREAK_REASONS = (
+    ContributionMatchReason.COAUTHORS,
+    ContributionMatchReason.LABORATORY,
+    ContributionMatchReason.HAL_STRUCTURE,
+    ContributionMatchReason.SERIAL,
+    ContributionMatchReason.ACTIVITY_YEARS,
+)
+"""Indices qui départagent les personnes candidates d'une forme de nom ambiguë (`domain.persons.tie_break`), dans l'ordre d'examen."""
+
+NAME_BASED_REASONS = (*NAME_MATCH_REASONS, *TIE_BREAK_REASONS)
+"""Signaux appuyés sur la forme de nom de la contribution."""
 
 _REASON_BY_IDENTIFIER: dict[PersonIdentifierType, ContributionMatchReason] = {
     PersonIdentifierType.ORCID: ContributionMatchReason.ORCID,
@@ -82,15 +100,17 @@ _REASON_BY_IDENTIFIER: dict[PersonIdentifierType, ContributionMatchReason] = {
 MATCH_REASON_PRIORITY: tuple[ContributionMatchReason, ...] = (
     ContributionMatchReason.MANUAL,
     *(_REASON_BY_IDENTIFIER[id_type] for id_type in IDENTIFIER_ORDER),
-    *NAME_MATCH_REASONS,
+    *NAME_BASED_REASONS,
 )
-"""Signaux de rattachement, dans l'ordre d'examen de la décision : épinglage, identifiants du plus fiable au moins fiable, nom."""
+"""Signaux de rattachement, dans l'ordre d'examen de la décision : épinglage, identifiants du plus fiable au moins fiable, nom, départage d'un nom ambigu."""
 
 
 def _strength(reason: ContributionMatchReason) -> int:
-    """Renvoie le rang d'un rattachement, du mieux appuyé au moins bien appuyé : épinglage, identifiant, nom."""
+    """Renvoie le rang d'un rattachement, du mieux appuyé au moins bien appuyé : épinglage, identifiant, nom, départage d'un nom ambigu."""
     if reason == ContributionMatchReason.MANUAL:
         return 0
+    if reason in TIE_BREAK_REASONS:
+        return 3
     return 2 if reason in NAME_MATCH_REASONS else 1
 
 
@@ -161,6 +181,13 @@ class PersonIndex:
             if by_value is not None and value not in by_value:
                 by_value[value] = identified
 
+    def add_name_forms(self, person_id: int, forms: Iterable[str]) -> None:
+        """Associe à la personne des formes de nom : les noms des contributions sources d'une contribution rattachée pendant la décision. Une forme déjà associée à une autre personne devient ambiguë."""
+        for form in forms:
+            persons = self.name_forms.get(form, [])
+            if person_id not in persons:
+                self.name_forms[form] = [*persons, person_id]
+
 
 @dataclass(frozen=True)
 class ContributionDecision:
@@ -171,6 +198,8 @@ class ContributionDecision:
     reason: ContributionMatchReason | ContributionSkipReason | None = None
     refused: tuple[tuple[str, str], ...] = ()
     """Identifiants refusés faute de nom compatible : `(type, valeur)`."""
+    candidates: frozenset[int] = frozenset()
+    """Personnes candidates d'une contribution laissée sans personne pour ambiguïté."""
 
 
 def _single(candidates: set[int]) -> int | None:
@@ -269,7 +298,10 @@ def _intersect(
         reason = min((c[person_id] for c in candidates), key=MATCH_REASON_PRIORITY.index)
         return ContributionDecision(ContributionOutcome.MATCH, person_id, reason, refused)
     return ContributionDecision(
-        ContributionOutcome.SKIP, reason=ambiguity if common else conflict, refused=refused
+        ContributionOutcome.SKIP,
+        reason=ambiguity if common else conflict,
+        refused=refused,
+        candidates=frozenset(common),
     )
 
 

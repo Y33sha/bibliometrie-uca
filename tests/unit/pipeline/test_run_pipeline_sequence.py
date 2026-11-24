@@ -53,17 +53,6 @@ class TestSelectPhasesToRun:
     def test_sans_option_toutes_les_phases(self):
         assert run_pipeline._select_phases_to_run(_args()) == list(run_pipeline.PHASES)
 
-    def test_sans_extras_omet_les_enrichissements(self):
-        choisies = run_pipeline._select_phases_to_run(_args(no_extras=True))
-
-        assert choisies == [phase for phase in run_pipeline.PHASES if not phase.extra]
-
-    def test_sans_extras_laisse_passer_une_phase_nommee(self):
-        """`--only` prime sur `--no-extras` : l'enrichissement nommé est sélectionné."""
-        choisies = run_pipeline._select_phases_to_run(_args(only="subjects", no_extras=True))
-
-        assert [phase.name for phase in choisies] == ["subjects"]
-
     def test_une_seule_phase(self):
         choisies = run_pipeline._select_phases_to_run(_args(only="persons"))
 

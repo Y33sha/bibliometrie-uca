@@ -24,11 +24,11 @@ Un jeu d'évaluation tiré des verdicts humains existe depuis le 2026-10-19 (`bu
 ### Phase 2 — Alignement des listes d'auteurs
 
 - [ ] Diagnostic de chaque liste d'auteurs avant l'alignement. Il nomme le défaut, écarte les contributions sources concernées et reste stocké pour la relecture et la mesure. Les signaux viennent de l'enregistrement source seul ; la comparaison avec les autres enregistrements sources de la publication sert de confirmation.
+- [ ] Auteurs collectifs non reconnus : « INRAE, France » figure comme auteur dans des listes OpenAlex et scanR, parfois plusieurs fois.
 - [ ] Fusions erronées probables dans l'onglet Fusions suspectes. L'onglet retient une publication dont moins de la moitié des contributions sources ont un correspondant : un enregistrement source étranger minoritaire lui échappe (12 des 20 fusions erronées probables de l'échantillon du 2026-10-18). Critère à ajouter : un enregistrement source dont presque aucune contribution source n'a de correspondant.
 
 ### Phase 3 — Rattachements et corrections
 
-- [ ] Rejets d'une personne comme signal d'attribution erronée par une source (HAL, ScanR), pour défaire les attributions semblables : nom courant, sujets éloignés des publications de la personne.
 - [ ] Précision et rappel de la résolution par contribution sur le jeu d'évaluation.
 - [ ] Relecture des personnes supprimées par la purge, et des contributions laissées sans personne parce que leur personne est déjà dans la publication, au regard du gel du 2026-10-24.
 - [ ] Repérage des erreurs des sources révélées par une contribution : des contributions sources d'une même contribution qui désigneraient seules des personnes différentes signalent une erreur de groupement, de nom, d'identifiant ou d'affiliation. Outil de l'administration, comme pour les fusions suspectes de publications.

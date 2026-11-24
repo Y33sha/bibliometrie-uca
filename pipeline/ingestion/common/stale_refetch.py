@@ -17,6 +17,7 @@ from domain.types import JsonValue
 from pipeline.http.lookup import LookupOutcome
 from pipeline.ingestion.common.lookup import LookupChannel, by_native_id, look_up
 from pipeline.ingestion.common.staging import StagingStore
+from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 type FetchOutcome = LookupOutcome[Mapping[str, JsonValue]]
@@ -41,7 +42,7 @@ _STALE_ROWS_SQL = text(
           OR sr.publication_year = ANY(:years)
           OR sr.doc_type = '{DocType.ONGOING_THESIS}'
       )
-    ORDER BY s.id
+    ORDER BY s.last_seen_at, s.id
     """
 )
 """`publication_year` vient de `source_records`. Un document sans enregistrement source reste sélectionné. Une thèse en cours est sans année de soutenance : elle est cherchée quelle que soit la fenêtre."""
@@ -50,7 +51,7 @@ _STALE_ROWS_SQL = text(
 def get_stale_source_ids(
     conn: Connection, source: str, years: list[int], *, after_days: int
 ) -> list[str]:
-    """Renvoie les identifiants natifs des documents de la source non revus par le moissonnage depuis `after_days` jours, hors documents disparus.
+    """Renvoie les identifiants natifs des documents de la source non revus par le moissonnage depuis `after_days` jours, hors documents disparus, du moins récemment revu au plus récemment revu.
 
     `years` borne la sélection aux documents de ces années, et aux thèses en cours.
     """
@@ -68,13 +69,23 @@ async def refresh(
     *,
     after_days: int,
     years: list[int],
+    limit: int | None = None,
 ) -> PhaseMetrics:
     """Cherche de nouveau par identifiant natif les documents de la source non revus par le moissonnage depuis `after_days` jours.
 
-    Un document absent de la source, ou renvoyé sous un autre identifiant natif, est marqué disparu. `years` borne la sélection (`get_stale_source_ids`).
+    Un document absent de la source, ou renvoyé sous un autre identifiant natif, est marqué disparu. `years` borne la sélection (`get_stale_source_ids`). `limit` plafonne le nombre de documents d'une exécution. Les documents revus depuis le plus longtemps passent en premier.
 
     Renvoie les compteurs de `look_up` : documents réécrits (`updated`), identiques (`unchanged`), lots non servis (`errors`), absences confirmées (`disappeared`).
     """
+    source_ids = get_stale_source_ids(conn, source, years, after_days=after_days)
+    if limit and len(source_ids) > limit:
+        scoped_logger(log, source).info(
+            "plafond de %d documents par exécution, %d reportés aux suivantes",
+            limit,
+            len(source_ids) - limit,
+        )
+        source_ids = source_ids[:limit]
+
     return await look_up(
         conn,
         log,
@@ -88,5 +99,5 @@ async def refresh(
             stage=lambda staging, record: staging.stage(source, record, listed=False),
             absent_metric="disappeared",
         ),
-        get_stale_source_ids(conn, source, years, after_days=after_days),
+        source_ids,
     )

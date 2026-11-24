@@ -1,6 +1,6 @@
 """Phase `finalize` : données dérivées des contributions, après la résolution des personnes. Chaque tâche a sa transaction.
 
-La phase supprime les publications sans enregistrement source, ou sans contribution rattachée à une personne ni indice d'appartenance au périmètre lié au document (`DOCUMENT_EVIDENCE`). Elle recompose ensuite le périmètre des publications et les vues matérialisées des structures, sur les publications restantes. Elle recalcule l'éditeur des revues, supprime les référentiels vides, puis recompte les publications des adresses, revues et éditeurs.
+La phase supprime les publications sans enregistrement source, ou sans contribution rattachée à une personne ni indice d'appartenance au périmètre lié au document (`DOCUMENT_EVIDENCE`). Elle recompose ensuite le périmètre des publications et les vues matérialisées des structures, sur les publications restantes. Elle recalcule l'éditeur des revues, supprime les référentiels vides, recompte les publications des adresses, revues et éditeurs, puis l'usage des sujets.
 
 Les référentiels vides se suppriment dans l'ordre monographies, revues, éditeurs : une monographie retient sa collection, une revue ou un préfixe DOI son éditeur. Leur suppression suit celle des publications : un référentiel vidé pendant le run disparaît dans le même run.
 
@@ -30,6 +30,7 @@ from pipeline.transformation.publications.lifecycle import purge_publications
 from pipeline.transformation.publications.publication_perimeter import (
     refresh_publications_perimeter_evidence,
 )
+from pipeline.transformation.publications.subjects.subjects import COUNT_SUBJECT_USAGE
 from pipeline.transformation.publishing.monographs import delete_empty_monographs
 from pipeline.transformation.publishing.publication_counts import (
     refresh_publisher_publication_counts,
@@ -199,8 +200,8 @@ _PUBLICATIONS_IN_PERIMETER = Task(
 )
 
 
-_STRUCTURES = Task(
-    "structures",
+_REFRESH_STRUCTURE_VIEWS = Task(
+    "refresh_structure_views",
     reads=(
         "source_contribution_structures",
         "contributions.id",
@@ -232,7 +233,7 @@ _SERIAL_PUBLISHERS = Task(
     ),
     writes=("serials.publisher_id",),
     # Les revues et les monographies supprimées ensuite comme référentiels vides n'ont pas de publication : leur suppression ne change aucun éditeur.
-    previous_run=("serials.id", "monographs.serial_id"),
+    previous_runs=("serials.id", "monographs.serial_id"),
     run=_serial_publishers,
     section=_SYNC_SECTION,
     label="Éditeur des revues",
@@ -279,7 +280,7 @@ _DELETE_EMPTY_SERIALS = Task(
         "serial_issns.serial_id",
     ),
     # Les éditeurs supprimés ensuite comme référentiels vides sont sans revue.
-    previous_run=("publishers.name",),
+    previous_runs=("publishers.name",),
     run=in_transaction(delete_empty_serials.run_delete_empty_serials),
     section=_EMPTY_CONTAINERS_SECTION,
     label=delete_empty_serials.LABEL,
@@ -326,7 +327,7 @@ _PUBLICATION_COUNTS = Task(
         "serials.publication_count",
         "publishers.publication_count",
     ),
-    previous_run=("addresses",),
+    previous_runs=("addresses",),
     run=_publication_counts,
 )
 
@@ -334,7 +335,7 @@ _PUBLICATION_COUNTS = Task(
 _CHILDREN = (
     _PURGE_PUBLICATIONS,
     _PUBLICATIONS_IN_PERIMETER,
-    _STRUCTURES,
+    _REFRESH_STRUCTURE_VIEWS,
     Step(
         "publishing_cleanup",
         "publications → éditeur de chaque revue, référentiels de l'édition sans entrée vide",
@@ -346,6 +347,7 @@ _CHILDREN = (
         ),
     ),
     _PUBLICATION_COUNTS,
+    COUNT_SUBJECT_USAGE,
 )
 
 

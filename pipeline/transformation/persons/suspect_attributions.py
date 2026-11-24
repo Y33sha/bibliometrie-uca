@@ -1,0 +1,169 @@
+"""Phase `suspect_attributions` : attributions suspectes, recalculées à chaque run dans `suspect_contributions`.
+
+Les publications des personnes à fiche RH forment des clusters par la partition de Leiden (`igraph`). Les clusters signalés par la règle du domaine (`signaled_clusters`) donnent le motif `cluster`. Pour les personnes ayant au moins un rejet, la cascade de départage désigne les publications proches des publications rejetées (`resembles_rejected`) : motif `rejected_publications`. Les deux profils comparés viennent des contributions sources (`fetch_name_profiles`), coauteurs décrits par leur nom : un rejet dont la publication a été purgée compte encore.
+"""
+
+from __future__ import annotations
+
+import logging
+import random
+from collections.abc import Mapping
+
+import igraph
+from sqlalchemy import Connection
+
+from domain.persons.suspect_attributions import (
+    SuspectReason,
+    resembles_rejected,
+    signaled_clusters,
+)
+from pipeline.graph import Block, Phase, Task, in_transaction
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progress import track_progress, waiting
+from pipeline.transformation.persons.suspect_store import (
+    fetch_clue_frequencies,
+    fetch_name_profiles,
+    fetch_publication_clues,
+    write_suspect_contributions,
+)
+
+_SEED = 0
+"""Graine de la partition de Leiden : un même graphe donne les mêmes clusters d'un run à l'autre."""
+
+
+def leiden(n: int, weights: Mapping[tuple[int, int], float], resolution: float) -> list[int]:
+    """Renvoie le cluster de chaque sommet du graphe pondéré, par la partition de Leiden (modularité)."""
+    graph = igraph.Graph(n=n, edges=list(weights))
+    graph.es["weight"] = list(weights.values())
+    igraph.set_random_number_generator(random.Random(_SEED))  # noqa: S311 - partition reproductible
+    partition = graph.community_leiden(
+        objective_function="modularity", weights="weight", resolution=resolution, n_iterations=-1
+    )
+    return list(partition.membership)
+
+
+def detect(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
+    """Calcule les attributions suspectes et les écrit dans `suspect_contributions`. Chaque étape écrit sa ligne au journal."""
+    rows: list[tuple[int, int, SuspectReason, int | None]] = []
+    with waiting(f"{BRANCH}fréquence des indices", logger) as line:
+        frequencies = fetch_clue_frequencies(conn)
+        line.conclude(
+            f"{BRANCH}fréquence des indices : {quantity(frequencies.publication_count, 'publication')}"
+        )
+    with waiting(f"{BRANCH}indices des publications des personnes à fiche RH", logger) as line:
+        clues = fetch_publication_clues(conn)
+        line.conclude(
+            f"{BRANCH}indices des publications : {quantity(len(clues), 'personne')} à fiche RH"
+        )
+    with track_progress(len(clues), f"{BRANCH}clusters", logger, erase=True) as progress:
+        for person_id, publications in sorted(clues.items()):
+            for number, cluster in enumerate(
+                signaled_clusters(publications, frequencies, leiden), 1
+            ):
+                rows += [(c, person_id, SuspectReason.CLUSTER, number) for c in cluster]
+            progress.advance()
+    in_clusters = {row[0] for row in rows}
+    cluster_rows = len(rows)
+    clusters = len({(row[1], row[3]) for row in rows})
+    logger.info(
+        "%sclusters isolés : %s, %s, %s",
+        BRANCH,
+        quantity(len({row[1] for row in rows}), "personne"),
+        quantity(clusters, "cluster"),
+        quantity(cluster_rows, "publication"),
+    )
+
+    with waiting(f"{LAST_BRANCH}publications proches des publications rejetées", logger) as line:
+        profiles = fetch_name_profiles(conn)
+        candidates = [c for c in profiles.candidates if c[0] not in in_clusters]
+        for contribution_id, person_id, context in candidates:
+            if resembles_rejected(
+                person_id,
+                context,
+                profiles.own.get(person_id, []),
+                profiles.rejected.get(person_id, []),
+            ):
+                rows.append((contribution_id, person_id, SuspectReason.REJECTED_PUBLICATIONS, None))
+        resembling = len(rows) - cluster_rows
+        line.conclude(
+            f"{LAST_BRANCH}publications proches des publications rejetées :"
+            f" {resembling} sur {quantity(len(candidates), 'publication')}"
+            f" de {quantity(len(profiles.rejected), 'personne')} à rejets"
+        )
+
+    write_suspect_contributions(conn, rows)
+    persons = len({row[1] for row in rows})
+    return PhaseMetrics(
+        extras={
+            "suspect_persons": persons,
+            "suspect_in_clusters": cluster_rows,
+            "suspect_resembling_rejected": resembling,
+        },
+        report=(
+            f"{quantity(persons, 'personne')} : {quantity(cluster_rows, 'publication')} en clusters isolés,"
+            f" {resembling} proches des publications rejetées"
+        ),
+    )
+
+
+_CHILDREN = (
+    Task(
+        "detect_suspect_attributions",
+        reads=(
+            "contributions.id",
+            "contributions.publication_id",
+            "contributions.person_id",
+            "contributions.resolution_mode",
+            "contributions.roles",
+            "aligned_source_contributions",
+            "source_contributions.source_record_id",
+            "source_contributions.contributor_information_id",
+            "source_contribution_structures",
+            "structures.structure_type",
+            "source_contribution_hal_structures",
+            "hal_structures",
+            "source_records.publication_id",
+            "source_records.source",
+            "source_records.source_id",
+            "source_records.serial_id",
+            "source_records.publication_year",
+            "source_records.title_normalized",
+            "contributor_information",
+            "publications.id",
+            "publications.serial_id",
+            "publications.publication_year",
+            "publication_subjects",
+            "subjects.id",
+            "subjects.vocabulary",
+            "subjects.level",
+            "persons",
+            "hr_records",
+            "person_identifiers",
+            "source_contributions.source",
+            "source_contributions.perimeter_evidence",
+            "rejected_contributions",
+        ),
+        writes=("suspect_contributions",),
+        previous_runs=(
+            # Publications, contributions, alignements et sujets supprimés, enregistrements sources détachés par `finalize.purge_publications`.
+            "publications.id",
+            "publications.serial_id",
+            "publications.publication_year",
+            "contributions",
+            "aligned_source_contributions",
+            "publication_subjects",
+            "source_records.publication_id",
+        ),
+        run=in_transaction(detect),
+        label="Attributions suspectes",
+    ),
+)
+
+
+PHASE = Phase(
+    "suspect_attributions",
+    "Attributions suspectes : clusters isolés, ressemblance avec les publications rejetées",
+    _CHILDREN,
+    Block.ENTITIES,
+)

@@ -6,7 +6,7 @@ Un document qui porte le DOI d'un erratum ou d'un avis Crossref le perd, et reç
 
 Quand une partie du groupe perd le DOI, les enregistrements sources qui le gardent perdent les clés de confirmation partagées avec ceux qui le perdent. Exemple : le dépôt HAL d'une communication, recopié par l'enregistrement source OpenAlex du volume d'actes. Le cas de chaque identifiant retiré, DOI compris, est inscrit dans `source_record_identifiers.removed_by`.
 
-Les types lus sont ceux corrigés par la tâche unaire. Chaque passage repart de tous les identifiants : un enregistrement source à conflit disparu retrouve ses identifiants au run suivant.
+Les types lus sont ceux corrigés par la tâche `correct_source_records`. Chaque passage repart de tous les identifiants : un enregistrement source à conflit disparu retrouve ses identifiants au run suivant.
 """
 
 import logging

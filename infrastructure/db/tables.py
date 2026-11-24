@@ -40,6 +40,7 @@ from domain.config import (
     CAP_BOUNDS,
     CAP_KEYS,
     DELAY_BOUNDS,
+    DELAY_BY_SOURCE_KEYS,
     DELAY_KEYS,
     ConfigKey,
     integer_bounds,
@@ -54,6 +55,7 @@ from domain.merge import MergedEntity
 from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
+from domain.persons.suspect_attributions import SuspectReason
 from domain.platforms.platform import PlatformType
 from domain.publications.oa_status import OaStatus
 from domain.publications.relations import RelationType
@@ -168,6 +170,12 @@ config = Table(
         f"OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= {DELAY_BOUNDS[0]} "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_delay_is_positive_integer",
+    ),
+    # Le domaine contrôle les sources et les bornes de chaque délai.
+    CheckConstraint(
+        f"key NOT IN ({', '.join(repr(key) for key in sorted(DELAY_BY_SOURCE_KEYS))}) "
+        "OR jsonb_typeof(value) = 'object'",
+        name="config_delay_by_source_is_object",
     ),
     CheckConstraint(
         f"key <> '{ConfigKey.SITE_TITLE}' OR jsonb_typeof(value) = 'string'",
@@ -458,6 +466,22 @@ serials = Table(
         comment=(
             "Date de la dernière recherche des métadonnées de la revue dans OpenAlex. "
             "NULL : jamais cherchées."
+        ),
+    ),
+    Column(
+        "openalex_is_oa",
+        Boolean,
+        comment=(
+            "Revue en open access intégral d'après OpenAlex (`is_oa`). "
+            "NULL : revue absente d'OpenAlex ou jamais cherchée."
+        ),
+    ),
+    Column(
+        "openalex_oa_flip_year",
+        SmallInteger,
+        comment=(
+            "Année du passage de la revue à l'open access intégral d'après OpenAlex "
+            "(`oa_flip_year`). NULL pour une revue née en open access intégral."
         ),
     ),
     Column("oa_model", oa_model_enum),
@@ -880,6 +904,38 @@ rejected_contributions = Table(
         "Couples (enregistrement source, personne) rejetés par l'administration, "
         "par clé naturelle de l'enregistrement source. Le rejet d'un enregistrement source "
         "disparu de sa source s'applique à son retour."
+    ),
+    schema="persons",
+)
+
+
+suspect_reason_enum = PgEnum(*SuspectReason, name="suspect_reason", create_type=False)
+
+suspect_contributions = Table(
+    "suspect_contributions",
+    metadata,
+    Column("contribution_id", Integer, primary_key=True),
+    Column(
+        "person_id",
+        Integer,
+        nullable=False,
+        comment="Personne rattachée à la contribution au moment du calcul.",
+    ),
+    Column("reason", suspect_reason_enum, nullable=False),
+    Column(
+        "cluster",
+        SmallInteger,
+        comment="Numéro du cluster signalé parmi ceux de la personne. NULL pour le motif `rejected_publications`.",
+    ),
+    CheckConstraint(
+        "(cluster IS NULL) = (reason = 'rejected_publications')",
+        name="suspect_contributions_cluster_by_reason",
+    ),
+    comment=(
+        "Contributions rattachées à une personne et probablement signées par un homonyme : "
+        "publication d'un cluster isolé (`cluster`), ou plus proche des publications rejetées "
+        "pour la personne que de ses autres publications (`rejected_publications`). "
+        "Recalculée à chaque run."
     ),
     schema="persons",
 )

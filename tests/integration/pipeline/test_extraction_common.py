@@ -452,6 +452,14 @@ class TestGetStaleSourceIds:
         rows = get_stale_source_ids(sa_sync_conn, "theses", [2023, 2024], after_days=90)
         assert rows == ["s367812"]
 
+    def test_le_document_revu_depuis_le_plus_longtemps_vient_en_tete(self, sa_sync_conn):
+        """Sous plafond, la phase cherche d'abord les documents revus depuis le plus longtemps."""
+        insert_staging(sa_sync_conn, "openalex", source_id="W1", seen_days_ago=100)
+        insert_staging(sa_sync_conn, "openalex", source_id="W2", seen_days_ago=300)
+        insert_staging(sa_sync_conn, "openalex", source_id="W3", seen_days_ago=200)
+        rows = get_stale_source_ids(sa_sync_conn, "openalex", _WINDOW, after_days=90)
+        assert rows == ["W2", "W3", "W1"]
+
     def test_the_threshold_comes_from_the_argument(self, sa_sync_conn):
         insert_staging(sa_sync_conn, "openalex", source_id="W1", seen_days_ago=40)
         assert get_stale_source_ids(sa_sync_conn, "openalex", _WINDOW, after_days=90) == []

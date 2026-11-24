@@ -901,7 +901,15 @@ def test_dataset_piece_without_target_when_parent_absent(sa_sync_conn):
 
 
 def _seed_figshare(
-    conn, *, source_id, doi, title_normalized, source="datacite", year=2023, doc_type="dataset"
+    conn,
+    *,
+    source_id,
+    title_normalized,
+    doi=None,
+    identifiers=(),
+    source="datacite",
+    year=2023,
+    doc_type="dataset",
 ):
     """Insère un enregistrement source figshare, sans relation déclarée."""
     return insert_source_record(
@@ -911,6 +919,7 @@ def _seed_figshare(
         title=title_normalized,
         title_normalized=title_normalized,
         doi=doi,
+        identifiers=identifiers,
         doc_type=doc_type,
         publication_year=year,
     )
@@ -985,6 +994,64 @@ def test_figshare_additional_file_without_number_targets_the_collection(sa_sync_
     )
     _apply_cluster(conn)
     assert _targets(conn) == {"10.6084/m9.figshare.23538907": "10.6084/m9.figshare.c.6702115"}
+
+
+def test_figshare_additional_file_targets_the_collection_present_with_its_versioned_doi(
+    sa_sync_conn,
+):
+    """Le work OpenAlex de la collection contient aussi sa forme `.v1`. La collection garde un seul DOI sans version, donc la pièce a pour cible la collection."""
+    conn = sa_sync_conn
+    _seed_figshare(
+        conn, source_id="c", doi="10.6084/m9.figshare.c.6702115", title_normalized=_ARTICLE
+    )
+    _seed_figshare(
+        conn,
+        source="openalex",
+        source_id="W-c",
+        title_normalized=_ARTICLE,
+        identifiers=[
+            SourceIdentifier(
+                SourceIdentifierType.DOI,
+                "10.6084/m9.figshare.c.6702115",
+                SourceIdentifierRole.DERIVED,
+            ),
+            SourceIdentifier(
+                SourceIdentifierType.DOI,
+                "10.6084/m9.figshare.c.6702115.v1",
+                SourceIdentifierRole.SECONDARY,
+            ),
+        ],
+    )
+    _seed_figshare(
+        conn,
+        source_id="f1",
+        doi="10.6084/m9.figshare.23538907",
+        title_normalized=f"additional file 1 of {_ARTICLE}",
+    )
+    _apply_cluster(conn)
+    assert _targets(conn)["10.6084/m9.figshare.23538907"] == "10.6084/m9.figshare.c.6702115"
+
+
+def test_figshare_additional_file_targets_the_versioned_doi_of_the_collection(sa_sync_conn):
+    """Cas réel (`10.6084/m9.figshare.c.7304499`) : la collection est présente sous sa forme `.v1`, et sa forme sans version est inconnue de doi.org. La pièce a pour cible la forme `.v1`."""
+    conn = sa_sync_conn
+    _seed_figshare(
+        conn, source_id="c", doi="10.6084/m9.figshare.c.6702115.v1", title_normalized=_ARTICLE
+    )
+    conn.execute(
+        text(
+            "INSERT INTO dois (doi, registered, resolved_at)"
+            " VALUES ('10.6084/m9.figshare.c.6702115', FALSE, now())"
+        )
+    )
+    _seed_figshare(
+        conn,
+        source_id="f1",
+        doi="10.6084/m9.figshare.23538907",
+        title_normalized=f"additional file 1 of {_ARTICLE}",
+    )
+    _apply_cluster(conn)
+    assert _targets(conn) == {"10.6084/m9.figshare.23538907": "10.6084/m9.figshare.c.6702115.v1"}
 
 
 def test_figshare_additional_file_stays_without_collection(sa_sync_conn):

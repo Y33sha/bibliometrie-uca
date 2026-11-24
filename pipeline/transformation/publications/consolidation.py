@@ -242,6 +242,7 @@ def consolidate(conn: Connection, publication_ids: Sequence[int]) -> Consolidati
                 publication.serial_id,
                 publication.doc_type,
                 publication.source_extras,
+                publication.publication_year,
             )
             for publication_id, publication in aggregated.items()
         ],

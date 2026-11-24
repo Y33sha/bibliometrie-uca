@@ -5,7 +5,7 @@
   import { resolve } from "$app/paths";
   import { api } from "#lib/api/index.js";
   import { formatNumber, titleCase } from "#lib/utils.js";
-  import { personExclusionLabels, staffCategoryLabels } from "#lib/labels.js";
+  import { PERSON_VALID_LABEL, personExclusionLabels, staffCategoryLabels } from "#lib/labels.js";
   import { autofocus } from "#lib/actions/focus.js";
   import Drawer from "#lib/components/Drawer.svelte";
   import { useDrawerEntity } from "#lib/composables/useDrawerEntity.svelte.js";
@@ -156,8 +156,8 @@
         <select
           class="select exclusion-select"
           class:excluded={!!person.exclusion}
-          use:tooltip={'Exclusion de la personne'}
-          aria-label="Exclusion de la personne"
+          use:tooltip={'Statut de la personne'}
+          aria-label="Statut de la personne"
           value={person.exclusion ?? ""}
           onchange={(e) =>
             onsetExclusion(
@@ -165,7 +165,7 @@
               ((e.currentTarget as HTMLSelectElement).value || null) as PersonExclusion | null,
             )}
         >
-          <option value="">Retenue</option>
+          <option value="">{PERSON_VALID_LABEL}</option>
           {#each Object.entries(personExclusionLabels) as [value, label] (value)}
             <option {value}>{label}</option>
           {/each}

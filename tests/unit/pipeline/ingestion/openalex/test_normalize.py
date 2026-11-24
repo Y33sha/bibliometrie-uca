@@ -382,11 +382,11 @@ class TestGetPublisher:
         assert get_publisher(work) == PublisherFacts("X", None)
 
 
-# ── conteneurs (branches issn/eissn/oa_model) ───────────────────
+# ── conteneurs (branches issn/eissn) ───────────────────
 
 
 class TestContainerDescription:
-    def test_repository_source_sans_modele_oa(self):
+    def test_identifiant_de_la_source(self):
         work = {
             "primary_location": {
                 "source": {
@@ -396,19 +396,7 @@ class TestContainerDescription:
                 }
             }
         }
-        facts = get_container_facts(work)
-        assert facts.oa_model is None
-        assert facts.openalex_id == "S1"
-
-    def test_serial_full_oa(self):
-        work = {
-            "primary_location": {"source": {"display_name": "OA", "type": "journal", "is_oa": True}}
-        }
-        assert get_container_facts(work).oa_model == "full_oa"
-
-    def test_serial_subscription(self):
-        work = {"primary_location": {"source": {"display_name": "Sub", "type": "journal"}}}
-        assert get_container_facts(work).oa_model == "subscription"
+        assert get_container_facts(work).openalex_id == "S1"
 
     def test_issns_sans_support_et_issnl(self):
         """OpenAlex ne donne pas le support de ses ISSN : ils restent de support inconnu ; `issn_l` a le drapeau ISSN-L."""

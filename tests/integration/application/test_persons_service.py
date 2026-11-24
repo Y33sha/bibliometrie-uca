@@ -739,6 +739,23 @@ class TestBatchAssignOrphanContributions:
         assert _pinned_to(sa_sync_conn, [owned, orphan]) == [None, p2]
         assert _contribution_person(sa_sync_conn, orphan_contribution) == (p2, "manual")
 
+    def test_pins_contribution_already_attached_to_the_person(
+        self, sa_sync_conn, contribution_service
+    ):
+        """Une contribution déjà rattachée à la personne visée est épinglée sur elle : confirmation d'une attribution suspecte."""
+        insert_persons_perimeter(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
+        contribution, source_contribution = _orphan(sa_sync_conn, insert_publication(sa_sync_conn))
+        set_perimeter_author_contribution(
+            sa_sync_conn, contribution, person_id=person_id, mode="idref"
+        )
+
+        assigned = contribution_service.batch_assign_orphan_contributions(person_id, [contribution])
+
+        assert assigned == 1
+        assert _contribution_person(sa_sync_conn, contribution) == (person_id, "manual")
+        assert _pinned_to(sa_sync_conn, [source_contribution]) == [person_id]
+
 
 # ── detach_contributions ─────────────────────────────────────────────
 
@@ -1043,6 +1060,22 @@ class TestAssignOrphanContribution:
         person_id = _person(sa_sync_conn)
         with pytest.raises(NotFoundError):
             contribution_service.assign_orphan_contribution(person_id, 999999)
+
+    def test_pins_contribution_already_attached_to_the_person(
+        self, sa_sync_conn, contribution_service
+    ):
+        """Attribuer une contribution déjà rattachée à la personne l'épingle sur elle."""
+        insert_persons_perimeter(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
+        contribution, source_contribution = _orphan(sa_sync_conn, insert_publication(sa_sync_conn))
+        set_perimeter_author_contribution(
+            sa_sync_conn, contribution, person_id=person_id, mode="hal_person_id"
+        )
+
+        contribution_service.assign_orphan_contribution(person_id, contribution)
+
+        assert _contribution_person(sa_sync_conn, contribution) == (person_id, "manual")
+        assert _pinned_to(sa_sync_conn, [source_contribution]) == [person_id]
 
 
 class TestReassignRejectedPairUnit:

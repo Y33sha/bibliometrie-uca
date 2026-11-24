@@ -29,6 +29,38 @@ class TestFromRaw:
         assert ContributorName.from_raw("") is None
 
 
+class TestParentheses:
+    """Les segments entre parenthèses sortent du découpage du nom ; le nom brut les garde."""
+
+    def test_annotation_d_une_chaine_brute(self):
+        """Cas réel : OpenAlex donne « Corona, Christophe (author) »."""
+        name = ContributorName.from_raw("Corona, Christophe (author)")
+        assert name.split() == ("Corona", "Christophe")
+        assert name.normalized() == ("corona", "christophe")
+        assert name.raw == "Corona, Christophe (author)"
+
+    @pytest.mark.parametrize(
+        ("last", "first", "expected"),
+        [
+            ("Genova", "F. (F.)", ("Genova", "F.")),
+            ("Grivaux", "S. (Sophie)", ("Grivaux", "Sophie")),
+            ("Bertrand", "J.-P. (Jean-Pierre)", ("Bertrand", "Jean-Pierre")),
+            ("Zhou", "Eddie (Chenhui)", ("Zhou", "Eddie")),
+            ("Lambert", "C. (Marie)", ("Lambert", "C.")),
+            ("Churakova (Sidorova)", "Olga V.", ("Churakova", "Olga V.")),
+            ("Tong", "Baojia(Tony)", ("Tong", "Baojia")),
+        ],
+    )
+    def test_nom_et_prenom_de_la_source(self, last, first, expected):
+        assert ContributorName.from_parts(last, first).split() == expected
+
+    def test_prenom_complet_entre_parentheses_d_une_chaine_brute(self):
+        assert ContributorName.from_raw("Lambert, C. (Celine)").split() == ("Lambert", "Celine")
+
+    def test_nom_reduit_a_une_parenthese_reste_tel_quel(self):
+        assert ContributorName(last_name="(†)", first_name="Jean").split()[0] == "(†)"
+
+
 class TestNomAbsent:
     @pytest.mark.parametrize("raw", ["(:Unap)", ":unkn", ":none", "None, None", "null, null"])
     def test_chaine_qui_tient_lieu_de_nom_absent(self, raw):

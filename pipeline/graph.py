@@ -4,7 +4,7 @@ Le module de chaque phase déclare la phase (`PHASE`), avec ses étapes et ses t
 
 Une donnée se désigne par sa table (`"serials"`) ou par une colonne (`"serials.serial_type"`). `"serials.id"` désigne l'existence des lignes, créées et supprimées par les écrivains. Une table et l'une de ses colonnes se recouvrent.
 
-Une tâche dépend des tâches placées avant elle et écrivant une donnée lue par elle. Une lecture déclarée `previous_run` lit aussi les écritures du run précédent, faites par une tâche placée après elle ou par elle-même. Les tests vérifient que l'ordre d'exécution ne fait lire à aucune tâche une donnée écrite après elle, sauf lecture du run précédent déclarée.
+Une tâche dépend des tâches placées avant elle et écrivant une donnée lue par elle. Une lecture déclarée `previous_runs` lit aussi les écritures du run précédent, faites par une tâche placée après elle ou par elle-même. Les tests vérifient que l'ordre d'exécution ne fait lire à aucune tâche une donnée écrite après elle, sauf lecture du run précédent déclarée.
 
 La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle, une file par source (`network`) : les tâches d'une même source s'enchaînent dans l'ordre, les sources s'exécutent en même temps. Une tâche peut dépendre d'une tâche de sa source placée avant elle, jamais d'une tâche d'une autre source du groupe.
 """
@@ -35,7 +35,7 @@ class Task:
     run: TaskRun
     reads: tuple[str, ...] = ()
     writes: tuple[str, ...] = ()
-    previous_run: tuple[str, ...] = ()
+    previous_runs: tuple[str, ...] = ()
     """Lectures de données écrites au run précédent, par une tâche placée après elle ou par la tâche elle-même."""
     network: str | None = None
     """API interrogée, si la tâche sort sur le réseau."""
@@ -118,13 +118,13 @@ def dependencies(tasks: Sequence[Task]) -> dict[str, set[str]]:
 
 
 def order_violations(tasks: Sequence[Task]) -> list[tuple[str, str, str]]:
-    """Renvoie les triplets (lecteur, donnée, écrivain) où l'écrivain, placé après le lecteur, écrit une donnée lue par le lecteur sans déclaration `previous_run`."""
+    """Renvoie les triplets (lecteur, donnée, écrivain) où l'écrivain, placé après le lecteur, écrit une donnée lue par le lecteur sans déclaration `previous_runs`."""
     return sorted(
         (reader.name, item, writer.name)
         for i, reader in enumerate(tasks)
         for writer in tasks[i + 1 :]
         for item in _writes_read(reader, writer)
-        if not _overlaps_any(item, reader.previous_run)
+        if not _overlaps_any(item, reader.previous_runs)
     )
 
 
@@ -166,12 +166,11 @@ def interface(children: Iterable[Step | Task]) -> tuple[frozenset[str], frozense
 class Block(StrEnum):
     """Bloc du premier niveau de l'arborescence du pipeline. Il regroupe les phases à l'affichage, sans effet sur l'exécution."""
 
-    HARVESTING = "Moissonnage"
+    HARVESTING = "Moissonnage et normalisation"
+    REFERENTIALS = "Référentiels"
     SOURCE_RECORDS = "Enregistrements sources"
     ENTITIES = "Entités"
     DERIVED_DATA = "Données dérivées"
-    ENRICHMENTS = "Enrichissements"
-    """Phases hors résolution d'entités : `--no-extras` les omet."""
 
 
 @dataclass(frozen=True)
@@ -189,12 +188,9 @@ class Phase:
     """Précondition, vérifiée avant les tâches : lève une exception si elle n'est pas remplie."""
     assemble: Callable[[Mapping[str, PhaseMetrics]], PhaseMetrics] | None = None
     """Métriques de la phase, d'après celles de ses tâches exécutées, par nom de tâche. `None` : leur somme."""
+    total_line: bool = False
+    """Après plusieurs tâches exécutées, le journal de la phase se termine par la ligne « Total », somme de leurs bilans."""
 
     @property
     def tasks(self) -> tuple[Task, ...]:
         return leaves(self.children)
-
-    @property
-    def extra(self) -> bool:
-        """Enrichissement : `--no-extras` omet la phase."""
-        return self.block is Block.ENRICHMENTS

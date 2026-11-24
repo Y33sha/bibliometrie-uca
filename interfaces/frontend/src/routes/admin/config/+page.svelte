@@ -18,6 +18,7 @@
   import { applyBrandHue, defaultSiteTitle, institution, previewBrandHue } from "#lib/institution.svelte.js";
   import type { components } from "#lib/api/schema.js";
   import { formatCount } from "#lib/plural.js";
+  import { sourceLabel, sourceOrder } from "#lib/sources.svelte.js";
 
   type StructureListItem = components["schemas"]["StructureListItem"];
   type StructureListResponse = components["schemas"]["StructureListResponse"];
@@ -139,6 +140,7 @@
   /** Plafonds d'interrogation des API, dont le champ vidé retire la borne. */
   const CAPS = [
     { key: "fetch_missing_max_per_source", label: "Imports par DOI : max par source" },
+    { key: "fetch_stale_max_per_source", label: "Documents non revus : max par source" },
     { key: "unpaywall_max_per_run", label: "Unpaywall" },
     { key: "doi_resolution_max_per_run", label: "doi.org (URL des DOI)" },
     { key: "sudoc_max_per_run", label: "Sudoc : revues vérifiées" },
@@ -146,7 +148,6 @@
 
   /** Délais au-delà desquels le pipeline interroge de nouveau une source, en jours. */
   const DELAYS = [
-    { key: "fetch_stale_after_days", label: "Documents non revus" },
     { key: "fetch_missing_retry_after_days", label: "Recherches infructueuses" },
     { key: "unpaywall_recheck_after_days", label: "Statut open access (Unpaywall)" },
     { key: "doi_resolution_recheck_after_days", label: "URL des DOI (doi.org)" },
@@ -166,8 +167,8 @@
   const TEXT_KEYS = new Set([SITE_TITLE_KEY]);
 
   /** Bornes du champ pour une clé entière, `null` pour les autres. */
-  function numericBounds(key: string): { min: number; max: number } | null {
-    const item = configByKey(key);
+  function numericBounds(editKey: string): { min: number; max: number } | null {
+    const item = configByKey(splitEditKey(editKey)[0]);
     if (item?.minimum == null || item.maximum == null) return null;
     return { min: item.minimum, max: item.maximum };
   }
@@ -183,6 +184,21 @@
 
   function configByKey(key: string): ConfigItem | undefined {
     return configs.find((c) => c.key === key);
+  }
+
+  /** Délai des documents non revus, par source. L'éditeur inline d'une source a pour clé `fetch_stale_after_days:<source>`. */
+  const STALE_DELAYS_KEY = "fetch_stale_after_days";
+  const staleDelays = $derived.by(() => {
+    const v = configByKey(STALE_DELAYS_KEY)?.value;
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, number>) : {};
+  });
+  /** Sources du délai, dans l'ordre d'affichage des sources. */
+  const staleDelaySources = $derived(sourceOrder().filter((source) => source in staleDelays));
+
+  /** Clé de configuration et source d'une clé d'éditeur inline. */
+  function splitEditKey(editKey: string): [string, string | null] {
+    const [key, source] = editKey.split(":");
+    return [key, source ?? null];
   }
 
   const LABORATORY_TYPES_KEY = "laboratory_types";
@@ -255,11 +271,14 @@
     perimeters = await api<Perimeter[]>("/api/perimeters");
   }
 
-  function startEdit(key: string) {
+  function startEdit(editKey: string) {
+    const [key, source] = splitEditKey(editKey);
     const item = configByKey(key);
     if (!item) return;
-    editingKey = key;
-    if (typeof item.value === "string") {
+    editingKey = editKey;
+    if (source !== null) {
+      editValue = String(staleDelays[source]);
+    } else if (typeof item.value === "string") {
       editValue = item.value;
     } else if (item.value === null) {
       editValue = "";
@@ -283,9 +302,10 @@
     }
   }
 
-  async function save(key: string) {
+  async function save(editKey: string) {
     saving = true;
     try {
+      const [key, source] = splitEditKey(editKey);
       const text = String(editValue ?? "");
       let parsed;
       if (TEXT_KEYS.has(key)) {
@@ -297,6 +317,7 @@
           parsed = text;
         }
       }
+      if (source !== null) parsed = { ...staleDelays, [source]: parsed };
       const saved = await configApi.setValue(key, parsed);
       if (key === SITE_TITLE_KEY) institution.title = (saved.value as string) || null;
       editingKey = null;
@@ -374,6 +395,19 @@
   <h2 class="section-title">Délais de réinterrogation</h2>
   <p class="info-box">Au-delà de ces délais, le pipeline interroge de nouveau la source.</p>
   <div class="config-grid">
+    {#each staleDelaySources as source (source)}
+      {@const days = staleDelays[source]}
+      {@const editKey = `${STALE_DELAYS_KEY}:${source}`}
+      <div class="config-row">
+        <span class="config-label">Documents non revus&nbsp;: {sourceLabel(source)}</span>
+        {#if editingKey === editKey}
+          {@render inlineEdit(editKey)}
+        {:else}
+          <span class="config-value-inline">{delayLabel(days)}</span>
+          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(editKey)} />
+        {/if}
+      </div>
+    {/each}
     {#each DELAYS as delay (delay.key)}
       {@const item = configByKey(delay.key)}
       {#if item}

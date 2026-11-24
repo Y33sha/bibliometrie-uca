@@ -1,4 +1,4 @@
-"""Phase `relations`, tâche `rebuild` : matching par titre, relations déclarées par les sources, paires de publications à clé partagée, reconstruction de `publication_relations`.
+"""Phase `relations`, tâche `rebuild_publication_relations` : matching par titre, relations déclarées par les sources, paires de publications à clé partagée, reconstruction de `publication_relations`.
 
 Le matching par titre relie un preprint (`fetch_preprint_title_matches`, titre identique) à sa version publiée. Le parent doit être la seule publication substantielle de ce titre, hors autres formes de la même œuvre ; sinon, aucun lien. Le parent est désigné par son `publication_id`, avec ou sans DOI.
 """

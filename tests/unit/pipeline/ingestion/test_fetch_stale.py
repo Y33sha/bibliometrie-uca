@@ -34,7 +34,7 @@ class _Base:
 def lancer(monkeypatch):
     """Lance `refresh` sur une lecture simulée ; renvoie les métriques et la base simulée."""
 
-    def _lancer(outcomes: dict):
+    def _lancer(outcomes: dict, *, limit: int | None = None):
         base = _Base()
 
         def _upsert(_store, *, source, source_id, doi, raw_data, authors_truncated, entry_mode):
@@ -64,6 +64,7 @@ def lancer(monkeypatch):
                 logging.getLogger("test"),
                 after_days=90,
                 years=[2024],
+                limit=limit,
             )
         )
         return metrics, base
@@ -100,6 +101,13 @@ def test_transient_failure_is_noop(lancer):
     # Un échec transitoire laisse l'absence non établie : le document reste présent.
     metrics, base = lancer({"X": UNAVAILABLE})
     assert (base.ecrits, base.disparus, metrics.errors) == ([], [], 1)
+
+
+def test_le_plafond_borne_les_documents_cherches_en_tete_de_selection(lancer):
+    metrics, base = lancer(_QUATRE_ISSUES, limit=2)
+
+    assert sorted(base.ecrits) == ["A", "B"]
+    assert metrics.total == 2
 
 
 def test_empty_is_noop(lancer):

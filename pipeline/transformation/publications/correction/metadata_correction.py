@@ -2,11 +2,10 @@
 
 Tâches (`pipeline.graph`), dans l'ordre du graphe :
 
-- **serial_by_doi** rattache la revue manquante désignée par l'espace de noms du DOI. Elle passe en premier : la correction unaire lit le type de la revue rattachée, et requalifie l'enregistrement source au même run.
-- **unary** applique à chaque enregistrement source les règles de correction (`correct_source_record`), et retire les identifiants et les liens des dépôts HAL introuvables.
+- **correct_source_records** applique à chaque enregistrement source les règles de correction (`correct_source_record`), et retire les identifiants et les liens des dépôts HAL introuvables.
 - **doi_targets** donne une cible au DOI des formes secondaires DataCite d'une œuvre présente en base.
 - **remove_identifiers** retire le DOI partagé par des œuvres distinctes (ouvrage et chapitre, volume d'actes et communication, enregistrement source d'une autre œuvre), et le DOI inconnu de doi.org.
-- **matchable** écarte de la réconciliation des enregistrements sources (`is_matchable`), d'après les valeurs corrigées.
+- **decide_matchability** écarte de la réconciliation des enregistrements sources (`is_matchable`), d'après les valeurs corrigées.
 
 Chaque tâche renvoie ses éléments examinés (`total`), mis à jour (`updated`), et son décompte par règle (`extras`).
 """
@@ -22,35 +21,11 @@ from pipeline.transformation.publications.correction import (
     doi_targets,
     matchable,
     remove_identifiers,
-    serial_by_doi,
 )
 
 _CHILDREN = (
     Task(
-        "serial_by_doi",
-        reads=(
-            "serial_doi_namespaces",
-            "source_record_identifiers",
-            "source_records.serial_id",
-            "source_records.corrections",
-            "source_records.doc_type",
-        ),
-        writes=(
-            "source_records.serial_id",
-            "source_records.corrections",
-            "source_record_keys_queue",
-        ),
-        # Espaces de noms des revues vides, supprimés avec elles par `finalize.delete_empty_serials`.
-        previous_run=(
-            "source_records",
-            "source_record_identifiers.removed_by",
-            "serial_doi_namespaces",
-        ),
-        section="Revues non renseignées, identifiables par le DOI du document",
-        run=in_transaction(serial_by_doi.run),
-    ),
-    Task(
-        "unary",
+        "correct_source_records",
         reads=(
             *(
                 f"source_records.{column}"
@@ -88,12 +63,10 @@ _CHILDREN = (
             "source_record_keys_queue",
         ),
         # Revues, monographies et éditeurs vides, supprimés par `finalize`.
-        previous_run=(
+        previous_runs=(
             "source_records",
             "source_record_identifiers.removed_by",
             "serials.serial_type",
-            "serials.oa_model",
-            "serials.doaj_payload",
             "monographs.proceedings",
             "publishers.publisher_type",
         ),
@@ -121,7 +94,7 @@ _CHILDREN = (
             "dois.registered",
         ),
         writes=("doi_targets", "source_record_keys_queue"),
-        previous_run=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
+        previous_runs=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
         section="Cibles des DOI de formes secondaires",
         run=in_transaction(doi_targets.run),
     ),
@@ -153,12 +126,12 @@ _CHILDREN = (
             "source_record_identifiers.removed_by",
             "source_record_keys_queue",
         ),
-        previous_run=("source_records", "source_record_identifiers.removed_by"),
+        previous_runs=("source_records", "source_record_identifiers.removed_by"),
         section="Retraits de DOI par confrontation de documents",
         run=in_transaction(remove_identifiers.run),
     ),
     Task(
-        "matchable",
+        "decide_matchability",
         reads=(
             *(
                 f"source_records.{column}"
@@ -179,7 +152,7 @@ _CHILDREN = (
         ),
         writes=("source_records.is_matchable", "source_record_keys_queue"),
         # Retraits de DOI de la réconciliation, que `is_matchable` ignore (`reconsidered`).
-        previous_run=("source_records.is_matchable", "source_record_identifiers.removed_by"),
+        previous_runs=("source_records.is_matchable", "source_record_identifiers.removed_by"),
         section="Enregistrements sources écartés de la réconciliation",
         run=in_transaction(matchable.run),
     ),

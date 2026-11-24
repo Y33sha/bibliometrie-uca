@@ -5,7 +5,7 @@ La table `config` contient ces réglages, modifiables dans l'interface d'adminis
 
 from sqlalchemy import Connection, text
 
-from domain.config import ConfigKey, start_year_value
+from domain.config import ConfigKey, normalize_config_value, start_year_value
 from domain.dates import today
 
 
@@ -27,6 +27,18 @@ def delay(conn: Connection, key: ConfigKey) -> int:
     value = _stored_int(conn, key)
     assert value is not None, key
     return value
+
+
+def delay_for_source(conn: Connection, key: ConfigKey, source: str) -> int:
+    """Renvoie le délai de réinterrogation de `source` pour `key`, en jours. Une source absente de la valeur stockée reçoit le délai par défaut de la clé."""
+    stored = conn.execute(
+        text("SELECT value FROM config WHERE key = :key"), {"key": key.value}
+    ).scalar_one()
+    by_source = normalize_config_value(key, stored)
+    assert isinstance(by_source, dict), key
+    days = by_source[source]
+    assert isinstance(days, int), key
+    return days
 
 
 def fixed_start_year(conn: Connection) -> int | None:

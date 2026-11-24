@@ -7,7 +7,6 @@ from enum import StrEnum
 from domain.documents.doc_types import DocType
 from domain.normalize import normalize_text, optional_plain_text
 from domain.serials.issns import SerialIssn, received_issns
-from domain.serials.serial import OaModel
 from domain.serials.series import names_a_volume, series_title
 from domain.serials.titles import names_a_dated_event, names_ebook_platform, names_proceedings
 from domain.source_records.doc_types import map_doc_type
@@ -115,7 +114,6 @@ class ContainerDescription:
     issns: tuple[SerialIssn, ...] = ()
     """ISSN de la revue ou de la collection, avec le support donné par la source."""
     openalex_id: str | None = None
-    oa_model: OaModel | None = None
     isbns: tuple[str, ...] = ()
     eisbns: tuple[str, ...] = ()
     year: int | None = None
@@ -137,7 +135,6 @@ class ContainerDescription:
             collection_title=None,
             issns=(),
             openalex_id=None,
-            oa_model=None,
         )
 
     @property
@@ -153,7 +150,6 @@ class SeriesDescription:
     title: str | None
     issns: tuple[SerialIssn, ...] = ()
     openalex_id: str | None = None
-    oa_model: OaModel | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -168,12 +164,11 @@ class VolumeDescription:
 
 
 def _series(description: ContainerDescription, title: str | None) -> SeriesDescription:
-    """Renvoie la série de titre `title`, avec les ISSN, la source OpenAlex et le modèle open access de la description."""
+    """Renvoie la série de titre `title`, avec les ISSN et la source OpenAlex de la description."""
     return SeriesDescription(
         title=title,
         issns=description.issns,
         openalex_id=description.openalex_id,
-        oa_model=description.oa_model,
     )
 
 

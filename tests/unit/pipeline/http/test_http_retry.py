@@ -177,6 +177,30 @@ class TestAsync:
         assert route.call_count == 2
 
     @pytest.mark.asyncio
+    async def test_le_journal_d_un_429_releve_les_en_tetes_de_debit_et_le_corps(
+        self, http_mock, caplog
+    ):
+        http_mock.get("https://api.example/foo").mock(
+            side_effect=[
+                httpx2.Response(
+                    429,
+                    headers={"X-Rate-Limit-Limit": "3", "Retry-After": "2", "Server": "nginx"},
+                    text="Too many\n requests",
+                ),
+                httpx2.Response(200, json={"ok": True}),
+            ]
+        )
+        async with httpx2.AsyncClient() as client:
+            await http_request_with_retry_async(
+                client, "GET", "https://api.example/foo", initial_backoff=0.01, label="test"
+            )
+        [warning] = [r.getMessage() for r in caplog.records if "HTTP 429" in r.getMessage()]
+        assert "x-rate-limit-limit=3" in warning
+        assert "retry-after=2" in warning
+        assert "server" not in warning
+        assert "corps : Too many requests" in warning
+
+    @pytest.mark.asyncio
     async def test_5xx_is_retried(self, http_mock):
         route = http_mock.get("https://api.example/foo").mock(return_value=httpx2.Response(503))
         async with httpx2.AsyncClient() as client:

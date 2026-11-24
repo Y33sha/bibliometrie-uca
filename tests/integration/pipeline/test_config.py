@@ -9,7 +9,14 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 
 from domain.config import DEFAULT_START_YEAR_OFFSET, ConfigKey
 from domain.dates import today
-from pipeline.runtime.config import cap, delay, fixed_start_year, get_years, window_years
+from pipeline.runtime.config import (
+    cap,
+    delay,
+    delay_for_source,
+    fixed_start_year,
+    get_years,
+    window_years,
+)
 from tests.integration.helpers.config import set_config
 
 
@@ -68,6 +75,11 @@ class TestFormeImposeeEnBase:
     @pytest.mark.parametrize("valeur", ["longtemps", 0, -3, True, 1.5])
     def test_un_delai_hors_forme_est_refuse(self, sa_sync_conn, valeur):
         with pytest.raises(IntegrityError, match="config_delay_is_positive_integer"):
+            set_config(sa_sync_conn, "fetch_missing_retry_after_days", valeur)
+
+    @pytest.mark.parametrize("valeur", [90, "longtemps", [90]])
+    def test_un_delai_par_source_hors_forme_est_refuse(self, sa_sync_conn, valeur):
+        with pytest.raises(IntegrityError, match="config_delay_by_source_is_object"):
             set_config(sa_sync_conn, "fetch_stale_after_days", valeur)
 
 
@@ -97,7 +109,6 @@ class TestDelais:
     @pytest.mark.parametrize(
         "key",
         [
-            ConfigKey.FETCH_STALE_AFTER_DAYS,
             ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS,
             ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS,
             ConfigKey.DOAJ_REFRESH_AFTER_DAYS,
@@ -107,3 +118,13 @@ class TestDelais:
     def test_le_delai_configure_est_lu(self, sa_sync_conn, key):
         set_config(sa_sync_conn, key.value, 7)
         assert delay(sa_sync_conn, key) == 7
+
+    def test_le_delai_d_une_source_est_lu(self, sa_sync_conn):
+        set_config(sa_sync_conn, "fetch_stale_after_days", {"crossref": 365, "hal": 30})
+        key = ConfigKey.FETCH_STALE_AFTER_DAYS
+        assert delay_for_source(sa_sync_conn, key, "crossref") == 365
+        assert delay_for_source(sa_sync_conn, key, "hal") == 30
+
+    def test_une_source_absente_de_la_valeur_stockee_recoit_le_delai_par_defaut(self, sa_sync_conn):
+        set_config(sa_sync_conn, "fetch_stale_after_days", {"crossref": 365})
+        assert delay_for_source(sa_sync_conn, ConfigKey.FETCH_STALE_AFTER_DAYS, "openalex") == 90
