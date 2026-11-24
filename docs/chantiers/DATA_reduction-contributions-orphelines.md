@@ -1,0 +1,114 @@
+# Chantier — Réduction des contributions orphelines
+
+## Contexte
+
+Une contribution orpheline est une contribution du périmètre, sous un rôle d'auteur, sans personne rattachée. Motifs des 944 contributions orphelines, d'après le rejeu de la décision du rattachement au 2026-11-17 :
+
+| Motif | Contributions |
+|---|---|
+| Forme de nom désignant plusieurs personnes | 533 |
+| Personne rattachée à une autre contribution de la publication | 389 |
+| Noms des contributions sources désignant des personnes différentes | 11 |
+| Personnes candidates toutes rejetées pour la publication | 10 |
+| Identifiants désignant des personnes différentes | 1 |
+
+Les 389 contributions dont la personne est rattachée à une autre contribution de la publication se répartissent ainsi :
+
+- par origine : 378 partagent un enregistrement source avec l'autre contribution, donc l'enregistrement liste l'auteur deux fois. 8 viennent de deux enregistrements d'une même source dans la publication. 3 viennent d'un alignement manqué entre deux sources.
+- par graphie : 111 ont la même graphie que l'autre contribution, 250 une initiale face à un prénom complet, 28 deux prénoms complets différents (nom et prénom inversés, faute d'accent, changement de nom).
+
+## Décisions
+
+- Chaque catégorie d'orphelines se résout par une règle du pipeline.
+- Les indices se mesurent sur les orphelines et sur un jeu de contrôle : contributions rattachées par un identifiant ou à la main, au nom désignant plusieurs personnes.
+- Le chantier [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md) reprend après celui-ci.
+- Une forme de nom ambiguë se départage par une cascade d'indices : coauteurs, structure du référentiel, structure HAL, revue, années d'activité. La première étape qui désigne une seule personne candidate décide.
+
+## Phasage
+
+### Phase 1 — Départage des formes de nom ambiguës
+
+Un indice désigne une personne candidate quand elle seule partage cet indice avec la contribution, d'après ses autres publications. Indice laboratoire : un laboratoire ou une équipe du référentiel. Indice discipline : un sous-domaine OpenAlex, à défaut un domaine OpenAlex, puis un domaine HAL de niveau 2, puis de niveau 1. Mesure du 2026-11-17 sur les 533 orphelines au nom ambigu et sur un jeu de contrôle de 1 102 contributions :
+
+| Verdict | Orphelines | Contrôle : justes / faux |
+|---|---|---|
+| Laboratoire et discipline désignent la même personne | 159 | 327 / 5 |
+| Discipline seule | 150 | 290 / 18 |
+| Laboratoire seul | 72 | 43 / 4 |
+| Laboratoire et discipline désignent deux personnes | 5 | laboratoire juste 4 fois sur 4 |
+| Aucun indice | 147 | 411 |
+
+- [x] Relecture des 27 faux du jeu de contrôle :
+  - 14 références fausses : 12 IdRef de ScanR, 2 identifiants HAL. La personne désignée par la règle est la bonne.
+  - 1 personne en double : la règle désigne le doublon de la personne de référence.
+  - 10 erreurs de la règle : 6 entre deux homonymes du même laboratoire et du même domaine, 3 par un domaine HAL de niveau 1, 1 par le laboratoire CHU.
+  - 2 cas indécidables.
+- [x] Variantes de la règle. 295 contributions du contrôle ont pour référence le seul IdRef de ScanR. Le contrôle épuré les écarte :
+
+  | Variante | Orphelines départagées | Contrôle épuré : justes / faux |
+  |---|---|---|
+  | Règle mesurée | 386 | 476 / 11 |
+  | Sans CHU | 368 | 484 / 11 |
+  | Sans domaine HAL de niveau 1 | 382 | 464 / 7 |
+  | Sans CHU ni domaine HAL de niveau 1 | 364 | 472 / 7 |
+- [x] Indice coauteurs : personnes rattachées à la publication et présentes dans les autres publications de la personne candidate. Seuil : au moins un coauteur partagé, à défaut au moins deux. Mesure sur le contrôle épuré, laboratoire sans CHU, discipline sans domaine HAL de niveau 1 :
+
+  | Règle | Orphelines départagées | Contrôle épuré : justes / faux |
+  |---|---|---|
+  | Coauteurs | 422 | 613 / 3 |
+  | Coauteurs, puis laboratoire | 429 | 626 / 3 |
+  | Coauteurs, puis laboratoire, puis discipline | 456 | 662 / 5 |
+  | Laboratoire, puis discipline | 364 | 472 / 7 |
+
+  Les coauteurs départagent 4 des 6 erreurs entre homonymes du même laboratoire et du même domaine.
+- [x] Indices structures HAL (laboratoire, équipe ou département HAL), revue et années d'activité (année de la publication à deux ans au plus des autres publications de la personne). Mesure du 2026-11-19 (`data/experiments/contributions-orphelines/mesure.py`) :
+
+  | Règle | Orphelines départagées | Contrôle épuré : justes / faux |
+  |---|---|---|
+  | Laboratoire seul | 142 | 286 / 0 |
+  | Structures HAL seules | 85 | 372 / 3 |
+  | Revue seule | 188 | 277 / 3 |
+  | Années seules | 182 | 137 / 0 |
+  | Coauteurs, laboratoire, structures HAL, revue | 453 | 688 / 3 |
+  | Coauteurs, laboratoire, structures HAL, revue, discipline | 475 | 699 / 5 |
+  | Coauteurs, laboratoire, structures HAL, revue, discipline, années | 488 | 703 / 5 |
+  | Coauteurs, laboratoire, structures HAL, revue, années | 477 | 692 / 3 |
+  | Coauteurs, laboratoire ou structures HAL en une étape, revue, années | 475 | 679 / 3 |
+
+  Des profils tirés des seuls rattachements par identifiant ou à la main départagent autant de cas du contrôle, et moins d'orphelines. L'indice laboratoire réunit les structures du référentiel atteintes par l'adresse, le ROR ou la structure HAL. L'indice structures HAL ajoute les structures HAL hors du référentiel, et les équipes ou départements HAL rattachés à un laboratoire du référentiel.
+- [x] Rejets d'une personne comme indice négatif (idée de ReCiter) : la personne candidate est écartée quand la publication partage un coauteur ou un laboratoire avec ses publications rejetées, et aucun avec ses propres publications. Sur le contrôle épuré, l'indice écarte 26 fois une autre personne et jamais la personne de référence. Les cas écartés sont déjà départagés par la cascade.
+- [ ] Règle de départage dans la phase `persons`, avec les indices retenus :
+  - [ ] Règle du domaine : cascade ordonnée d'indices. Chaque indice reçoit le contexte de la contribution et les profils des personnes candidates, et désigne une personne ou aucune. Constantes du domaine : structures du référentiel retenues (laboratoires et équipes, hors CHU), types de structure HAL retenus (laboratoire, équipe, département), écart d'années (2), seuils de coauteurs (1, puis 2).
+  - [ ] Décision : `decide_contribution` renvoie les personnes candidates d'une forme de nom ambiguë. La cascade décide ces contributions avant `settle_publication`. Dans une publication, un rattachement par la cascade cède devant un rattachement par le nom.
+  - [ ] Mode de rattachement : une valeur de `resolution_mode` par indice (migration), pour mesurer chaque indice et retrouver ses rattachements. Libellés dans la vue du pipeline de l'administration.
+  - [ ] Chargement par lot de publications : contexte des contributions ambiguës du lot (personnes rattachées à la publication, structures, revue, année) et profils de leurs personnes candidates, hors publication décidée. Profils et coauteurs présents viennent des seuls rattachements hors cascade, donc le résultat est indépendant de l'ordre des lots.
+  - [ ] Purge : la redécision des contributions rattachées par le nom ou par la cascade passe par la même cascade.
+  - [ ] Tests : un test du domaine par indice et pour l'ordre de la cascade ; tests d'intégration du rattachement et de la purge.
+  - [ ] Mesure avant commit, sur la base de production : durée de la tâche, orphelines départagées face aux 477 attendues.
+
+### Phase 2 — Auteur listé deux fois dans un enregistrement source
+
+- [ ] Règle de réunion des deux contributions sources d'un enregistrement désignant la même personne, à décider. 378 orphelines.
+
+### Phase 3 — Enregistrements d'une même source et alignements manqués
+
+- [ ] Diagnostic des 8 orphelines issues de deux enregistrements d'une même source et des 3 alignements manqués.
+
+### Phase 4 — Cas restants
+
+- [ ] Relecture des 11 conflits de noms, des 10 orphelines aux candidats tous rejetés et du conflit d'identifiants.
+
+### Phase 5 — Contributions des brevets
+
+L'indice de périmètre « déposant du brevet » va à tous les inventeurs de la famille. HAL donne par défaut le rôle d'auteur aux inventeurs. Ce rôle permettait à un co-inventeur extérieur de fonder une personne : 56 personnes sans fiche RH au 2026-11-19.
+
+- [x] Une contribution d'une publication de type brevet a le seul rôle inventeur (`ROLE_BY_DOC_TYPE`). La décision du rattachement juge la création d'une personne sur les rôles de la contribution. Un changement de type de la publication remet ses contributions en recomposition.
+- [ ] Remise en file des 410 contributions de brevet au rôle d'auteur (`requeue_doc_type_roles`), puis `run_pipeline --from author_grouping`.
+
+### Phase 6 — Documentation
+
+- [ ] Mise à jour de la documentation du rattachement des personnes.
+
+## Questions ouvertes
+
+- Deux coauteurs homonymes de même graphie dans un enregistrement : critère qui les distingue d'un auteur listé deux fois.

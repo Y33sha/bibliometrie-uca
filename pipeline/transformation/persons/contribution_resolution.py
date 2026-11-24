@@ -130,10 +130,9 @@ _IDENTIFIERS_OBJECT = ", ".join(
 def _members_sql(restriction: str) -> str:
     """Renvoie la requête des contributions sources des contributions retenues par `restriction` (jointures et clause `WHERE` sur `g`)."""
     return f"""
-        SELECT g.id AS contribution_id, g.publication_id, g.in_perimeter, sc.source::text AS source,
-               sc.raw_author_name, sc.raw_last_name, sc.raw_first_name,
+        SELECT g.id AS contribution_id, g.publication_id, g.in_perimeter, g.roles,
+               sc.source::text AS source, sc.raw_author_name, sc.raw_last_name, sc.raw_first_name,
                jsonb_strip_nulls(jsonb_build_object({_IDENTIFIERS_OBJECT})) AS identifiers,
-               sc.roles,
                (SELECT ca.person_id FROM confirmed_source_contributions ca
                 WHERE ca.source_contribution_id = sc.id) AS pinned_person_id
         FROM {CONTRIBUTIONS_AND_SOURCES}
@@ -259,9 +258,9 @@ def _aligned_contributions(rows: Iterable[Row[tuple[object, ...]]]) -> Candidate
     members: dict[int, dict[int, list[AlignedSourceContribution]]] = defaultdict(
         lambda: defaultdict(list)
     )
-    in_perimeter: dict[int, bool] = {}
+    attributes: dict[int, tuple[bool, tuple[str, ...]]] = {}
     for r in rows:
-        in_perimeter[r.contribution_id] = r.in_perimeter
+        attributes[r.contribution_id] = (r.in_perimeter, tuple(r.roles or ()))
         members[r.publication_id][r.contribution_id].append(
             AlignedSourceContribution(
                 source=r.source,
@@ -269,14 +268,13 @@ def _aligned_contributions(rows: Iterable[Row[tuple[object, ...]]]) -> Candidate
                     r.raw_author_name, r.raw_last_name, r.raw_first_name
                 ),
                 identifiers=r.identifiers,
-                roles=r.roles or (),
                 pinned_person_id=r.pinned_person_id,
             )
         )
     return {
         publication_id: {
             contribution_id: AlignedContribution(
-                tuple(contribution_members), in_perimeter[contribution_id]
+                tuple(contribution_members), *attributes[contribution_id]
             )
             for contribution_id, contribution_members in by_contribution.items()
         }
@@ -513,7 +511,7 @@ def unidentified_orphans(
         for contribution_id, contribution in by_contribution.items()
         if decisions[contribution_id].outcome != ContributionOutcome.MATCH
         and contribution.in_perimeter
-        and any(ContributionRole.AUTHOR in m.roles for m in contribution.members)
+        and ContributionRole.AUTHOR in contribution.roles
     ]
 
 

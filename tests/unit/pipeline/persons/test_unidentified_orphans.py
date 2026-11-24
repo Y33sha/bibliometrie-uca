@@ -11,18 +11,13 @@ from domain.persons.contribution_matching import (
 from domain.persons.contributor_name import ContributorName
 from pipeline.transformation.persons.contribution_resolution import unidentified_orphans
 
-
-def _member(*, roles=("author",)):
-    return AlignedSourceContribution(
-        source="hal",
-        name=ContributorName.from_parts("Martin", "Anne"),
-        identifiers={},
-        roles=roles,
-    )
+_MEMBER = AlignedSourceContribution(
+    source="hal", name=ContributorName.from_parts("Martin", "Anne"), identifiers={}
+)
 
 
-def _contribution(*members, in_perimeter=True):
-    return AlignedContribution(members, in_perimeter)
+def _contribution(*, roles=("author",), in_perimeter=True):
+    return AlignedContribution((_MEMBER,), in_perimeter, roles)
 
 
 _SKIP = ContributionDecision(
@@ -34,11 +29,11 @@ def test_seules_les_contributions_d_auteur_du_perimetre_sans_personne_comptent()
     """Une contribution hors périmètre écartée par la décision, une contribution d'un autre rôle et une contribution rattachée restent hors du décompte."""
     candidates = {
         1: {
-            10: _contribution(_member()),
-            11: _contribution(_member(), in_perimeter=False),
-            12: _contribution(_member(roles=("editor",))),
-            13: _contribution(_member()),
-            14: _contribution(_member(roles=("editor",)), _member(roles=("editor", "author"))),
+            10: _contribution(),
+            11: _contribution(in_perimeter=False),
+            12: _contribution(roles=("editor",)),
+            13: _contribution(),
+            14: _contribution(roles=("author", "editor")),
         }
     }
     decisions = {
