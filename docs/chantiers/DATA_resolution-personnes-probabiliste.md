@@ -51,20 +51,25 @@ Mesure exploratoire du 2026-11-24 (`data/experiments/fausses-attributions/embedd
 
 ### Phase 1 — Jeu de paires et indices
 
-Scripts et données dans `data/experiments/`, hors pipeline.
+Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py`, `indices.py`), hors pipeline. Jeu du 2026-11-24 : 29 455 paires de 1 101 personnes, 28 188 positives, 1 267 négatives (rejets 861, homonymes par le nom 283, autres candidates d'une forme ambiguë 126, verdicts 14). Les personnes sont celles du jeu des embeddings.
 
 - [x] Embeddings des publications, modèle `paraphrase-multilingual-MiniLM-L12-v2`.
-- [ ] Positifs : épinglages, confirmations, verdicts « de la personne ». S'y ajoutent les contributions rattachées par un identifiant donné par au moins deux sources, ou par un ORCID de Crossref, DataCite, INSPIRE-HEP ou du `raw_orcid` d'OpenAlex. HAL et ScanR seuls sont exclus : l'ORCID de ScanR seul est faux une fois sur deux.
-- [ ] Négatifs : rejets, verdicts « homonyme », autres personnes candidates d'un nom ambigu sur les contributions positives.
-- [ ] Indices de chaque paire. La publication notée est exclue du profil de la personne.
+- [x] Positifs : épinglages, confirmations, verdicts « de la personne ». S'y ajoutent les contributions rattachées par un identifiant donné par au moins deux sources, ou par un ORCID de Crossref, DataCite, INSPIRE-HEP ou du `raw_orcid` d'OpenAlex. HAL et ScanR seuls sont exclus : l'ORCID de ScanR seul est faux une fois sur deux.
+- [x] Négatifs : rejets, verdicts « homonyme », autres personnes candidates d'un nom ambigu sur les contributions positives, autres personnes de même nom de famille et de même initiale. Un prénom complet identique compte seulement entre personnes déclarées distinctes.
+- [x] Indices de chaque paire. La publication notée est exclue du profil de la personne.
   - Réseau : coauteurs partagés pondérés par leur rareté, laboratoire, structure HAL, revue.
   - Contenu : similarité d'embeddings aux publications voisines, score thématique, cosinus des sous-champs.
   - Contexte : écart d'années, nombre d'auteurs de la publication, prénom complet ou initiale, taille du profil, année comprise dans les périodes RH.
 
 ### Phase 2 — Régression logistique
 
-- [ ] Entraînement et évaluation face à la cascade de départage (résolution) et aux clusters (détection) : précision des 50 et des 100 alertes les mieux classées, aire sous la courbe précision-rappel, exactitude sur les noms ambigus mis de côté.
-- [ ] Ablation par indice.
+- [x] Entraînement et évaluation en cinq plis groupés par personne (`modele_logistique.py`), le 2026-11-24.
+  - Détection : AUC de 0,992, aire sous la courbe précision-rappel des négatifs de 0,89. Les 100 paires les moins bien notées sont toutes négatives.
+  - Tranche difficile, publications de 100 contributions au plus, hors des 6 personnes à plus de 50 négatifs (21 125 paires, 214 négatives) : AUC de 0,991, aire de 0,82, 95 négatives parmi les 100 paires les moins bien notées. Au seuil qui signale 1 % des positives, 188 négatives sur 214 sont signalées : rejets 77 sur 85, homonymes par le nom 65 sur 66, verdicts 11 sur 12, autres candidates 35 sur 51.
+  - Résolution, sur 349 contributions disputées entre la personne juste et au moins une autre candidate : le modèle désigne la personne juste dans 346 cas. La cascade de départage rejouée sur les indices décide 338 cas, dont 336 justes.
+  - Le nombre de contributions de la publication a un coefficient de −2,8 : les rejets viennent souvent des grandes collaborations. Les positifs, rattachés par identifiant, en comptent moins.
+- [x] Ablation par famille d'indices : sans le contenu (embeddings, thèmes, sous-champs), l'aire tombe de 0,89 à 0,74 ; sans le réseau, à 0,83 ; sans le contexte, elle reste à 0,90. Seuls, la similarité d'embeddings donne une AUC de 0,986, les coauteurs pondérés 0,854.
+- [ ] Évaluation sur des positifs rattachés par le nom ou par IdRef, plus proches des contributions à juger que les positifs rattachés par ORCID.
 
 ### Phase 3 — Arbres de gradient
 
