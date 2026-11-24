@@ -8,7 +8,6 @@
 - [Détection des fausses attributions](DATA_detection-fausses-attributions.md)
 - [Modèle open access des revues](DATA_modele-open-access-des-revues.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
-- [Réduction des contributions orphelines](DATA_reduction-contributions-orphelines.md)
 
 ### Non commencé
 
@@ -21,6 +20,7 @@
 
 ## Chantiers archivés
 
+- 2026-11-24 — [Réduction des contributions orphelines](archived/2026-11-24_DATA_reduction-contributions-orphelines.md)
 - 2026-11-20 — [Réorganisation du pipeline selon ses dépendances](archived/2026-11-20_CODE_reorganisation-du-pipeline.md)
 - 2026-11-17 — [Refactorisation : fin du moissonnage](archived/2026-11-17_CODE_refacto-fin-du-moissonnage.md)
 - 2026-11-17 — [Types de document](archived/2026-11-17_DATA_types-document.md)

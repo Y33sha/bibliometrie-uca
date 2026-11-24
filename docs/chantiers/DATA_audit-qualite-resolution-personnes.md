@@ -42,10 +42,11 @@ Un jeu d'évaluation tiré des verdicts humains existe depuis le 2026-10-19 (`bu
   - Intersection dans le rattachement par le nom seul : une décision change. « Christian Boyer » dans HAL et ScanR, « Boyer, B » dans OpenAlex.
   - Intersection aussi au niveau des identifiants, les candidats d'une contribution source étant l'union des personnes désignées par ses identifiants : même résultat. Les 14 conflits d'identifiants opposent deux contributions sources, par exemple un ORCID de HAL et un IdRef de ScanR pour deux personnes en doublon (Christelle Richard, Christelle Gremeau-Richard).
   - Intersection des candidats de chaque contribution source, désignés par ses identifiants ou à défaut par son nom : 19 décisions changent. 18 rattachements par identifiant sont perdus face à un nom qui désigne une seule autre personne. Ce nom vient d'un alignement erroné ou d'une erreur de source : « Y. Sano » dans WoS pour Takane Sano, à l'ORCID confirmé.
-- [ ] Documentation : `--rebuild-persons` dans `docs/exploitation/03-pipeline.md`.
+- [x] Documentation : `--rebuild-persons` dans `docs/exploitation/03-pipeline.md`.
 
 ## Questions ouvertes
 
 - Périmètre des publications : il réunit les indices des seules contributions rattachées à une personne non exclue. Une erreur d'affiliation relève de la contribution source, pas de la personne.
 - Recalcul immédiat des contributions invalidées par une décision de l'administration, exposé par le pipeline (`pipeline/public.py`) sur un index réduit aux valeurs de leurs contributions sources.
 - Idée de ReCiter : enregistrer ce qui a concordé, en plus de la règle.
+- Deux coauteurs homonymes de même graphie dans un enregistrement source : critère qui les distingue d'un auteur listé deux fois.
