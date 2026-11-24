@@ -56,7 +56,10 @@ Scripts et données dans `data/experiments/`, hors pipeline.
 - [x] Embeddings des publications, modèle `paraphrase-multilingual-MiniLM-L12-v2`.
 - [ ] Positifs : épinglages, confirmations, verdicts « de la personne ». S'y ajoutent les contributions rattachées par un identifiant donné par au moins deux sources, ou par un ORCID de Crossref, DataCite, INSPIRE-HEP ou du `raw_orcid` d'OpenAlex. HAL et ScanR seuls sont exclus : l'ORCID de ScanR seul est faux une fois sur deux.
 - [ ] Négatifs : rejets, verdicts « homonyme », autres personnes candidates d'un nom ambigu sur les contributions positives.
-- [ ] Indices de chaque paire, la publication notée exclue du profil de la personne : coauteurs partagés pondérés par leur rareté, laboratoire, structure HAL, revue, écart d'années, similarité d'embeddings aux publications voisines, score thématique, cosinus des sous-champs, nombre d'auteurs de la publication, prénom complet ou initiale, taille du profil, année comprise dans les périodes RH.
+- [ ] Indices de chaque paire. La publication notée est exclue du profil de la personne.
+  - Réseau : coauteurs partagés pondérés par leur rareté, laboratoire, structure HAL, revue.
+  - Contenu : similarité d'embeddings aux publications voisines, score thématique, cosinus des sous-champs.
+  - Contexte : écart d'années, nombre d'auteurs de la publication, prénom complet ou initiale, taille du profil, année comprise dans les périodes RH.
 
 ### Phase 2 — Régression logistique
 
