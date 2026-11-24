@@ -61,6 +61,12 @@ Le critère IdRef précède le critère de nom. Une contribution sans contributi
 - 307 des 1 713 IdRef confirmés de personnes viennent de ScanR seul.
 - 1 299 contributions, dans 1 134 publications, ont pour seules contributions sources du périmètre des contributions sources ScanR. Elles perdent leur personne.
 - Au 2026-11-03, les autres sources contredisaient l'IdRef ScanR seul dans 7,6 % des cas tranchés. 9 des 14 cas contredits relus étaient des homonymes. Parmi 16 cas sans information, 9 étaient plausibles. Les 7 autres étaient des thèses, avec l'IdRef d'un membre du jury ou du directeur.
+- Au 2026-11-24 (`data/experiments/resolution-personnes/audit_rapide*.py`) :
+  - l'IdRef de ScanR diffère de l'IdRef d'une autre source de la même contribution dans 811 contributions sur 81 850 ;
+  - il diffère de l'IdRef confirmé de la personne rattachée dans 1 731 contributions sur 51 627. 994 sont rattachées par ORCID, 176 par compte HAL : une autre source y donne l'IdRef de la personne dans 844 cas ;
+  - 289 de ces 1 731 contributions sont rattachées par un IdRef autre que l'IdRef confirmé de leur personne.
+- Fausses attributions rejetées par l'administration, au 2026-11-24 : 88 paires comportaient un identifiant de la personne, donné à l'homonyme par une source. L'IdRef de ScanR est seul dans 58 de ces paires, présent dans 7 autres.
+- Clusters de deux publications signalés au 2026-11-24 : 7 clusters relèvent probablement d'un homonyme, presque tous rattachés par IdRef. Dans 3 d'entre eux, ScanR est la seule source à donner un IdRef.
 
 ### Périmètre
 

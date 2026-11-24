@@ -68,6 +68,7 @@ Prérequis : phase 3 du chantier [alignement des auteurs](archived/2026-10-24_DA
 - [x] Onglet « Fusions suspectes » et son compteur : publications dont moins de la moitié des auteurs se retrouvent d'un enregistrement source à l'autre (`1a77daf4d`).
 - [ ] Mesure de sa précision sur des cas relus.
 - [ ] Taille du groupe hors `dataset` et `software` : évaluer le signal.
+- [ ] Enregistrement source étranger minoritaire. L'onglet retient une publication dont moins de la moitié des contributions sources ont un correspondant : un enregistrement source étranger minoritaire lui échappe (12 des 20 fusions erronées probables de l'échantillon du 2026-10-18). Critère à ajouter : un enregistrement source dont presque aucune contribution source n'a de correspondant.
 
 ### 4. Verdicts durables
 

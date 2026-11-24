@@ -2,9 +2,13 @@
 
 ## Contexte
 
-Une contribution réunit les contributions sources d'un même auteur dans une publication, alignées par la phase `author_grouping`, et désigne sa personne, décidée par la phase `persons`. Les deux mécanismes sont en place. Restent des contrôles de qualité des données et des outils de correction, sans ordre imposé entre eux.
+Une contribution réunit les contributions sources d'un même auteur dans une publication, alignées par la phase `author_grouping`, et désigne sa personne, décidée par la phase `persons`. Les deux mécanismes sont en place. Restent des contrôles des identifiants et des outils de correction.
 
-Un jeu d'évaluation tiré des verdicts humains existe depuis le 2026-10-19 (`build_evaluation_set.py`) : 2 373 couples (contribution source, personne) justes, 523 couples (enregistrement source, personne) faux, 23 paires de personnes distinctes. Le schéma `snapshot_20261024_gel` de la base locale garde l'état des personnes et de leurs rattachements avant la bascule sur les contributions.
+Mesures du 2026-11-24 (`data/experiments/resolution-personnes/audit_rapide*.py`), sans suite :
+
+- Neutralisation par nom contraire au consensus : 38 508 contributions sources, dont 503 du périmètre.
+- ORCID d'OpenAlex sur un enregistrement source sans DOI : 77 529 contributions sources. Quand une autre source de la contribution donne un ORCID, il diffère dans 58 cas sur 1 705.
+- Auteurs collectifs non reconnus, au nom d'un organisme : environ 500 contributions sources, dont 10 du périmètre.
 
 ## Décisions
 
@@ -14,23 +18,16 @@ Un jeu d'évaluation tiré des verdicts humains existe depuis le 2026-10-19 (`bu
 
 ### Phase 1 — Identifiants
 
-- [ ] Neutralisation par partage d'un auteur listé deux fois dans un enregistrement source, sous deux graphies : ses deux contributions sources perdent son identifiant (Polichtchouk et Polishchuk, même ORCID). Mesurer le cas, et marquer plutôt le doublon d'auteur. Au 2026-10-24, 42 130 contributions sources ont une neutralisation par partage.
-- [ ] Neutralisation par nom contraire au consensus : effet sur chacun de ses usages (rattachement, arbitrage des identifiants, alignement, attribution des identifiants), face au contrôle de compatibilité des noms que fait déjà le rattachement par identifiant. Au 2026-10-24, 19 070 contributions sources ont une telle neutralisation.
-- [ ] Identifiants attribués à tort. 226 personnes ont plusieurs ORCID non rejetés au 2026-10-24, dont Miriam Calvo Gomez, qui a l'ORCID de Marta Calvi sur 192 publications. Un ORCID en attente rattache parfois la contribution d'une autre personne que son titulaire (21 cas dans la relecture du 2026-10-19). Au 2026-11-24, 530 paires rejetées de 14 personnes comportent seulement des identifiants de l'homonyme, attribués à la personne puis rejetés : surtout des ORCID de Crossref et d'INSPIRE-HEP dans des grandes collaborations (chantier [détection des fausses attributions](archived/2026-11-24_DATA_detection-fausses-attributions.md)).
-- [ ] Contrôle des identifiants par le nom que déclarent les API d'IdRef et d'ORCID.
-- [ ] ORCID d'OpenAlex sans DOI : sur des enregistrements sources OpenAlex sans DOI, `raw_orcid` donne deux fois un ORCID faux (Yannick Chevalier, Bruno Pereira). Provenance de `raw_orcid` hors Crossref à vérifier.
-- [ ] Fiabilité des IdRef et des ORCID de ScanR, confrontés aux autres sources de la même contribution. L'IdRef de ScanR sert au rattachement, son ORCID est exclu (`ORCID_MATCH_SOURCES`). La mesure dit aussi si ScanR reste utile comme source.
+- [ ] Neutralisation par partage d'un auteur listé deux fois dans un enregistrement source : ses deux contributions sources perdent son identifiant (Polichtchouk et Polishchuk, même ORCID). Au 2026-11-24, 70 724 contributions sources ont une neutralisation par partage, dont 514 du périmètre. 403 de ces 514 sont en doublon d'auteur (`duplicate_of`). La neutralisation a lieu à la normalisation, avant la détection des doublons d'auteur par l'alignement.
+- [ ] Identifiants attribués à tort, au 2026-11-24 :
+  - 106 personnes ont plusieurs ORCID non rejetés, dont 17 à fiche RH ;
+  - 289 contributions sont rattachées par un IdRef autre que l'IdRef confirmé de leur personne ;
+  - 530 paires rejetées de 14 personnes comportent seulement des identifiants de l'homonyme, attribués à la personne puis rejetés : surtout des ORCID de Crossref et d'INSPIRE-HEP dans des grandes collaborations (chantier [détection des fausses attributions](archived/2026-11-24_DATA_detection-fausses-attributions.md)).
+- [ ] Contrôle des identifiants par le nom déclaré dans IdRef et dans ORCID.
+- [x] File des doublons par nom : noms de famille comparés aussi sans espaces ni tirets (Le Roy et Leroy, N'Sambu et Nsambu). 14 paires au 2026-11-24. 5e1f0a9b3
 
-### Phase 2 — Alignement des listes d'auteurs
+### Phase 2 — Rattachements et corrections
 
-- [ ] Diagnostic de chaque liste d'auteurs avant l'alignement. Il nomme le défaut, écarte les contributions sources concernées et reste stocké pour la relecture et la mesure. Les signaux viennent de l'enregistrement source seul ; la comparaison avec les autres enregistrements sources de la publication sert de confirmation.
-- [ ] Auteurs collectifs non reconnus : « INRAE, France » figure comme auteur dans des listes OpenAlex et scanR, parfois plusieurs fois.
-- [ ] Fusions erronées probables dans l'onglet Fusions suspectes. L'onglet retient une publication dont moins de la moitié des contributions sources ont un correspondant : un enregistrement source étranger minoritaire lui échappe (12 des 20 fusions erronées probables de l'échantillon du 2026-10-18). Critère à ajouter : un enregistrement source dont presque aucune contribution source n'a de correspondant.
-
-### Phase 3 — Rattachements et corrections
-
-- [ ] Précision et rappel de la résolution par contribution sur le jeu d'évaluation.
-- [ ] Relecture des personnes supprimées par la purge, et des contributions laissées sans personne parce que leur personne est déjà dans la publication, au regard du gel du 2026-10-24.
 - [ ] Repérage des erreurs des sources révélées par une contribution : des contributions sources d'une même contribution qui désigneraient seules des personnes différentes signalent une erreur de groupement, de nom, d'identifiant ou d'affiliation. Outil de l'administration, comme pour les fusions suspectes de publications.
 - [ ] Scission d'une contribution par une décision humaine, quand deux de ses contributions sources désignent deux personnes.
 - [ ] File d'administration des contributions aux affiliations conflictuelles : certaines contributions sources donnent un indice de périmètre, d'autres une affiliation hors périmètre. L'administration décide.
@@ -49,9 +46,7 @@ Un jeu d'évaluation tiré des verdicts humains existe depuis le 2026-10-19 (`bu
 
 - Périmètre des publications : il réunit les indices des seules contributions rattachées à une personne non exclue. Une erreur d'affiliation relève de la contribution source, pas de la personne.
 - Recalcul immédiat des contributions invalidées par une décision de l'administration, exposé par le pipeline (`pipeline/public.py`) sur un index réduit aux valeurs de leurs contributions sources.
-- Idée de ReCiter : enregistrer ce qui a concordé, en plus de la règle.
 - Deux coauteurs homonymes de même graphie dans un enregistrement source : critère qui les distingue d'un auteur listé deux fois.
 - Adresse concaténée comme indice du document : la publication entre dans le périmètre, la contribution se rattache par le nom ou l'identifiant sans créer de personne. Étude du 2026-11-16 (`doc_evidence.py`, chantier [vérification des affiliations](archived/2026-11-24_DATA_verification-affiliations.md)).
   - Mise en œuvre : un indice `concatenated_address` parmi les indices liés au document, hors des structures des contributions et de l'union des indices de la contribution, et un troisième état de la décision du rattachement.
   - 103 publications recevraient l'indice. 93 contributions sans personne se rattacheraient par le nom à une personne existante, souvent une fausse personne du périmètre à une, deux ou trois contributions, ou un homonyme. Garde-fou possible : rattachement limité aux personnes à fiche RH ou à identifiant confirmé.
-- Doublons de personnes, relevés pendant l'audit des affiliations décalées. Un nom normalisé à espaces sépare deux personnes : 20 paires de même initiale de prénom (Le Roy et Leroy, D'Incan et Dincan, Nsambu et N'Sambu), dont une quinzaine de vrais doublons. Une coquille de l'éditeur reprise par OpenAlex et Crossref crée une personne à part (Malpeuch, à côté de Malpuech).
