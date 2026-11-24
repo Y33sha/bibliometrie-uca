@@ -58,7 +58,17 @@ Mesures de la relecture de la file :
   - adresse rattachée au laboratoire de la fiche RH : écarte 4 fausses alertes, sans perdre aucune fausse attribution ni aucun groupe de rejets.
   - adresse rattachée à une structure du périmètre (`adresse_perimetre.py`) : écarte 3 clusters de plus, tous de la personne. Le jeu de validation perd 4 petits groupes de confusions d'initiale.
 - Ressemblance aux rejets sans l'indice des années d'activité (`sans_annees.py`) : même rappel, une fausse alerte de moins.
-- Sources des rejets (`sources_des_rejets.py`) : sur 943 paires rejetées, 156 des 159 rattachements par identifiant venaient de HAL ou de ScanR. Les 784 rattachements par le nom viennent surtout des grandes collaborations : 585 publications de plus de 100 contributions.
+- Source de l'attribution erronée (`sources_des_rejets.py`), au 2026-11-24, sur les 880 paires rejetées dont la publication existe encore :
+
+  | Cas | Paires | Personnes |
+  |---|---|---|
+  | Identifiant de la personne donné à l'homonyme par une source | 88 | 23 |
+  | Identifiants de l'homonyme attribués à la personne, puis rejetés | 530 | 14 |
+  | Rattachement par le nom | 262 | 24 |
+
+  - Identifiant de la personne : IdRef de ScanR seul dans 58 paires, avec un identifiant HAL dans 7. Identifiants HAL seuls (compte HAL, idHAL, ORCID) dans 20 paires, IdRef de theses.fr dans 2, ORCID de Crossref et d'OpenAlex avec HAL dans 1.
+  - Identifiants de l'homonyme : ORCID donnés par Crossref et INSPIRE-HEP (physique), ou par DataCite et OpenAlex (jeux de données). 496 paires de 6 personnes viennent de publications de plus de 100 contributions. La contribution au nom de la personne y est hors périmètre.
+  - Rattachement par le nom : 89 paires de 4 personnes dans des publications de plus de 100 contributions. Dans les 173 autres paires, de 22 personnes, la contribution au nom de la personne est dans le périmètre par HAL, le plus souvent avec OpenAlex, ScanR ou WoS.
 - Décisions de l'administration sur la file (`decisions.py`) : les 17 groupes rejetés reposaient sur un identifiant de HAL ou de ScanR. 7 des 13 groupes confirmés comptaient des rattachements par le nom. Le jeu de validation compte deux homonymes du périmètre ; les autres confusions portent sur l'initiale du prénom.
 
 Mesures d'indices supplémentaires (`phase5_*.py`), au 2026-11-23. Jeu : 838 contributions rejetées rattachées de nouveau à leur personne, face aux 61 621 contributions actuelles non épinglées et aux 659 épinglées.
@@ -70,6 +80,10 @@ Mesures d'indices supplémentaires (`phase5_*.py`), au 2026-11-23. Jeu : 838 con
 - Laboratoire d'adresse hors des structures RH, avec un ORCID autre que celui de la personne : 111 contributions rejetées de plus, dont 107 de Muriel Bonnet, 1 contribution actuelle.
 - ORCID d'une autre personne de la base : 139 contributions rejetées de plus, dont 129 de Muriel Bonnet, 13 contributions actuelles et 1 épinglée. 5 des 13 sont des ORCID d'un coauteur de la même publication.
 - Clusters des personnes sans fiche RH d'au moins six publications (`phase5_sans_rh.py`) : 3 621 personnes, 4 signalées, 12 publications.
+- Taille minimale des clusters signalés (`phase5_taille.py`) :
+  - à 2 publications, 8 clusters de plus, aucune contribution rejetée de plus, 16 contributions actuelles chez 8 personnes. D'après leur discipline, 7 des 8 clusters relèvent probablement d'un homonyme : paragangliomes chez un juriste, combustible nucléaire chez un biologiste végétal, radiothérapie pédiatrique chez un physiologiste du sport ;
+  - à 1 publication, 12 contributions rejetées de plus, 118 contributions actuelles chez 81 personnes ;
+  - un minimum de quatre publications par personne, au lieu de six, ajoute 2 contributions actuelles.
 
 ## Décisions
 
