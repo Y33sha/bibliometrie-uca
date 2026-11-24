@@ -53,7 +53,7 @@
 
 ## Phases du pipeline
 
-A jour au 2026-11-20. L'ordre suit les dépendances entre tâches. `uv run python -m interfaces.cli.dev.pipeline_tree` affiche l'arborescence complète (blocs, phases, étapes, tâches).
+A jour au 2026-11-24. L'ordre suit les dépendances entre tâches. `uv run python -m interfaces.cli.dev.pipeline_tree` affiche l'arborescence complète (blocs, phases, étapes, tâches).
 
 Moissonnage et normalisation
 
@@ -79,15 +79,16 @@ Enregistrements sources
 Entités
 
 - `publications` — Rattachement des enregistrements sources aux publications, puis consolidation de la file `publications_queue`
+- `relations` — Relations entre publications
+- `subjects` — Sujets des publications
 - `author_grouping` — Alignement des auteurs d'une publication entre ses sources
 - `persons` — Rattachement des contributions aux personnes
+- `suspect_attributions` — File des attributions suspectes : clusters isolés, ressemblance aux publications rejetées
 
 Données dérivées
 
 - `finalize` — Périmètre des publications, purges, vues des structures, nettoyage des référentiels de l'édition, compteurs
 - `open_access` — Verdict d'Unpaywall sur le DOI des publications, statut open access des publications
-- `relations` — Relations entre publications
-- `subjects` — Sujets des publications
 
 ## Conventions du projet
 

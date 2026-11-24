@@ -21,7 +21,7 @@ Les 389 contributions dont la personne est rattachée à une autre contribution 
 
 - Chaque catégorie d'orphelines se résout par une règle du pipeline.
 - Les indices se mesurent sur les orphelines et sur un jeu de contrôle : contributions rattachées par un identifiant ou à la main, au nom désignant plusieurs personnes.
-- Le chantier [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md) reprend après celui-ci.
+- Le chantier [Audit de la qualité de la résolution des personnes](../DATA_audit-qualite-resolution-personnes.md) reprend après celui-ci.
 - Une forme de nom ambiguë se départage par une cascade d'indices : coauteurs, structure du référentiel, structure HAL, revue, années d'activité. La première étape qui désigne une seule personne candidate décide.
 
 ## Phasage
@@ -86,7 +86,7 @@ Un indice désigne une personne candidate quand elle seule partage cet indice av
   - [x] Tests : un test du domaine par indice et pour l'ordre de la cascade ; tests d'intégration du rattachement et de la purge.
   - [x] Mesure du 2026-11-19 sur la base de production (`simulation_cascade.py`) : 477 orphelines départagées (coauteurs 422, années 24, revue 19, laboratoire 8, structure HAL 4), en 5,9 s.
   - [x] Après la migration : snapshot du schéma, run de la phase `persons`. Run du 2026-11-19 : 944 orphelines ramenées à 461, 492 rattachements par la cascade.
-  - [ ] Capture de la vue du pipeline.
+  - [x] Capture de la vue du pipeline : le détail de la phase `persons` du run du 2026-11-23 affiche un libellé par indice de départage.
 
 ### Phase 2 — Auteur listé deux fois dans un enregistrement source
 
@@ -130,7 +130,7 @@ Au 2026-11-19, 387 orphelines ont leur personne rattachée à une autre contribu
   - conflits de noms : 9 contributions d'une personne en double sous deux noms, soit 7 paires de personnes fusionnées le 2026-11-20 (Ribeiro Mickael et Micakël, Fahrat et Farhat, Riquelme et Arbre, « Chéreau Dr Isabelle »…). 4 erreurs d'alignement ou de source (« goli / g » pour Godi, « laurichesse / h » rattaché à Henri pour Hélène, López Rodríguez attribuée à tort par une source) ;
   - personnes candidates toutes rejetées : le rejet humain écarte la seule personne au nom de la contribution, donc l'auteur est un homonyme sans fiche de personne ;
   - conflit d'identifiants : ScanR donne l'IdRef d'un homonyme biologiste à Nice à un radiologue, désigné par son identifiant HAL confirmé.
-- [ ] Deux contributions rattachées par le rejeu de la décision restent orphelines après le run du 2026-11-20 (Cosserant, Clement). Vérifier au run suivant.
+- [x] Deux contributions rattachées par le rejeu de la décision restent orphelines après le run du 2026-11-20 (Cosserant, Clement). Le run du 2026-11-23 les rattache. Au 2026-11-24, 166 orphelines. Le rejeu en rattache 2 autres, détachées par un rejet de l'administration postérieur au run.
 
 ### Phase 5 — Contributions des brevets
 
@@ -150,8 +150,4 @@ Piste écartée : une fiche d'homonyme, exclue hors périmètre, réunit les con
 
 ### Phase 7 — Documentation
 
-- [ ] Mise à jour de la documentation du rattachement des personnes.
-
-## Questions ouvertes
-
-- Deux coauteurs homonymes de même graphie dans un enregistrement : critère qui les distingue d'un auteur listé deux fois.
+- [x] Mise à jour de la documentation du rattachement des personnes et de l'alignement des auteurs.

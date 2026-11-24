@@ -1,6 +1,6 @@
 # Pipeline
 
-*À jour le 2026-11-20.*
+*À jour le 2026-11-24.*
 
 Le pipeline moissonne les sources, normalise leurs données, puis déduit les publications, les contributions et les personnes du référentiel. Le [guide d'exploitation](../exploitation/03-pipeline.md) décrit son lancement et ses options.
 
@@ -43,11 +43,12 @@ Les phases s'exécutent dans cet ordre, qui suit les dépendances entre tâches.
 **Entités**
 
 - [`publications`](07-publications.md) regroupe en publications les enregistrements sources qui décrivent le même document, puis recalcule les publications de la file de consolidation.
+- [`relations`](11-enrichissements.md) et `subjects` écrivent les relations entre publications et les sujets.
 - [`author_grouping`](08-author-grouping.md) aligne en contributions les auteurs d'une publication, d'une source à l'autre.
 - [`persons`](09-persons.md) rattache chaque contribution à une personne.
+- [`suspect_attributions`](09-persons.md#attributions-suspectes-suspect_attributions) signale les publications d'une personne probablement signées par un homonyme.
 
 **Données dérivées**
 
 - [`finalize`](10-finalize.md) purge les publications, reporte le périmètre sur les publications restantes, rafraîchit les vues des structures, nettoie les référentiels de l'édition et recompte.
 - [`open_access`](11-enrichissements.md#statut-open-access-open_access) interroge Unpaywall sur le DOI des publications, puis recalcule leur statut open access.
-- [`relations`](11-enrichissements.md) et `subjects` écrivent les relations entre publications et les sujets.

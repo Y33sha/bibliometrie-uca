@@ -109,16 +109,18 @@ def test_un_cluster_isole_d_une_personne_a_fiche_rh_est_signale(sa_sync_conn):
 
 
 def test_une_publication_a_adresse_du_perimetre_n_est_pas_signalee(sa_sync_conn):
-    """La publication à adresse du périmètre sort du cluster, qui passe sous la taille minimale."""
+    """Les publications à adresse du périmètre sortent du cluster, qui passe sous la taille minimale."""
     _, isolated = _isolated_cluster(sa_sync_conn)
-    publication, contribution = isolated[0]
-    source_record = insert_source_record(
-        sa_sync_conn, publication, source="crossref", source_id="c1"
-    )
-    source_contribution = insert_source_contribution(
-        sa_sync_conn, source_record, source="crossref", in_perimeter=True
-    )
-    add_aligned_source_contribution(sa_sync_conn, contribution, source_contribution, source_record)
+    for publication, contribution in isolated[:2]:
+        source_record = insert_source_record(
+            sa_sync_conn, publication, source="crossref", source_id=f"c{publication}"
+        )
+        source_contribution = insert_source_contribution(
+            sa_sync_conn, source_record, source="crossref", in_perimeter=True
+        )
+        add_aligned_source_contribution(
+            sa_sync_conn, contribution, source_contribution, source_record
+        )
 
     detect(sa_sync_conn, _LOGGER)
 

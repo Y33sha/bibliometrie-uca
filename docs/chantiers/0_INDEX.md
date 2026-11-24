@@ -5,10 +5,9 @@
 ### En cours
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
-- [Détection des fausses attributions](DATA_detection-fausses-attributions.md)
 - [Modèle open access des revues](DATA_modele-open-access-des-revues.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
-- [Réduction des contributions orphelines](DATA_reduction-contributions-orphelines.md)
+- [Retrait de la source ScanR](DATA_source-scanr.md)
 
 ### Non commencé
 
@@ -17,10 +16,12 @@
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Refactorisation : normalisation](CODE_refacto-normalisation.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
-- [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
 ## Chantiers archivés
 
+- 2026-11-24 — [Vérification des affiliations des sources](archived/2026-11-24_DATA_verification-affiliations.md)
+- 2026-11-24 — [Détection des fausses attributions](archived/2026-11-24_DATA_detection-fausses-attributions.md)
+- 2026-11-24 — [Réduction des contributions orphelines](archived/2026-11-24_DATA_reduction-contributions-orphelines.md)
 - 2026-11-20 — [Réorganisation du pipeline selon ses dépendances](archived/2026-11-20_CODE_reorganisation-du-pipeline.md)
 - 2026-11-17 — [Refactorisation : fin du moissonnage](archived/2026-11-17_CODE_refacto-fin-du-moissonnage.md)
 - 2026-11-17 — [Types de document](archived/2026-11-17_DATA_types-document.md)
