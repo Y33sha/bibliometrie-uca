@@ -162,7 +162,7 @@ def _seed_publication(
 class TestRefreshFromSources:
     def test_enrich_via_refresh(self, sa_sync_conn, publication_repo):
         """`lifecycle.refresh` reprend les métadonnées des enregistrements sources (revue) et déduit le statut open access de leurs copies."""
-        serial_id = insert_serial(sa_sync_conn, "Science", oa_model="full_oa")
+        serial_id = insert_serial(sa_sync_conn, "Science", oa_model="full_oa", openalex_is_oa=True)
         publication_id = _seed_publication(publication_repo, "Pub", doi="10.5555/enrich-test")
         record = insert_source_record(
             sa_sync_conn,

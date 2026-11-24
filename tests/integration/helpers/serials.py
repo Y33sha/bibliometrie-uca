@@ -41,6 +41,8 @@ def insert_serial(
     serial_type: str | None = None,
     is_in_doaj: bool = False,
     oa_model: str | None = None,
+    openalex_is_oa: bool | None = None,
+    openalex_oa_flip_year: int | None = None,
     doaj_imported_at: object = None,
 ) -> int:
     """Insère une revue et renvoie son `id`. Le titre normalisé vaut par défaut le titre en minuscules. Une colonne facultative laissée à `None` prend la valeur par défaut du schéma. `is_in_doaj` ajoute la revue à la liste `doaj`."""
@@ -54,6 +56,8 @@ def insert_serial(
             "openalex_id": openalex_id,
             "serial_type": serial_type,
             "oa_model": oa_model,
+            "openalex_is_oa": openalex_is_oa,
+            "openalex_oa_flip_year": openalex_oa_flip_year,
             "doaj_imported_at": doaj_imported_at,
         },
         {"serial_type": "serial_type", "oa_model": "oa_model"},
