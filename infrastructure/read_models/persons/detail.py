@@ -7,17 +7,19 @@ from domain.documents.doc_types import DOC_TYPE_FAMILIES
 from domain.sources.registry import Source
 from infrastructure.read_models._common import (
     StructureRef,
-    page_count,
+)
+from infrastructure.read_models.addresses.models import (
+    ScopedAddressesResponse,
+    ScopedAddressSummary,
+)
+from infrastructure.read_models.addresses.scoped import (
+    person_scope,
+    scoped_address_summary,
+    scoped_addresses,
 )
 from infrastructure.read_models.persons.identifiers import person_identifiers
 from infrastructure.read_models.persons.laboratories import person_periods
 from infrastructure.read_models.persons.models import (
-    PersonAddressesResponse,
-    PersonAddressOut,
-    PersonAddressStruct,
-    PersonAddressStructureSeries,
-    PersonAddressSummary,
-    PersonAddressYear,
     PersonProfileCore,
     PersonProfileResponse,
     PersonThesesResponse,
@@ -30,8 +32,6 @@ from infrastructure.sql_fragments import (
     has_author_role,
     in_clause,
     is_laboratory,
-    is_ranking_record,
-    is_raw_address,
 )
 
 _THESIS_ROLES = (
@@ -46,23 +46,6 @@ _THESIS_ROLE_LABELS = {
     ContributionRole.JURY_PRESIDENT: "Président du jury",
     ContributionRole.JURY_MEMBER: "Membre du jury",
 }
-
-
-_PERSON_ADDRESS_PUBLICATIONS_CTE = f"""
-    WITH person_address_publications AS (
-        SELECT DISTINCT g.publication_id, sca.address_id, p.publication_year
-        FROM contributions g
-        JOIN aligned_source_contributions m ON m.contribution_id = g.id
-        JOIN source_contributions sc ON sc.id = m.source_contribution_id
-        JOIN source_records sr ON sr.id = sc.source_record_id
-        JOIN source_contribution_addresses sca
-          ON sca.source_contribution_id = m.source_contribution_id
-        JOIN addresses a ON a.id = sca.address_id
-        JOIN publications p ON p.id = g.publication_id
-        WHERE g.person_id = :pid AND {is_raw_address("a")} AND {is_ranking_record("sr", "p")}
-    )
-"""
-"""CTE `person_address_publications` : triplets (publication, adresse brute, année) des contributions sources des contributions de la personne `:pid`, issues des sources lues par les classements, sur les publications de la famille « publications »."""
 
 
 class PersonDetailQueries:
@@ -193,102 +176,13 @@ class PersonDetailQueries:
 
     def person_addresses(
         self, person_id: int, *, page: int, per_page: int
-    ) -> PersonAddressesResponse:
-        """Renvoie les adresses brutes des contributions sources des contributions de la personne, les plus fréquentes d'abord."""
-        cte = _PERSON_ADDRESS_PUBLICATIONS_CTE
-        binds = {"pid": person_id}
-        total = self._conn.execute(
-            text(f"{cte} SELECT COUNT(DISTINCT address_id) FROM person_address_publications"),
-            binds,
-        ).scalar_one()
-        # Une page au-delà de la dernière ramène sur la dernière, plutôt que sur une liste vide.
-        page = min(page, page_count(total, per_page) or 1)
-        offset = (page - 1) * per_page
+    ) -> ScopedAddressesResponse:
+        """Renvoie les adresses brutes des publications de la personne (`scoped_addresses`)."""
+        return scoped_addresses(self._conn, person_scope(person_id), page=page, per_page=per_page)
 
-        rows = self._conn.execute(
-            text(f"""
-                {cte}
-                SELECT a.id, a.raw_text, COUNT(*) AS publication_count,
-                       (SELECT jsonb_agg(jsonb_build_object(
-                            'id', s.id, 'acronym', s.acronym, 'name', s.name))
-                        FROM address_structures ast
-                        JOIN structures s ON s.id = ast.structure_id
-                        WHERE ast.address_id = a.id
-                          AND ast.is_confirmed IS DISTINCT FROM FALSE
-                       ) AS structures
-                FROM person_address_publications pap
-                JOIN addresses a ON a.id = pap.address_id
-                GROUP BY a.id
-                ORDER BY publication_count DESC, a.raw_text
-                LIMIT :pg_limit OFFSET :pg_offset
-            """),
-            {**binds, "pg_limit": per_page, "pg_offset": offset},
-        ).all()
-        addresses = [
-            PersonAddressOut(
-                id=r.id,
-                raw_text=r.raw_text,
-                publication_count=r.publication_count,
-                structures=(
-                    [
-                        PersonAddressStruct(id=s["id"], acronym=s["acronym"], name=s["name"])
-                        for s in r.structures
-                    ]
-                    if r.structures
-                    else None
-                ),
-            )
-            for r in rows
-        ]
-        return PersonAddressesResponse(
-            total=total, page=page, per_page=per_page, addresses=addresses
-        )
-
-    def person_address_summary(self, person_id: int) -> PersonAddressSummary:
-        """Compte, par année, les publications avec adresse de la personne, puis, par structure, celles dont une adresse brute est rattachée à la structure. Les publications sans année sont ignorées."""
-        cte = _PERSON_ADDRESS_PUBLICATIONS_CTE
-        binds = {"pid": person_id}
-        counts = dict(
-            self._conn.execute(
-                text(f"""
-                    {cte}
-                    SELECT publication_year, COUNT(DISTINCT publication_id)
-                    FROM person_address_publications
-                    WHERE publication_year IS NOT NULL
-                    GROUP BY publication_year
-                """),
-                binds,
-            ).all()
-        )
-        years = list(range(min(counts), max(counts) + 1)) if counts else []
-        rows = self._conn.execute(
-            text(f"""
-                {cte}
-                SELECT s.id, s.acronym, s.name, pap.publication_year,
-                       COUNT(DISTINCT pap.publication_id) AS publications
-                FROM person_address_publications pap
-                JOIN address_structures ast ON ast.address_id = pap.address_id
-                JOIN structures s ON s.id = ast.structure_id
-                WHERE ast.is_confirmed IS DISTINCT FROM FALSE
-                  AND pap.publication_year IS NOT NULL
-                GROUP BY s.id, pap.publication_year
-            """),
-            binds,
-        ).all()
-        structures: dict[int, PersonAddressStructureSeries] = {}
-        for r in rows:
-            series = structures.get(r.id)
-            if series is None:
-                series = structures[r.id] = PersonAddressStructureSeries(
-                    id=r.id, acronym=r.acronym, name=r.name, publications=[0] * len(years)
-                )
-            series.publications[r.publication_year - years[0]] = r.publications
-        return PersonAddressSummary(
-            years=[
-                PersonAddressYear(year=y, publications_with_address=counts.get(y, 0)) for y in years
-            ],
-            structures=sorted(structures.values(), key=lambda s: (-sum(s.publications), s.name)),
-        )
+    def person_address_summary(self, person_id: int) -> ScopedAddressSummary:
+        """Compte, par année et par structure, les publications avec adresse de la personne (`scoped_address_summary`)."""
+        return scoped_address_summary(self._conn, person_scope(person_id))
 
     def person_subjects(self, person_id: int, *, limit: int) -> list[SubjectFrequency]:
         """Renvoie les sujets des publications signées par la personne, les plus fréquents d'abord."""

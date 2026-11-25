@@ -24,6 +24,7 @@ from infrastructure.read_models.addresses.models import (
     TextPredicateMode,
 )
 from infrastructure.read_models.addresses.queries import AddressesQueries
+from infrastructure.read_models.addresses.scoped import lab_members_scope, person_scope
 from interfaces.api.deps import (
     address_service,
     addresses_queries,
@@ -144,16 +145,21 @@ def get_address_publications(
     addr_id: int,
     limit: int = Query(20, ge=1, le=500),
     person_id: int | None = Query(None),
-    ranking: bool = Query(False),
+    lab_id: int | None = Query(None),
     queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressPublicationsResponse:
-    """Renvoie un échantillon de publications liées à une adresse. `person_id` restreint aux contributions sources de la personne, `ranking` aux sources lues par les classements et à la famille « publications »."""
+    """Renvoie un échantillon de publications liées à une adresse. `person_id` restreint aux publications de la personne, `lab_id` à celles des membres du laboratoire parues pendant leur présence ; les deux lisent les sources des classements, sur la famille « publications »."""
     raw_text = queries.get_address_raw_text(addr_id)
     if raw_text is None:
         raise HTTPException(status_code=404, detail="Adresse introuvable")
-    publications = queries.get_address_publications(
-        addr_id, limit, person_id=person_id, ranking=ranking
+    scope = (
+        person_scope(person_id)
+        if person_id is not None
+        else lab_members_scope(lab_id)
+        if lab_id is not None
+        else None
     )
+    publications = queries.get_address_publications(addr_id, limit, scope=scope)
     return AddressPublicationsResponse(
         address_id=addr_id, raw_text=raw_text, publications=publications
     )

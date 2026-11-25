@@ -539,7 +539,7 @@ export interface paths {
         };
         /**
          * Get Address Publications
-         * @description Renvoie un échantillon de publications liées à une adresse. `person_id` restreint aux contributions sources de la personne, `ranking` aux sources lues par les classements et à la famille « publications ».
+         * @description Renvoie un échantillon de publications liées à une adresse. `person_id` restreint aux publications de la personne, `lab_id` à celles des membres du laboratoire parues pendant leur présence ; les deux lisent les sources des classements, sur la famille « publications ».
          */
         get: operations["get_address_publications_api_addresses__addr_id__publications_get"];
         put?: never;
@@ -933,9 +933,29 @@ export interface paths {
         };
         /**
          * Get Structure Addresses
-         * @description Liste les adresses brutes rattachées à la structure, hors rattachements rejetés.
+         * @description Liste les adresses brutes des publications des membres de la structure parues pendant leur présence, issues des sources lues par les classements, sur la famille « publications », les plus fréquentes d'abord.
          */
         get: operations["get_structure_addresses_api_structures__structure_id__addresses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/{structure_id}/address-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Structure Address Summary
+         * @description Compte, par année, les publications des membres de la structure parues pendant leur présence avec une adresse brute dans une source lue par les classements, sur la famille « publications », puis, par structure, celles dont une adresse brute est rattachée à la structure.
+         */
+        get: operations["get_structure_address_summary_api_structures__structure_id__address_summary_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4723,82 +4743,6 @@ export interface components {
              */
             root_structure_ids?: number[] | null;
         };
-        /** PersonAddressOut */
-        PersonAddressOut: {
-            /** Id */
-            id: number;
-            /** Raw Text */
-            raw_text: string;
-            /**
-             * Publication Count
-             * @description Nombre de publications de la personne dont une contribution source porte l'adresse.
-             */
-            publication_count: number;
-            /** Structures */
-            structures: components["schemas"]["PersonAddressStruct"][] | null;
-        };
-        /** PersonAddressStruct */
-        PersonAddressStruct: {
-            /** Id */
-            id: number;
-            /** Acronym */
-            acronym: string | null;
-            /** Name */
-            name: string;
-        };
-        /** PersonAddressStructureSeries */
-        PersonAddressStructureSeries: {
-            /** Id */
-            id: number;
-            /** Acronym */
-            acronym: string | null;
-            /** Name */
-            name: string;
-            /**
-             * Publications
-             * @description Nombre de publications dont une adresse est rattachée à la structure, pour chaque année de `PersonAddressSummary.years`, dans le même ordre.
-             */
-            publications: number[];
-        };
-        /**
-         * PersonAddressSummary
-         * @description Structures reconnues dans les adresses de la personne, comptées en publications par année.
-         */
-        PersonAddressSummary: {
-            /**
-             * Years
-             * @description Années consécutives, de la plus ancienne à la plus récente publication avec adresse.
-             */
-            years: components["schemas"]["PersonAddressYear"][];
-            /**
-             * Structures
-             * @description Structures, de la plus fréquente à la moins fréquente sur toutes les années.
-             */
-            structures: components["schemas"]["PersonAddressStructureSeries"][];
-        };
-        /** PersonAddressYear */
-        PersonAddressYear: {
-            /** Year */
-            year: number;
-            /**
-             * Publications With Address
-             * @description Nombre de publications de l'année dont une contribution source de la personne porte une adresse.
-             */
-            publications_with_address: number;
-        };
-        /** PersonAddressesResponse */
-        PersonAddressesResponse: {
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Per Page */
-            per_page: number;
-            /** Addresses */
-            addresses: components["schemas"]["PersonAddressOut"][];
-            /** Pages */
-            readonly pages: number;
-        };
         /**
          * PersonExclusion
          * @description Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'interface publique et du périmètre. Ses formes de nom servent au matching.
@@ -5747,6 +5691,82 @@ export interface components {
             /** Phases */
             phases: components["schemas"]["PhaseBrief"][];
         };
+        /** ScopedAddressOut */
+        ScopedAddressOut: {
+            /** Id */
+            id: number;
+            /** Raw Text */
+            raw_text: string;
+            /**
+             * Publication Count
+             * @description Nombre de publications du périmètre dont une contribution source porte l'adresse.
+             */
+            publication_count: number;
+            /** Structures */
+            structures: components["schemas"]["ScopedAddressStructure"][] | null;
+        };
+        /** ScopedAddressStructure */
+        ScopedAddressStructure: {
+            /** Id */
+            id: number;
+            /** Acronym */
+            acronym: string | null;
+            /** Name */
+            name: string;
+        };
+        /** ScopedAddressStructureSeries */
+        ScopedAddressStructureSeries: {
+            /** Id */
+            id: number;
+            /** Acronym */
+            acronym: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Publications
+             * @description Nombre de publications dont une adresse est rattachée à la structure, pour chaque année de `ScopedAddressSummary.years`, dans le même ordre.
+             */
+            publications: number[];
+        };
+        /**
+         * ScopedAddressSummary
+         * @description Structures reconnues dans les adresses des publications du périmètre, comptées en publications par année.
+         */
+        ScopedAddressSummary: {
+            /**
+             * Years
+             * @description Années consécutives, de la plus ancienne à la plus récente publication avec adresse.
+             */
+            years: components["schemas"]["ScopedAddressYear"][];
+            /**
+             * Structures
+             * @description Structures, de la plus fréquente à la moins fréquente sur toutes les années.
+             */
+            structures: components["schemas"]["ScopedAddressStructureSeries"][];
+        };
+        /** ScopedAddressYear */
+        ScopedAddressYear: {
+            /** Year */
+            year: number;
+            /**
+             * Publications With Address
+             * @description Nombre de publications du périmètre de l'année dont une contribution source porte une adresse.
+             */
+            publications_with_address: number;
+        };
+        /** ScopedAddressesResponse */
+        ScopedAddressesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Addresses */
+            addresses: components["schemas"]["ScopedAddressOut"][];
+            /** Pages */
+            readonly pages: number;
+        };
         /**
          * SerialDetailResponse
          * @description Profil complet de la revue (GET /api/serials/{id}), pour sa page publique et l'édition admin : la ligne de liste et les champs propres au détail.
@@ -6234,28 +6254,6 @@ export interface components {
              * @description Lien vers l'enregistrement sur le portail de sa source.
              */
             readonly record_url: string;
-        };
-        /** StructureAddressOut */
-        StructureAddressOut: {
-            /** Id */
-            id: number;
-            /** Raw Text */
-            raw_text: string;
-            /** Is Confirmed */
-            is_confirmed: boolean | null;
-        };
-        /** StructureAddressesResponse */
-        StructureAddressesResponse: {
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Per Page */
-            per_page: number;
-            /** Addresses */
-            addresses: components["schemas"]["StructureAddressOut"][];
-            /** Pages */
-            readonly pages: number;
         };
         /**
          * StructureCreate
@@ -7833,7 +7831,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 person_id?: number | null;
-                ranking?: boolean;
+                lab_id?: number | null;
             };
             header?: never;
             path: {
@@ -8590,7 +8588,38 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StructureAddressesResponse"];
+                    "application/json": components["schemas"]["ScopedAddressesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_structure_address_summary_api_structures__structure_id__address_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                structure_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScopedAddressSummary"];
                 };
             };
             /** @description Validation Error */
@@ -9291,7 +9320,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PersonAddressesResponse"];
+                    "application/json": components["schemas"]["ScopedAddressesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9322,7 +9351,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PersonAddressSummary"];
+                    "application/json": components["schemas"]["ScopedAddressSummary"];
                 };
             };
             /** @description Validation Error */

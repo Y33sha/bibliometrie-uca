@@ -207,44 +207,6 @@ class PersonThesesResponse(Model):
     structures: dict[int, StructureRef]
 
 
-class PersonAddressStruct(Model):
-    id: int
-    acronym: str | None
-    name: str
-
-
-class PersonAddressOut(Model):
-    id: int
-    raw_text: str
-    publication_count: int
-    """Nombre de publications de la personne dont une contribution source porte l'adresse."""
-    structures: list[PersonAddressStruct] | None
-
-
-class PersonAddressesResponse(PaginatedResponse):
-    addresses: list[PersonAddressOut]
-
-
-class PersonAddressYear(Model):
-    year: int
-    publications_with_address: int
-    """Nombre de publications de l'année dont une contribution source de la personne porte une adresse."""
-
-
-class PersonAddressStructureSeries(PersonAddressStruct):
-    publications: list[int]
-    """Nombre de publications dont une adresse est rattachée à la structure, pour chaque année de `PersonAddressSummary.years`, dans le même ordre."""
-
-
-class PersonAddressSummary(Model):
-    """Structures reconnues dans les adresses de la personne, comptées en publications par année."""
-
-    years: list[PersonAddressYear]
-    """Années consécutives, de la plus ancienne à la plus récente publication avec adresse."""
-    structures: list[PersonAddressStructureSeries]
-    """Structures, de la plus fréquente à la moins fréquente sur toutes les années."""
-
-
 # ---------------------------------------------------------------------------
 # Administration : formes de nom (`name_form_contributions`)
 # ---------------------------------------------------------------------------

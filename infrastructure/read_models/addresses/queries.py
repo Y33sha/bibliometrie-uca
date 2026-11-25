@@ -20,6 +20,7 @@ from infrastructure.read_models.addresses.models import (
     FoundCountry,
     StructureLinkState,
 )
+from infrastructure.read_models.addresses.scoped import AddressScope
 from infrastructure.read_models.sql_fragments import contributor_display_name
 from infrastructure.sql_fragments import address_country_conditions, is_ranking_record
 
@@ -177,18 +178,15 @@ class AddressesQueries:
         addr_id: int,
         limit: int,
         *,
-        person_id: int | None = None,
-        ranking: bool = False,
+        scope: AddressScope | None = None,
     ) -> list[AddressPublicationItem]:
-        """Renvoie les publications dont une contribution source porte l'adresse. `person_id` restreint aux contributions sources de la personne, `ranking` aux enregistrements sources des sources lues par les classements, sur les publications de la famille « publications »."""
+        """Renvoie les publications dont une contribution source porte l'adresse. `scope` restreint aux contributions sources des contributions du périmètre, lues dans les sources des classements, sur les publications de la famille « publications »."""
         conditions = []
-        if ranking:
+        if scope is not None:
             conditions.append(is_ranking_record("sr", "p"))
-        if person_id is not None:
-            conditions.append("""sca.source_contribution_id IN (
+            conditions.append(f"""sca.source_contribution_id IN (
                 SELECT m.source_contribution_id FROM aligned_source_contributions m
-                JOIN contributions g ON g.id = m.contribution_id
-                WHERE g.person_id = :person_id
+                WHERE m.contribution_id IN ({scope.contributions})
             )""")
         extra_where = "".join(f" AND {c}" for c in conditions)
         rows = self._conn.execute(
@@ -208,7 +206,7 @@ class AddressesQueries:
                 ORDER BY p.id, p.publication_year DESC
                 LIMIT :lim
             """),
-            {"id": addr_id, "lim": limit, "person_id": person_id},
+            {"id": addr_id, "lim": limit, **(scope.binds if scope else {})},
         ).all()
         return [
             AddressPublicationItem(

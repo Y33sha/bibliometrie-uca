@@ -7,6 +7,9 @@ from functools import partial
 
 from sqlalchemy import text
 
+from domain.documents.dates import DatePrecision, PublicationDate
+from infrastructure.read_models.addresses.queries import AddressesQueries
+from infrastructure.read_models.addresses.scoped import lab_members_scope
 from infrastructure.read_models.structures.models import StructureFilters
 from infrastructure.read_models.structures.queries import StructuresQueries
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
@@ -17,6 +20,10 @@ from tests.integration.helpers.addresses import (
 from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_hr_period, insert_person
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import (
+    insert_aligned_source_contribution,
+    insert_source_contribution_address,
+)
 from tests.integration.helpers.structures import (
     add_contribution_structure,
     insert_persons_perimeter,
@@ -195,40 +202,77 @@ class TestGetLaboratory:
 
 
 class TestGetLaboratoryAddresses:
-    def test_lists_linked_addresses(self, sa_sync_conn):
-        lab = insert_structure(sa_sync_conn, "LAB")
-        addr = insert_address(sa_sync_conn, "A")
-        insert_address_structure(sa_sync_conn, addr, structure_id=lab, is_confirmed=True)
+    """Adresses des publications des membres du laboratoire pendant leur présence. Alice, présente du 1er janvier 2020 au 30 juin 2022, signe en 2021 avec Bruno, présent depuis 2021 ; Alice signe aussi une publication de 2019 et une publication de 2022 datée à l'année ; Bruno signe en 2024 ; une non-membre porte l'adresse du laboratoire."""
 
-        res = StructuresQueries(sa_sync_conn).get_structure_addresses(lab, page=1, per_page=50)
-        ids = [a.id for a in res.addresses]
-        assert addr in ids
-
-    def test_excludes_rejected_links(self, sa_sync_conn):
-        lab = insert_structure(sa_sync_conn, "LAB")
-        addr = insert_address(sa_sync_conn, "R")
-        insert_address_structure(sa_sync_conn, addr, structure_id=lab, is_confirmed=False)
-        res = StructuresQueries(sa_sync_conn).get_structure_addresses(lab, page=1, per_page=50)
-        ids = [a.id for a in res.addresses]
-        assert addr not in ids
-
-    def test_lists_raw_addresses_only(self, sa_sync_conn):
-        """Un libellé HAL, un nom seul ou une adresse sans origine sont absents de la liste et du total."""
-        lab = insert_structure(sa_sync_conn, "LAB")
-        raw = insert_address(sa_sync_conn, "Laboratoire, Aubière, France")
-        insert_address_structure(sa_sync_conn, raw, structure_id=lab)
-        for raw_text, origin in (
-            ("LAB - Laboratoire (Aubière - France)", "hal_label"),
-            ("Laboratoire", "name_only"),
-            ("Adresse à classer", None),
+    def _setup(self, conn):
+        lab = insert_structure(conn, "LAB", acronym="LAB")
+        uca = insert_structure(conn, "UCA", acronym="UCA")
+        lab_address = insert_address(conn, "LAB, Clermont-Ferrand, France")
+        uca_address = insert_address(conn, "Université Clermont Auvergne, France")
+        insert_address_structure(conn, lab_address, structure_id=lab)
+        insert_address_structure(conn, uca_address, structure_id=uca)
+        alice = insert_person(conn, "Alice")
+        bruno = insert_person(conn, "Bruno")
+        outsider = insert_person(conn, "Externe")
+        insert_hr_period(
+            conn, alice, structure_id=lab, start_date=date(2020, 1, 1), end_date=date(2022, 6, 30)
+        )
+        insert_hr_period(conn, bruno, structure_id=lab, start_date=date(2021, 1, 1))
+        publications = {}
+        for key, publication_date, authors in (
+            (
+                "shared",
+                PublicationDate(date(2021, 5, 1), DatePrecision.DAY),
+                [(alice, lab_address), (bruno, uca_address)],
+            ),
+            ("before", PublicationDate.of_year(2019), [(alice, lab_address)]),
+            ("departure_year", PublicationDate.of_year(2022), [(alice, lab_address)]),
+            ("bruno", PublicationDate.of_year(2024), [(bruno, uca_address)]),
+            ("outsider", PublicationDate.of_year(2021), [(outsider, lab_address)]),
         ):
-            address = insert_address(sa_sync_conn, raw_text, origin=origin)
-            insert_address_structure(sa_sync_conn, address, structure_id=lab)
+            publication = insert_publication(conn, publication_date=publication_date)
+            publications[key] = publication
+            for person, address in authors:
+                insert_contribution(conn, publication, person_id=person, roles=["author"])
+                member = insert_aligned_source_contribution(conn, publication, person)
+                insert_source_contribution_address(conn, member, address_id=address)
+        return lab, uca, lab_address, uca_address, publications
+
+    def test_summary_counts_member_publications_during_presence(self, sa_sync_conn):
+        """La publication de 2021 signée par deux membres compte une fois ; celles d'avant l'arrivée, de l'année du départ datée à l'année et de la non-membre sont exclues."""
+        lab, uca, _, _, _ = self._setup(sa_sync_conn)
+
+        summary = StructuresQueries(sa_sync_conn).get_structure_address_summary(lab)
+
+        assert [(y.year, y.publications_with_address) for y in summary.years] == [
+            (2021, 1),
+            (2022, 0),
+            (2023, 0),
+            (2024, 1),
+        ]
+        assert [(s.id, s.publications) for s in summary.structures] == [
+            (uca, [1, 0, 0, 1]),
+            (lab, [1, 0, 0, 0]),
+        ]
+
+    def test_addresses_of_member_publications(self, sa_sync_conn):
+        lab, _, lab_address, uca_address, _ = self._setup(sa_sync_conn)
 
         res = StructuresQueries(sa_sync_conn).get_structure_addresses(lab, page=1, per_page=50)
 
-        assert [a.id for a in res.addresses] == [raw]
-        assert res.total == 1
+        assert [(a.id, a.publication_count) for a in res.addresses] == [
+            (uca_address, 2),
+            (lab_address, 1),
+        ]
+
+    def test_address_publications_restricted_to_members(self, sa_sync_conn):
+        lab, _, lab_address, _, publications = self._setup(sa_sync_conn)
+
+        items = AddressesQueries(sa_sync_conn).get_address_publications(
+            lab_address, 20, scope=lab_members_scope(lab)
+        )
+
+        assert [p.id for p in items] == [publications["shared"]]
 
 
 class TestGetLaboratorySubjects:

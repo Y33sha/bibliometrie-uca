@@ -118,16 +118,6 @@ class StructureDetailResponse(Model):
     """Personnes retenues à période de présence actuelle dans la structure."""
 
 
-class StructureAddressOut(Model):
-    id: int
-    raw_text: str
-    is_confirmed: bool | None
-
-
-class StructureAddressesResponse(PaginatedResponse):
-    addresses: list[StructureAddressOut]
-
-
 class StructurePartner(Model):
     """Organisation partenaire d'une structure : un ROR des auteurs de ses publications."""
 
