@@ -88,9 +88,22 @@ Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py
   - Rattachement par le nom : 9 publications de la personne sur 10 tranchées. Rattachement par un ORCID donné par HAL seul : 6 homonymes sur 8 tranchées. Rattachement par IdRef : 3 homonymes sur 9.
   - Une personne à la production dispersée fournit 5 alertes, toutes de la personne. La similarité d'embeddings du modèle n'est pas normalisée par personne.
   - Restreintes aux contributions signalables, titres génériques écartés, les alertes du tour comptent 9 homonymes sur 15.
-- [ ] Alertes restreintes aux contributions signalables selon la règle des clusters, titres et types génériques écartés.
-- [ ] Indice de similarité normalisée par personne : écart de la publication à la dispersion du profil, la publication notée exclue.
-- [ ] Tour 3 : les 30 contributions les moins bien notées après ces deux changements, sans calibration.
+- [x] Indices : contributions du périmètre et contributions rattachées au CHU dans la publication, similarité normalisée par la dispersion du profil de la personne, similarité normalisée et score thématique croisés avec le nombre de contributions.
+- [x] Banc d'essais hors ligne (`essais.py`), le 2026-11-25 : variantes notées hors pli sur les paires jugées restreintes aux alertes possibles (contribution signalable, titres et types génériques écartés). 79 paires, 28 homonymes, 51 publications de la personne.
+
+  | Fonction de décision | AUC | Homonymes parmi les 10 / 20 / 30 moins bien notées |
+  |---|---|---|
+  | Similarité normalisée par personne | 0,78 | 6 / 13 / 19 |
+  | Similarité brute aux voisines | 0,84 | 7 / 14 / 21 |
+  | Règle des alertes par embeddings | 0,84 | 8 / 15 / 20 |
+  | Régression logistique, indices du tour 2 | 0,93 | 8 / 18 / 23 |
+  | Régression logistique, tous les indices | 0,93 | 9 / 16 / 25 |
+  | Arbres de gradient, tous les indices | 0,94 | 10 / 17 / 23 |
+
+  - Les modèles battent nettement les règles. Les indices ajoutés ne changent pas le résultat de façon mesurable sur 79 paires.
+  - Les paires évaluées comptent 35 % d'homonymes. La précision des alertes dans le stock est plus basse.
+  - Coauteurs dans la publication, homonymes contre publications de la personne : à fiche RH, 4 contre 24 dès un coauteur, 0 contre 8 à partir de trois ; du périmètre, 0 contre 10 à partir de cinq ; rattachés au CHU, 1 contre 8 à partir de deux.
+  - L'écart de similarité normalisée entre publications de la personne et homonymes se réduit avec la taille de la publication : 2,1 points sous 10 contributions, 0,6 au-delà de 100.
 
 ### Phase 3 — Arbres de gradient
 
