@@ -328,7 +328,7 @@ _CHILDREN = (
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
-    """Renvoie les métriques de la phase : documents normalisés, table des sources, enregistrements sources disparus supprimés, identifiants neutralisés par l'arbitrage."""
+    """Renvoie les métriques de la phase : documents normalisés, table des sources, identifiants neutralisés par l'arbitrage."""
     rows = [
         {**cast("dict[str, object]", metrics.details["row"]), "duration_s": metrics.duration_s}
         for metrics in by_task.values()
@@ -337,9 +337,6 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     metrics = PhaseMetrics()
     metrics.add(seen=sum(cast("int", row["processed"]) for row in rows))
     metrics.details["table"] = {"rows": rows}
-    metrics.details["disappeared_pruned"] = by_task["prune_disappeared"].extras.get(
-        "disappeared", 0
-    )
     arbitration = by_task[ARBITRATE_IDENTIFIERS.name].extras
     metrics.details["summary"] = {
         "identifiers_neutralized": arbitration.get("neutralized", 0),

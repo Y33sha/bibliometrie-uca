@@ -83,11 +83,6 @@ def test_le_mode_full_reecrit_le_staging(lancer):
     assert appels[-2:] == ["VACUUM FULL staging", "arbitrate"]
 
 
-def test_le_decompte_des_retraits_part_dans_les_metriques(lancer):
-    metrics = lancer([], disparues=7)
-    assert metrics.details["disappeared_pruned"] == 7
-
-
 def test_les_identifiants_neutralises_partent_dans_les_metriques(lancer):
     metrics = lancer([])
     assert metrics.details["summary"]["identifiers_neutralized"] == 2

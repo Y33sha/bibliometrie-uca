@@ -14,11 +14,11 @@
 - [Dashboard, point d'entrée de la vue Statistiques](UI_dashboard-point-d-entree.md)
 - [Financements](DATA_financements.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Refactorisation : normalisation](CODE_refacto-normalisation.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 
 ## Chantiers archivés
 
+- 2026-11-25 — [Refactorisation : normalisation](archived/2026-11-25_CODE_refacto-normalisation.md)
 - 2026-11-24 — [Vérification des affiliations des sources](archived/2026-11-24_DATA_verification-affiliations.md)
 - 2026-11-24 — [Détection des fausses attributions](archived/2026-11-24_DATA_detection-fausses-attributions.md)
 - 2026-11-24 — [Réduction des contributions orphelines](archived/2026-11-24_DATA_reduction-contributions-orphelines.md)

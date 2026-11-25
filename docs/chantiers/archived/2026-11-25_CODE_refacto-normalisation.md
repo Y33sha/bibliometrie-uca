@@ -2,12 +2,13 @@
 
 ## Contexte
 
-Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software Design* (John Ousterhout). La [fiche précédente](archived/2026-11-17_CODE_refacto-fin-du-moissonnage.md) couvre la fin du moissonnage.
+Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software Design* (John Ousterhout). La [fiche précédente](2026-11-17_CODE_refacto-fin-du-moissonnage.md) couvre la fin du moissonnage.
 
 ## Décisions
 
 - Périmètre de la fiche : phase `normalize` (`pipeline/ingestion/common/normalize.py`) et patron `SourceNormalizer` (`pipeline/ingestion/common/normalizer.py`). Les normaliseurs de chaque source respectent le patron et restent hors périmètre.
 - `--normalize-full` de `run_pipeline` devient l'option `--resync-contributions` de `rehydrate_staging_from_raw_store` : seule, elle était sans effet visible.
+- La clé `disappeared_pruned` des métriques de la phase, sans lecteur, est supprimée.
 - Le compteur des documents écartés de la phase 2 est stocké dans `pipeline_phase_executions` : une clé s'ajoute à la table de la phase, avec sa colonne dans l'administration.
 
 ## Phasage
@@ -37,4 +38,4 @@ Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy
 
 ## Questions ouvertes
 
-- La clé `disappeared_pruned` de `assemble` n'a aucun lecteur.
+Aucune.
