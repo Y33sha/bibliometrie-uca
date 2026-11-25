@@ -37,13 +37,14 @@
 		}
 		if (!canvas || years.length === 0) return;
 		const bar = { grouped: false, borderRadius: 4, borderSkipped: 'start' as const };
+		// Chart.js annote les tableaux de données reçus : il reçoit des copies, les tableaux réactifs de Svelte refusent ces annotations.
 		chart = new Chart(canvas, {
 			type: 'bar',
 			data: {
 				labels: years.map(String),
 				datasets: [
-					...(part ? [{ label: part.label, data: part.values, backgroundColor: partColor, order: 0, ...bar }] : []),
-					{ label: totalLabel, data: totals, backgroundColor: `${cssColor('text-faint')}66`, order: 1, ...bar },
+					...(part ? [{ label: part.label, data: [...part.values], backgroundColor: partColor, order: 0, ...bar }] : []),
+					{ label: totalLabel, data: [...totals], backgroundColor: `${cssColor('text-faint')}66`, order: 1, ...bar },
 				],
 			},
 			options: {
