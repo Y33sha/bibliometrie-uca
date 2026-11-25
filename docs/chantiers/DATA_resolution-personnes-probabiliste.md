@@ -80,10 +80,10 @@ Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py
   - Les 30 contributions basses ont une note de 0,001 au plus : les probabilités ne sont pas calibrées pour le stock.
   - 11 des 18 contributions basses rattachées par le nom sont de la personne : publications éloignées de ses autres publications, sans coauteur partagé. Les positifs d'entraînement, rattachés par ORCID, comptent peu de cas de ce genre.
   - Le modèle sans le nombre de contributions de la publication donne une AUC de 0,85.
-- [ ] Verdicts versés à l'entraînement, avec les 76 verdicts des alertes par embeddings.
-- [ ] Indices supplémentaires : coauteur à fiche RH dans la publication, adresse rattachée à une structure RH de la personne.
-- [ ] Calibration sur les verdicts.
-- [ ] Nouveau tirage des 30 contributions les moins bien notées, jugé à l'aveugle.
+- [x] Verdicts versés à l'entraînement, avec les 76 verdicts des alertes par embeddings (`tour.py`). 97 paires jugées dans le jeu, dont 27 négatives ; les autres homonymes jugés figurent parmi les rejets. Une paire jugée pèse 20 fois plus qu'une autre.
+- [x] Indices supplémentaires : nombre de coauteurs à fiche RH dans la publication, adresse rattachée à un laboratoire RH de la personne (structures des périodes RH, leurs descendantes et leurs ascendantes de type laboratoire). Sur les paires jugées, notées hors pli, l'AUC passe de 0,913 à 0,957 ; sur tout le jeu, de 0,989 à 0,996.
+- [x] Calibration de Platt sur les notes hors pli des paires jugées. Sur 33 583 contributions hors entraînement, 162 ont une probabilité sous 0,5, 39 sous 0,2. Les paires jugées sur-représentent les alertes : la probabilité vaut pour un mélange semblable.
+- [ ] Nouveau tirage des 30 contributions les moins bien notées (`tour2.json`), jugé à l'aveugle. Probabilité calibrée de 0,02 à 0,17.
 
 ### Phase 3 — Arbres de gradient
 
