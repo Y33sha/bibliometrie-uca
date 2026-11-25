@@ -22,8 +22,9 @@
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import AddressPublications from '#lib/components/AddressPublications.svelte';
 	import PublicationCountButton from '#lib/components/PublicationCountButton.svelte';
-	import YearLineChart from '#lib/components/charts/YearLineChart.svelte';
-	import { chartColor } from '#lib/components/charts/palette.js';
+	import YearShareBarChart from '#lib/components/charts/YearShareBarChart.svelte';
+	import ChartLegend from '#lib/components/charts/ChartLegend.svelte';
+	import { cssColor } from '#lib/components/charts/cssVar.js';
 	import { confirmDialog } from '#lib/dialogs.svelte.js';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import PersonCurationDrawer from '#lib/components/persons/PersonCurationDrawer.svelte';
@@ -77,24 +78,29 @@
 		buildParams: () => new URLSearchParams(),
 		pageParam: null,
 	});
-	// Courbes des structures les plus fréquentes ; la palette garde une couleur distincte par courbe.
-	const ADDR_MAX_SERIES = 8;
+	// Publications avec adresse par année ; la structure choisie dans la légende colore sa part de chaque barre. La plus fréquente est choisie d'office.
 	const addrYears = $derived(addrSummary?.years ?? []);
-	const addrStructures = $derived((addrSummary?.structures ?? []).slice(0, ADDR_MAX_SERIES));
-	const addrHiddenStructures = $derived(Math.max((addrSummary?.structures.length ?? 0) - ADDR_MAX_SERIES, 0));
-	// Part des publications avec adresse de l'année où figure la structure ; aucune valeur pour une année sans publication avec adresse.
-	const addrSeries = $derived(
-		addrStructures.map((s, i) => ({
-			label: structureLabel(s),
-			color: chartColor(i),
-			values: s.publications.map((n, y) => {
-				const total = addrYears[y].publications_with_address;
-				return total ? n / total : null;
-			}),
-		}))
+	const addrTotals = $derived(addrYears.map((y) => y.publications_with_address));
+	const addrStructures = $derived(addrSummary?.structures ?? []);
+	let addrSelectedLabel = $state<string | null>(null);
+	const addrSelected = $derived(addrStructures.find((s) => structureLabel(s) === addrSelectedLabel) ?? null);
+	const addrPartColor = $derived(cssColor('accent-mid'));
+	const addrLegend = $derived(
+		addrStructures.map((s) => {
+			const label = structureLabel(s);
+			return { label, color: label === addrSelectedLabel ? addrPartColor : cssColor('text-faint') };
+		})
 	);
-	const addrDetail = (seriesIndex: number, yearIndex: number) =>
-		`${addrStructures[seriesIndex].publications[yearIndex]} sur ${formatCount(addrYears[yearIndex].publications_with_address, 'publication')}`;
+	// Part de la structure choisie, toutes années confondues.
+	const addrSelectedShare = $derived.by(() => {
+		if (!addrSelected) return '';
+		const part = addrSelected.publications.reduce((a, b) => a + b, 0);
+		const total = addrTotals.reduce((a, b) => a + b, 0);
+		return `${formatCount(part, 'publication')} sur ${formatNumber(total)} (${formatPercent(total ? part / total : 0)})`;
+	});
+	function selectAddrStructure(label: string) {
+		addrSelectedLabel = addrSelectedLabel === label ? null : label;
+	}
 	let expandedAddrId = $state<number | null>(null);
 	let addrPublications = $state<AddressPublication[]>([]);
 	let addrPublicationsLoading = $state(false);
@@ -104,6 +110,7 @@
 		addrSummary = await api<AddressSummary>(`/api/persons/${personId}/address-summary`, {
 			key: 'person-detail-address-summary',
 		});
+		addrSelectedLabel = addrSummary.structures.length ? structureLabel(addrSummary.structures[0]) : null;
 	}
 
 	async function toggleAddressPublications(addrId: number) {
@@ -294,12 +301,21 @@
 	{#if activeTab === 'addresses'}
 		<div class="tab-content">
 			<div class="addr-overview">
-				<h2>Part des publications avec adresse où figure chaque structure</h2>
+				<h2>Publications avec adresse, par année</h2>
+				{#if addrYears.length}
+					<YearShareBarChart
+						years={addrYears.map((y) => y.year)}
+						totals={addrTotals}
+						totalLabel="publication avec adresse"
+						part={addrSelected ? { label: structureLabel(addrSelected), values: addrSelected.publications } : null}
+						partColor={addrPartColor}
+					/>
+				{/if}
 				{#if addrStructures.length}
-					<YearLineChart years={addrYears.map((y) => y.year)} series={addrSeries} format={formatPercent} detail={addrDetail} max={1} />
-					{#if addrHiddenStructures}
-						<p class="addr-counts">{formatCount(addrHiddenStructures, 'autre structure')} dans le tableau des adresses.</p>
+					{#if addrSelected}
+						<p class="addr-share"><strong>{structureLabel(addrSelected)}</strong> : {addrSelectedShare}</p>
 					{/if}
+					<ChartLegend items={addrLegend} centered selected={addrSelectedLabel} onselect={selectAddrStructure} />
 				{:else if addrSummary}
 					<p class="addr-counts">Aucune structure reconnue.</p>
 				{/if}
@@ -382,6 +398,7 @@
 	}
 	.addr-overview h2 { font-size: var(--fs-base); font-weight: 600; margin: 0 0 8px; }
 	.addr-counts { font-size: var(--fs-sm); color: var(--text-secondary); margin: 4px 0 0; text-align: center; }
+	.addr-share { font-size: var(--fs-md); margin: 8px 0 0; text-align: center; }
 	.addr-cell { font-size: var(--fs-sm); color: var(--muted); word-break: break-all; }
 	.addr-publications { padding: 0 12px 12px 24px; }
 </style>
