@@ -14,14 +14,11 @@
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
 	import SubjectsCard from '#lib/components/SubjectsCard.svelte';
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
-	import Pagination from '#lib/components/Pagination.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import { activeTabId, type TabDef } from '#lib/tabs.js';
-	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import ThesesListView from '#lib/components/ThesesListView.svelte';
-	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
-	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
+	import ScopedAddresses from '#lib/components/ScopedAddresses.svelte';
 	import PartnersTab from './PartnersTab.svelte';
 	import StructureDrawer from '#lib/components/structures/StructureDrawer.svelte';
 	import TitleRow from '#lib/components/TitleRow.svelte';
@@ -35,7 +32,6 @@
 	import type { components } from '#lib/api/schema.js';
 	type Structure = components['schemas']['StructureOut'];
 	type LabProfile = components['schemas']['StructureDetailResponse'];
-	type LabAddress = components['schemas']['StructureAddressOut'];
 
 	// Volet d'édition de la structure, en session admin : ouvert tant que `?structure=<id>` figure dans l'URL.
 	const drawer = useDrawerParam('structure', isAdmin);
@@ -44,6 +40,7 @@
 	let lab: Structure | null = $state(null);
 	let thesesCount = $state(0);
 	let membersCount = $state(0);
+	let hrPersonsCount = $state(0);
 	let error = $state(false);
 
 	// L'onglet « Adresses » est réservé à la session admin.
@@ -57,35 +54,9 @@
 	]);
 	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
-	// Addresses tab
-	const addresses = usePaginatedFetch<LabAddress>({
-		endpoint: () => `/api/structures/${labId}/addresses`,
-		itemsKey: 'addresses',
-		apiKey: 'lab-addresses',
-		buildParams: () => new URLSearchParams(),
-		pageParam: 'apage',
-	});
-
 	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les thèses en cours, les personnes rattachées au laboratoire et les sujets.
 	let dashboardLoaded = $state(false);
 	let ongoingThesesCount = $state(0);
-
-	// `useUrlFilters` ne gère ici que les keys cross-onglets (tab, addresses). Les filtres publications/thèses/personnes sont gérés par leurs ListView.
-	const url = useUrlFilters({
-		basePath: () => `/structures/${labId}`,
-		filters: {
-			tab:              { type: 'single', urlKey: 'tab', defaultValue: 'dashboard' },
-			addrPage:         { type: 'page',   urlKey: 'apage' },
-		},
-	});
-
-	// --- Handlers ---
-	function syncUrl() {
-		url.syncUrl(() => ({
-			tab: activeTab,
-			addrPage: addresses.page,
-		}));
-	}
 
 	async function loadDashboard() {
 		// Le décompte des thèses en cours reprend le filtre « En cours » de l'onglet Thèses.
@@ -102,6 +73,7 @@
 			lab = profileData.structure;
 			thesesCount = profileData.theses_count;
 			membersCount = profileData.members_count;
+			hrPersonsCount = profileData.hr_persons_count;
 			return true;
 		} catch {
 			error = true;
@@ -113,13 +85,9 @@
 	$effect(() => {
 		if (!lab) return;
 		if (activeTab === 'dashboard' && !dashboardLoaded) untrack(loadDashboard);
-		if (activeTab === 'addresses' && !addresses.loaded) untrack(() => addresses.load());
 	});
 
 	onMount(() => {
-		// Page des adresses lue dans l'URL ; les onglets-listes lisent leurs propres paramètres.
-		const restored = url.restoreFromUrl(page.url.searchParams);
-		if (restored.addrPage) addresses.page = restored.addrPage as number;
 		void loadProfile();
 	});
 </script>
@@ -232,33 +200,12 @@
 	<!-- Tab: Adresses -->
 	{#if activeTab === 'addresses'}
 		<div class="tab-content">
-			<table class="data-table">
-				<thead>
-					<tr>
-						<th>Adresse</th>
-						<th style="width:80px">Statut</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#if addresses.items.length === 0}
-						<TableStatusRow loading={addresses.loading} error={addresses.error} colspan={2} emptyText="Aucune adresse" />
-					{:else}
-						{#each addresses.items as a (a.id)}
-							<tr>
-								<td class="addr-cell">{a.raw_text}</td>
-								<td>
-									{#if a.is_confirmed === true}
-										<span class="tag tag-success">Confirmée</span>
-									{:else}
-										<span class="tag">En attente</span>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					{/if}
-				</tbody>
-			</table>
-			<Pagination page={addresses.page} pages={addresses.pages} onchange={(p) => { addresses.page = p; syncUrl(); addresses.load(); }} />
+			<!-- L'onglet lit les publications des membres pendant leur présence : sans période de présence, il est vide. -->
+			{#if hrPersonsCount > 0}
+				<ScopedAddresses endpoint={`/api/structures/${labId}`} scope={{ lab_id: String(labId) }} preferredStructureId={lab.id} apiKey="lab" />
+			{:else}
+				<p class="no-results">Aucune personne du référentiel RH n'est rattachée à la structure.</p>
+			{/if}
 		</div>
 	{/if}
 
@@ -274,9 +221,4 @@
 	/>
 {/if}
 
-<style>
 
-
-	/* Addresses tab */
-	.addr-cell { font-size: var(--fs-sm); color: var(--muted); word-break: break-all; }
-</style>

@@ -130,3 +130,41 @@ class AddressStatsResponse(Model):
     pending: int
     rejected: int
     confirmed: int
+
+
+class ScopedAddressStructure(Model):
+    id: int
+    acronym: str | None
+    name: str
+
+
+class ScopedAddressOut(Model):
+    id: int
+    raw_text: str
+    publication_count: int
+    """Nombre de publications du périmètre dont une contribution source porte l'adresse."""
+    structures: list[ScopedAddressStructure] | None
+
+
+class ScopedAddressesResponse(PaginatedResponse):
+    addresses: list[ScopedAddressOut]
+
+
+class ScopedAddressYear(Model):
+    year: int
+    publications_with_address: int
+    """Nombre de publications du périmètre de l'année dont une contribution source porte une adresse."""
+
+
+class ScopedAddressStructureSeries(ScopedAddressStructure):
+    publications: list[int]
+    """Nombre de publications dont une adresse est rattachée à la structure, pour chaque année de `ScopedAddressSummary.years`, dans le même ordre."""
+
+
+class ScopedAddressSummary(Model):
+    """Structures reconnues dans les adresses des publications du périmètre, comptées en publications par année."""
+
+    years: list[ScopedAddressYear]
+    """Années consécutives, de la plus ancienne à la plus récente publication avec adresse."""
+    structures: list[ScopedAddressStructureSeries]
+    """Structures, de la plus fréquente à la moins fréquente sur toutes les années."""

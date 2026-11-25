@@ -16,19 +16,13 @@
 	import IdentifiersCell from '#lib/components/IdentifiersCell.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import { activeTabId, type TabDef } from '#lib/tabs.js';
-	import ListStatus from '#lib/components/ListStatus.svelte';
-	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
+	import ScopedAddresses from '#lib/components/ScopedAddresses.svelte';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
-	import AddressPublications from '#lib/components/AddressPublications.svelte';
-	import PublicationCountButton from '#lib/components/PublicationCountButton.svelte';
-	import BarChart, { barLabelSpace } from '#lib/components/charts/BarChart.svelte';
-	import YearSlider, { YEAR_TRACK_INSET } from '#lib/components/YearSlider.svelte';
 	import { confirmDialog } from '#lib/dialogs.svelte.js';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import PersonCurationDrawer from '#lib/components/persons/PersonCurationDrawer.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
-	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 
 	const personId = $derived(page.params.id);
@@ -36,10 +30,6 @@
 	type Person = components['schemas']['PersonProfileCore'];
 	type Identifier = components['schemas']['PersonIdentifierOut'];
 	type ProfileResponse = components['schemas']['PersonProfileResponse'];
-	type Address = components['schemas']['PersonAddressOut'];
-	type AddressSummary = components['schemas']['PersonAddressSummary'];
-	type AddressPublication = components['schemas']['AddressPublicationItem'];
-	type AddressPublicationsResponse = components['schemas']['AddressPublicationsResponse'];
 	type ThesisSection = components['schemas']['PersonThesesSection'];
 	type ThesisStructInfo = components['schemas']['StructureRef'];
 	type ThesesResponse = components['schemas']['PersonThesesResponse'];
@@ -67,72 +57,6 @@
 	let thesesTotal = $state(0);
 	let thesesStructures = $state<Record<string, ThesisStructInfo>>({});
 	let thesesLoaded = $state(false);
-
-	// Addresses tab : adresses et structures reconnues sur les publications d'une année.
-	const currentYear = new Date().getFullYear();
-	let addrYear = $state(currentYear);
-	let addrSummary = $state<AddressSummary | null>(null);
-	const addrYearMin = $derived(Math.min(addrSummary?.first_year_with_address ?? currentYear, currentYear));
-	const addrYearMax = $derived(Math.min(addrSummary?.last_year_with_address ?? currentYear, currentYear));
-	const addresses = usePaginatedFetch<Address>({
-		endpoint: () => `/api/persons/${personId}/addresses`,
-		itemsKey: 'addresses',
-		apiKey: 'person-detail-addresses',
-		buildParams: () => new URLSearchParams({ year: String(addrYear) }),
-		pageParam: null,
-	});
-	// Publications avec adresse où figure chaque structure, et leur part.
-	const addrStructures = $derived(addrSummary?.structures ?? []);
-	const addrShare = (publications: number) => formatPercent(publications / (addrSummary?.publications_with_address || 1));
-	const publicationCount = (n: number) => formatCount(n, 'publication');
-	// Largeur réservée aux libellés des structures, à gauche de l'axe du graphique.
-	const ADDR_AXIS_WIDTH = 120;
-	// Place des pourcentages, à droite de l'axe du graphique.
-	const ADDR_LABEL_SPACE = barLabelSpace(true);
-	let expandedAddrId = $state<number | null>(null);
-	let addrPublications = $state<AddressPublication[]>([]);
-	let addrPublicationsLoading = $state(false);
-
-	async function loadAddressSummary() {
-		addrSummary = await api<AddressSummary>(
-			`/api/persons/${personId}/address-summary?year=${addrYear}`,
-			{ key: 'person-detail-address-summary' }
-		);
-	}
-
-	function loadAddressTab() {
-		expandedAddrId = null;
-		addresses.page = 1;
-		loadAddressSummary();
-		addresses.load();
-	}
-
-	// Ouverture de l'onglet : bornes du curseur lues, puis année la plus récente du curseur.
-	async function openAddressTab() {
-		await loadAddressSummary();
-		if (addrYear === addrYearMax) {
-			addresses.load();
-			return;
-		}
-		addrYear = addrYearMax;
-		loadAddressTab();
-	}
-
-	async function toggleAddressPublications(addrId: number) {
-		if (expandedAddrId === addrId) {
-			expandedAddrId = null;
-			return;
-		}
-		expandedAddrId = addrId;
-		addrPublications = [];
-		addrPublicationsLoading = true;
-		const params = new URLSearchParams({ person_id: String(personId), year: String(addrYear), limit: '500' });
-		const data = await api<AddressPublicationsResponse>(`/api/addresses/${addrId}/publications?${params}`, {
-			key: 'person-detail-address-publications',
-		});
-		addrPublications = data.publications;
-		addrPublicationsLoading = false;
-	}
 
 	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les thèses dirigées ou jugées et les sujets.
 
@@ -164,7 +88,6 @@
 	$effect(() => {
 		if (!profile) return;
 		if (activeTab === 'theses' && !thesesLoaded) untrack(loadTheses);
-		if (activeTab === 'addresses' && !addresses.loaded) untrack(openAddressTab);
 	});
 
 	async function loadProfile(id: string) {
@@ -305,75 +228,7 @@
 	<!-- Tab: Adresses -->
 	{#if activeTab === 'addresses'}
 		<div class="tab-content">
-			<div class="addr-overview">
-				<h2>Structures reconnues dans les adresses</h2>
-				<div class="addr-year">
-					<div class="addr-year-label">Année <strong>{addrYear}</strong></div>
-					<YearSlider min={addrYearMin} max={addrYearMax} bind:value={addrYear} onchange={loadAddressTab} />
-				</div>
-				{#if addrStructures.length}
-					<!-- Axe des valeurs aligné sur la piste du curseur ; libellés des structures et pourcentages en débord. -->
-					<div
-						style:margin-left="{YEAR_TRACK_INSET - ADDR_AXIS_WIDTH}px"
-						style:width="calc(100% + {ADDR_AXIS_WIDTH + ADDR_LABEL_SPACE - 2 * YEAR_TRACK_INSET}px)"
-					>
-						<BarChart
-							labels={addrStructures.map((s) => structureLabel(s))}
-							values={addrStructures.map((s) => s.publications)}
-							datasetLabel="Publications avec adresse"
-							barLabel={addrShare}
-							tooltipLabel={publicationCount}
-							max={addrSummary?.publications_with_address}
-							horizontal
-							prominentLabels
-							categoryAxisWidth={ADDR_AXIS_WIDTH}
-							height={32 * addrStructures.length + 40}
-						/>
-					</div>
-				{:else if addrSummary}
-					<p class="addr-counts">Aucune structure reconnue.</p>
-				{/if}
-			</div>
-			<ListStatus list={addresses} emptyText="Aucune adresse">
-				<table class="data-table">
-					<thead>
-						<tr>
-							<th>{columnLabels.address}</th>
-							<th style="width:160px">Structures</th>
-							<th style="width:120px">Publications</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each addresses.items as a (a.id)}
-							<tr>
-								<td class="addr-cell">{a.raw_text}</td>
-								<td>
-									{#if a.structures?.length}
-										{#each a.structures as s (s.id)}
-											<span class="tag tag-accent">{structureLabel(s)}</span>
-										{/each}
-									{/if}
-								</td>
-								<td>
-									<PublicationCountButton
-										count={a.publication_count}
-										expanded={expandedAddrId === a.id}
-										onclick={() => toggleAddressPublications(a.id)}
-									/>
-								</td>
-							</tr>
-							{#if expandedAddrId === a.id}
-								<tr>
-									<td colspan="3" class="addr-publications">
-										<AddressPublications publications={addrPublications} loading={addrPublicationsLoading} />
-									</td>
-								</tr>
-							{/if}
-						{/each}
-					</tbody>
-				</table>
-				<Pagination page={addresses.page} pages={addresses.pages} onchange={(p) => { addresses.page = p; expandedAddrId = null; addresses.load(); }} />
-			</ListStatus>
+			<ScopedAddresses endpoint={`/api/persons/${personId}`} scope={{ person_id: String(personId) }} apiKey="person-detail" />
 		</div>
 	{/if}
 {/if}
@@ -405,20 +260,4 @@
 	.thesis-role-heading:first-child { margin-top: 0; }
 
 
-	/* Addresses tab */
-	.addr-overview {
-		width: 300px;
-		margin: 0 auto 16px;
-	}
-	.addr-overview h2 { font-size: var(--fs-base); font-weight: 600; margin: 0 0 8px; }
-	.addr-year {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		margin-bottom: 20px;
-	}
-	.addr-year-label { font-size: var(--fs-md); }
-	.addr-counts { font-size: var(--fs-sm); color: var(--text-secondary); margin: 0; }
-	.addr-cell { font-size: var(--fs-sm); color: var(--muted); word-break: break-all; }
-	.addr-publications { padding: 0 12px 12px 24px; }
 </style>

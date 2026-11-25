@@ -4,22 +4,22 @@ import ChartDataLabels from 'chartjs-plugin-datalabels';
 import type { Context as DataLabelsContext } from 'chartjs-plugin-datalabels';
 import { cssColor, cssVar, fontSize } from './cssVar';
 
-/** Opacité des éléments de l'année en cours, incomplète. */
+/** Opacité des éléments de l'année en cours, incomplète, et des années ultérieures. */
 const CURRENT_YEAR_OPACITY = 0.5;
 
 const faded = new WeakSet<Element>();
 const wrapped = new WeakSet<Element>();
 
 /**
- * Atténue les éléments (barres, points) dont le libellé commence par l'année en cours : `data.labels[i]` désigne l'élément `i` de chaque jeu de données.
+ * Atténue les éléments (barres, points) dont le libellé commence par l'année en cours ou une année ultérieure : `data.labels[i]` désigne l'élément `i` de chaque jeu de données.
  */
 const currentYearPlugin: Plugin = {
 	id: 'currentYear',
 	afterDatasetUpdate(chart, { meta }) {
-		const current = String(new Date().getFullYear());
+		const current = new Date().getFullYear();
 		meta.data.forEach((element, i) => {
 			const year = String(chart.data.labels?.[i] ?? '').match(/^\d{4}(?!\d)/)?.[0];
-			if (year !== current) {
+			if (year === undefined || Number(year) < current) {
 				faded.delete(element);
 				return;
 			}
@@ -40,7 +40,7 @@ const currentYearPlugin: Plugin = {
 };
 
 /**
- * Chart.js enregistré une fois pour toute l'application : composants standard, étiquettes de valeurs, atténuation de l'année en cours, police, taille et couleur de texte lues dans les variables CSS, infobulles à l'aspect de `TooltipHost`.
+ * Chart.js enregistré une fois pour toute l'application : composants standard, étiquettes de valeurs, atténuation de l'année en cours et des années ultérieures, police, taille et couleur de texte lues dans les variables CSS, infobulles à l'aspect de `TooltipHost`.
  */
 Chart.register(...registerables, ChartDataLabels, currentYearPlugin);
 Chart.defaults.font.family = cssVar('font');

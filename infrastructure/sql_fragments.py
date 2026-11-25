@@ -10,6 +10,7 @@ from domain.addresses.address_origin import AddressOrigin
 from domain.config import ConfigKey
 from domain.contributions.author_positions import SCANR_TRUNCATED_LENGTHS, AuthorPosition
 from domain.contributions.contribution_roles import ROLE_BY_DOC_TYPE
+from domain.documents.doc_types import DOC_TYPE_FAMILIES
 from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.creation import ROLES_WITHOUT_CREATION
 from domain.persons.identifiers import (
@@ -27,7 +28,7 @@ from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.identifiers import SourceIdentifierRole, SourceIdentifierType
 from domain.source_records.impact import CitationTop
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
-from domain.sources.registry import Source
+from domain.sources.registry import RANKING_SOURCES, Source
 from domain.structures.perimeter_evidence import (
     AFFILIATION_EVIDENCE,
     DOCUMENT_EVIDENCE,
@@ -103,6 +104,14 @@ def is_laboratory(structure: str = "s") -> str:
 def is_raw_address(address: str = "a") -> str:
     """Renvoie la condition vraie quand l'adresse aliasée `address` est une adresse brute. Une adresse sans origine en est exclue."""
     return f"{address}.origin = '{AddressOrigin.RAW.value}'"
+
+
+def is_ranking_record(source_record: str = "sr", publication: str = "p") -> str:
+    """Renvoie la condition vraie quand l'enregistrement source aliasé `source_record` vient d'une source lue par les classements (`RANKING_SOURCES`) et que la publication aliasée `publication` est de la famille « publications »."""
+    return (
+        f"{source_record}.source::text IN {in_clause(RANKING_SOURCES)}"
+        f" AND {publication}.doc_type::text IN {in_clause(DOC_TYPE_FAMILIES['publications'].types)}"
+    )
 
 
 def has_author_role(source_contribution: str = "sc") -> str:

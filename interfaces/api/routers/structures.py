@@ -19,9 +19,12 @@ from application.ports.repositories.structure_repository import (
 from application.services.structures import StructureService
 from domain.structures.ror import RorType
 from domain.structures.structure import StructureType
+from infrastructure.read_models.addresses.models import (
+    ScopedAddressesResponse,
+    ScopedAddressSummary,
+)
 from infrastructure.read_models.structures.models import (
     NameFormOut,
-    StructureAddressesResponse,
     StructureDeletionImpact,
     StructureDetailResponse,
     StructureFilters,
@@ -241,15 +244,24 @@ def get_structure(
     return detail
 
 
-@router.get("/{structure_id}/addresses", response_model=StructureAddressesResponse)
+@router.get("/{structure_id}/addresses", response_model=ScopedAddressesResponse)
 def get_structure_addresses(
     structure_id: int,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     queries: StructuresQueries = Depends(structures_queries),
-) -> StructureAddressesResponse:
-    """Liste les adresses brutes rattachées à la structure, hors rattachements rejetés."""
+) -> ScopedAddressesResponse:
+    """Liste les adresses brutes des publications des membres de la structure parues pendant leur présence, issues des sources lues par les classements, sur la famille « publications », les plus fréquentes d'abord."""
     return queries.get_structure_addresses(structure_id, page=page, per_page=per_page)
+
+
+@router.get("/{structure_id}/address-summary", response_model=ScopedAddressSummary)
+def get_structure_address_summary(
+    structure_id: int,
+    queries: StructuresQueries = Depends(structures_queries),
+) -> ScopedAddressSummary:
+    """Compte, par année, les publications des membres de la structure parues pendant leur présence avec une adresse brute dans une source lue par les classements, sur la famille « publications », puis, par structure, celles dont une adresse brute est rattachée à la structure."""
+    return queries.get_structure_address_summary(structure_id)
 
 
 @router.get("/{structure_id}/partners", response_model=StructurePartnersResponse)

@@ -46,6 +46,8 @@ class SourceProfile:
     """Deux enregistrements sources de la source désignent deux œuvres distinctes : une famille de brevets OPS par invention. Chacun est une ancre de la réconciliation, comme un DOI."""
     structure_ids: str | None = None
     """Nature des identifiants de structure de la source, affichée par le formulaire des structures (servi par `/api/sources/structure-ids`). Seules les sources qui la déclarent ont une clé dans `structures.api_ids`."""
+    ranking: bool = False
+    """Base lue par les classements internationaux d'établissements."""
 
 
 PROFILES: dict[Source, SourceProfile] = {
@@ -65,6 +67,7 @@ PROFILES: dict[Source, SourceProfile] = {
         person_identifiers=frozenset({PersonIdentifierType.ORCID}),
         aggregator=True,
         structure_ids="institution lineage IDs",
+        ranking=True,
     ),
     Source.WOS: SourceProfile(
         label="WoS",
@@ -72,6 +75,7 @@ PROFILES: dict[Source, SourceProfile] = {
         doi_searchable=True,
         opt_in=True,
         structure_ids="Organization-Enhanced",
+        ranking=True,
     ),
     Source.SCANR: SourceProfile(
         label="ScanR",
@@ -177,6 +181,9 @@ DISTINCT_WORK_SOURCES: frozenset[Source] = frozenset(
     s for s, p in PROFILES.items() if p.distinct_works
 )
 """Sources dont chaque enregistrement source est une œuvre distincte (`SourceProfile.distinct_works`)."""
+
+RANKING_SOURCES: frozenset[Source] = frozenset(s for s, p in PROFILES.items() if p.ranking)
+"""Sources lues par les classements internationaux d'établissements (`SourceProfile.ranking`)."""
 
 
 SOURCE_PRIORITY: tuple[Source, ...] = (

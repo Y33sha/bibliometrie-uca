@@ -116,16 +116,8 @@ class StructureDetailResponse(Model):
     theses_count: int
     members_count: int
     """Personnes retenues à période de présence actuelle dans la structure."""
-
-
-class StructureAddressOut(Model):
-    id: int
-    raw_text: str
-    is_confirmed: bool | None
-
-
-class StructureAddressesResponse(PaginatedResponse):
-    addresses: list[StructureAddressOut]
+    hr_persons_count: int
+    """Personnes à période de présence, actuelle ou passée, dans la structure."""
 
 
 class StructurePartner(Model):

@@ -20,8 +20,9 @@ from infrastructure.read_models.addresses.models import (
     FoundCountry,
     StructureLinkState,
 )
+from infrastructure.read_models.addresses.scoped import AddressScope
 from infrastructure.read_models.sql_fragments import contributor_display_name
-from infrastructure.sql_fragments import address_country_conditions
+from infrastructure.sql_fragments import address_country_conditions, is_ranking_record
 
 _RECOGNIZED_LINK = (
     "((asx.matched_form_id IS NOT NULL AND asx.is_confirmed IS NULL) OR asx.is_confirmed = TRUE)"
@@ -173,18 +174,20 @@ class AddressesQueries:
         return row.raw_text if row else None
 
     def get_address_publications(
-        self, addr_id: int, limit: int, *, person_id: int | None = None, year: int | None = None
+        self,
+        addr_id: int,
+        limit: int,
+        *,
+        scope: AddressScope | None = None,
     ) -> list[AddressPublicationItem]:
-        """Renvoie les publications dont une contribution source porte l'adresse. `person_id` restreint aux contributions sources de la personne, `year` aux publications de l'année."""
+        """Renvoie les publications dont une contribution source porte l'adresse. `scope` restreint aux contributions sources des contributions du périmètre, lues dans les sources des classements, sur les publications de la famille « publications »."""
         conditions = []
-        if person_id is not None:
-            conditions.append("""sca.source_contribution_id IN (
+        if scope is not None:
+            conditions.append(is_ranking_record("sr", "p"))
+            conditions.append(f"""sca.source_contribution_id IN (
                 SELECT m.source_contribution_id FROM aligned_source_contributions m
-                JOIN contributions g ON g.id = m.contribution_id
-                WHERE g.person_id = :person_id
+                WHERE m.contribution_id IN ({scope.contributions})
             )""")
-        if year is not None:
-            conditions.append("p.publication_year = :year")
         extra_where = "".join(f" AND {c}" for c in conditions)
         rows = self._conn.execute(
             text(f"""
@@ -203,7 +206,7 @@ class AddressesQueries:
                 ORDER BY p.id, p.publication_year DESC
                 LIMIT :lim
             """),
-            {"id": addr_id, "lim": limit, "person_id": person_id, "year": year},
+            {"id": addr_id, "lim": limit, **(scope.binds if scope else {})},
         ).all()
         return [
             AddressPublicationItem(

@@ -7,6 +7,15 @@ from sqlalchemy import Connection, Row, text
 
 from domain.structures.ror import ROR_TYPE_LABELS_FR, RorType
 from infrastructure.read_models._common import FacetOption
+from infrastructure.read_models.addresses.models import (
+    ScopedAddressesResponse,
+    ScopedAddressSummary,
+)
+from infrastructure.read_models.addresses.scoped import (
+    lab_members_scope,
+    scoped_address_summary,
+    scoped_addresses,
+)
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.filters import (
     OWN_RORS_SQL,
@@ -17,8 +26,6 @@ from infrastructure.read_models.filters import (
 from infrastructure.read_models.structures.models import (
     NameFormOut,
     RelatedStructureOut,
-    StructureAddressesResponse,
-    StructureAddressOut,
     StructureDeletionImpact,
     StructureDetailResponse,
     StructureFilters,
@@ -34,7 +41,7 @@ from infrastructure.read_models.structures.models import (
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
 from infrastructure.read_models.subjects.queries import entity_subjects
-from infrastructure.sql_fragments import has_author_role, is_raw_address
+from infrastructure.sql_fragments import has_author_role
 
 _PARTNER_LINKS = f"""
     WITH links AS (
@@ -408,6 +415,10 @@ class StructuresQueries:
         members_count = self._conn.execute(
             text(f"SELECT COUNT(*) FROM persons p WHERE {members_where}"), members_binds
         ).scalar_one()
+        hr_persons_count = self._conn.execute(
+            text("SELECT COUNT(DISTINCT person_id) FROM hr_periods WHERE structure_id = :id"),
+            {"id": structure_id},
+        ).scalar_one()
 
         return StructureDetailResponse(
             structure=StructureOut(
@@ -426,43 +437,20 @@ class StructuresQueries:
             forms=[_name_form_from_row(r) for r in form_rows],
             theses_count=theses_row.n,
             members_count=members_count,
+            hr_persons_count=hr_persons_count,
         )
 
     def get_structure_addresses(
         self, structure_id: int, *, page: int, per_page: int
-    ) -> StructureAddressesResponse:
-        """Renvoie les adresses brutes rattachées à une structure, hors rattachements rejetés."""
-        from_where = f"""
-            FROM addresses a
-            JOIN address_structures ast ON ast.address_id = a.id
-            WHERE ast.structure_id = :structure_id
-              AND ast.is_confirmed IS DISTINCT FROM FALSE
-              AND {is_raw_address("a")}
-        """
-        offset = (page - 1) * per_page
-        count_row = self._conn.execute(
-            text(f"SELECT COUNT(*) AS total {from_where}"),
-            {"structure_id": structure_id},
-        ).one()
-
-        rows = self._conn.execute(
-            text(f"""
-                SELECT a.id, a.raw_text, ast.is_confirmed
-                {from_where}
-                ORDER BY a.raw_text
-                LIMIT :pg_limit OFFSET :pg_offset
-            """),
-            {"structure_id": structure_id, "pg_limit": per_page, "pg_offset": offset},
-        ).all()
-        return StructureAddressesResponse(
-            total=count_row.total,
-            page=page,
-            per_page=per_page,
-            addresses=[
-                StructureAddressOut(id=r.id, raw_text=r.raw_text, is_confirmed=r.is_confirmed)
-                for r in rows
-            ],
+    ) -> ScopedAddressesResponse:
+        """Renvoie les adresses brutes des publications des membres de la structure pendant leur présence (`scoped_addresses`)."""
+        return scoped_addresses(
+            self._conn, lab_members_scope(structure_id), page=page, per_page=per_page
         )
+
+    def get_structure_address_summary(self, structure_id: int) -> ScopedAddressSummary:
+        """Compte, par année et par structure, les publications avec adresse des membres de la structure pendant leur présence (`scoped_address_summary`)."""
+        return scoped_address_summary(self._conn, lab_members_scope(structure_id))
 
     def get_structure_subjects(self, structure_id: int, *, limit: int) -> list[SubjectFrequency]:
         """Renvoie les sujets des publications d'une structure, les plus fréquents d'abord."""

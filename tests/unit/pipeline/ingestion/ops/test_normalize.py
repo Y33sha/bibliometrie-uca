@@ -23,7 +23,7 @@ from pipeline.ingestion.ops.normalize import (
     ops_source_record,
 )
 
-_BODY = json.loads((Path(__file__).parent / "family_FR1658141.json").read_text())
+_BODY = json.loads((Path(__file__).parent / "family_FR1658141.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture

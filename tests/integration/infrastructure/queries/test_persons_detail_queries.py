@@ -2,15 +2,15 @@
 
 from functools import partial
 
-from sqlalchemy import text
-
 from infrastructure.read_models.addresses.queries import AddressesQueries
+from infrastructure.read_models.addresses.scoped import person_scope
 from infrastructure.read_models.persons.queries import PersonsQueries
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
+    insert_aligned_source_contribution,
     insert_source_contribution,
     insert_source_contribution_address,
     insert_source_record,
@@ -19,36 +19,6 @@ from tests.integration.helpers.structures import insert_structure
 
 # Contribution du périmètre.
 _in_perimeter_contribution = partial(insert_contribution, in_perimeter=True)
-
-
-def _source_contribution(conn, publication_id, *, source="hal", roles=None):
-    """Insère une contribution source sur un enregistrement source de la publication, d'identifiant source unique."""
-    source_record_id = insert_source_record(
-        conn, publication_id, source=source, source_id=f"detail-{publication_id}-{source}"
-    )
-    return insert_source_contribution(
-        conn, source_record_id, source=source, roles=roles
-    ), source_record_id
-
-
-def _join_contribution(conn, source_contribution, *, publication_id, person_id):
-    """Ajoute la contribution source `(id, enregistrement source)` à la contribution de la personne dans la publication."""
-    source_contribution_id, source_record_id = source_contribution
-    conn.execute(
-        text("""
-            INSERT INTO aligned_source_contributions
-                (source_contribution_id, contribution_id, source_record_id, method)
-            SELECT :sc, g.id, :sr, 'reference'
-            FROM contributions g
-            WHERE g.publication_id = :p AND g.person_id = :person
-        """),
-        {
-            "sc": source_contribution_id,
-            "sr": source_record_id,
-            "p": publication_id,
-            "person": person_id,
-        },
-    )
 
 
 def _theses(conn, person_id):
@@ -97,10 +67,9 @@ class TestMemberReads:
         person = insert_person(sa_sync_conn, "Directrice")
         thesis = insert_publication(sa_sync_conn, doc_type="thesis")
         insert_contribution(sa_sync_conn, thesis, person_id=person, roles=["thesis_director"])
-        member = _source_contribution(
-            sa_sync_conn, thesis, source="theses", roles=["thesis_director"]
+        insert_aligned_source_contribution(
+            sa_sync_conn, thesis, person, source="theses", roles=["thesis_director"]
         )
-        _join_contribution(sa_sync_conn, member, publication_id=thesis, person_id=person)
 
         profile = PersonsQueries(sa_sync_conn).person_profile(person)
 
@@ -113,18 +82,20 @@ class TestMemberReads:
         publication = insert_publication(sa_sync_conn)
         other_publication = insert_publication(sa_sync_conn)
         insert_contribution(sa_sync_conn, publication, person_id=person, roles=["author"])
-        member = _source_contribution(sa_sync_conn, publication)
-        _join_contribution(sa_sync_conn, member, publication_id=publication, person_id=person)
-        outsider, _ = _source_contribution(sa_sync_conn, other_publication)
+        member = insert_aligned_source_contribution(sa_sync_conn, publication, person)
+        outsider = insert_source_contribution(
+            sa_sync_conn,
+            insert_source_record(
+                sa_sync_conn, other_publication, source="openalex", source_id="outsider"
+            ),
+        )
         member_address = insert_address(sa_sync_conn, "Membre de la contribution")
-        insert_source_contribution_address(sa_sync_conn, member[0], address_id=member_address)
+        insert_source_contribution_address(sa_sync_conn, member, address_id=member_address)
         insert_source_contribution_address(
             sa_sync_conn, outsider, address_id=insert_address(sa_sync_conn, "Hors contribution")
         )
 
-        response = PersonsQueries(sa_sync_conn).person_addresses(
-            person, year=None, page=1, per_page=50
-        )
+        response = PersonsQueries(sa_sync_conn).person_addresses(person, page=1, per_page=50)
 
         assert [address.id for address in response.addresses] == [member_address]
 
@@ -142,24 +113,49 @@ class TestMemberReads:
         for texts in texts_by_publication:
             publication = insert_publication(sa_sync_conn)
             insert_contribution(sa_sync_conn, publication, person_id=person, roles=["author"])
-            member = _source_contribution(sa_sync_conn, publication)
-            _join_contribution(sa_sync_conn, member, publication_id=publication, person_id=person)
+            member = insert_aligned_source_contribution(sa_sync_conn, publication, person)
             for raw_text, origin in texts:
                 address = insert_address(sa_sync_conn, raw_text, origin=origin)
-                insert_source_contribution_address(sa_sync_conn, member[0], address_id=address)
+                insert_source_contribution_address(sa_sync_conn, member, address_id=address)
                 if origin == "raw":
                     raw_address = address
         queries = PersonsQueries(sa_sync_conn)
 
-        response = queries.person_addresses(person, year=None, page=1, per_page=50)
-        summary = queries.person_address_summary(person, year=None)
+        response = queries.person_addresses(person, page=1, per_page=50)
+        summary = queries.person_address_summary(person)
 
         assert [address.id for address in response.addresses] == [raw_address]
-        assert summary.publications_with_address == 1
+        assert [y.publications_with_address for y in summary.years] == [1]
+
+    def test_addresses_from_ranking_sources_on_publications_only(self, sa_sync_conn):
+        """Les adresses d'un enregistrement HAL et celles d'un jeu de données sont absentes des adresses, du compte des publications avec adresse et des publications de l'adresse."""
+        person = insert_person(sa_sync_conn, "Adressee")
+        shared = insert_address(sa_sync_conn, "Institut Pascal, Aubière, France")
+        kept = None
+        for doc_type, source in (("article", "wos"), ("article", "hal"), ("dataset", "openalex")):
+            publication = insert_publication(sa_sync_conn, doc_type=doc_type)
+            insert_contribution(sa_sync_conn, publication, person_id=person, roles=["author"])
+            member = insert_aligned_source_contribution(
+                sa_sync_conn, publication, person, source=source
+            )
+            insert_source_contribution_address(sa_sync_conn, member, address_id=shared)
+            if source == "wos":
+                kept = publication
+        queries = PersonsQueries(sa_sync_conn)
+
+        response = queries.person_addresses(person, page=1, per_page=50)
+        summary = queries.person_address_summary(person)
+        items = AddressesQueries(sa_sync_conn).get_address_publications(
+            shared, 20, scope=person_scope(person)
+        )
+
+        assert [(a.id, a.publication_count) for a in response.addresses] == [(shared, 1)]
+        assert [y.publications_with_address for y in summary.years] == [1]
+        assert [p.id for p in items] == [kept]
 
 
 class TestAddressesByYear:
-    """Adresses de la personne sur les publications d'une année : CHU sur deux publications de 2024 et une de 2023, UCA sur une de 2024, une publication de 2024 sans adresse."""
+    """Adresses de la personne : CHU sur deux publications de 2024 et une de 2021, UCA sur une de 2024, une publication de 2024 sans adresse."""
 
     def _setup(self, conn):
         person = insert_person(conn, "Adressee")
@@ -177,64 +173,56 @@ class TestAddressesByYear:
             ("a", 2024, [chu_address, uca_address]),
             ("b", 2024, [chu_address]),
             ("c", 2024, []),
-            ("old", 2023, [chu_address]),
+            ("old", 2021, [chu_address]),
         ):
             publication = insert_publication(conn, publication_year=year)
             publications[key] = publication
             insert_contribution(conn, publication, person_id=person, roles=["author"])
-            member = _source_contribution(conn, publication)
-            _join_contribution(conn, member, publication_id=publication, person_id=person)
+            member = insert_aligned_source_contribution(conn, publication, person)
             for address in addresses:
-                insert_source_contribution_address(conn, member[0], address_id=address)
+                insert_source_contribution_address(conn, member, address_id=address)
         # Un coauteur d'une autre publication de 2024 porte aussi l'adresse du CHU.
         other_person = insert_person(conn, "Coauteur")
         other_publication = insert_publication(conn, publication_year=2024)
         insert_contribution(conn, other_publication, person_id=other_person, roles=["author"])
-        other = _source_contribution(conn, other_publication)
-        _join_contribution(conn, other, publication_id=other_publication, person_id=other_person)
-        insert_source_contribution_address(conn, other[0], address_id=chu_address)
+        other = insert_aligned_source_contribution(conn, other_publication, other_person)
+        insert_source_contribution_address(conn, other, address_id=chu_address)
         return person, publications, {"chu": chu, "uca": uca}, chu_address, uca_address
 
     def test_addresses_sorted_by_publication_count(self, sa_sync_conn):
         person, _, _, chu_address, uca_address = self._setup(sa_sync_conn)
 
-        response = PersonsQueries(sa_sync_conn).person_addresses(
-            person, year=2024, page=1, per_page=50
-        )
+        response = PersonsQueries(sa_sync_conn).person_addresses(person, page=1, per_page=50)
 
         assert [(a.id, a.publication_count) for a in response.addresses] == [
-            (chu_address, 2),
+            (chu_address, 3),
             (uca_address, 1),
         ]
 
-    def test_summary_counts_publications_per_structure(self, sa_sync_conn):
-        """Le dénominateur compte les publications avec adresse ; le lien rejeté n'est pas compté ; le CHU, présent dans les deux adresses de la publication a, compte une fois pour elle."""
+    def test_summary_counts_publications_per_structure_and_year(self, sa_sync_conn):
+        """Années consécutives de 2021 à 2024, à zéro sans publication avec adresse ; le lien rejeté n'est pas compté ; le CHU, présent dans les deux adresses de la publication a, compte une fois pour elle ; une publication de 2025 sans adresse est ignorée."""
         person, _, structures, _, _ = self._setup(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn, publication_year=2025)
+        insert_contribution(sa_sync_conn, publication, person_id=person, roles=["author"])
 
-        summary = PersonsQueries(sa_sync_conn).person_address_summary(person, year=2024)
+        summary = PersonsQueries(sa_sync_conn).person_address_summary(person)
 
-        assert summary.publications_with_address == 2
+        assert [(y.year, y.publications_with_address) for y in summary.years] == [
+            (2021, 1),
+            (2022, 0),
+            (2023, 0),
+            (2024, 2),
+        ]
         assert [(s.id, s.publications) for s in summary.structures] == [
-            (structures["chu"], 2),
-            (structures["uca"], 1),
+            (structures["chu"], [1, 0, 0, 2]),
+            (structures["uca"], [0, 0, 0, 1]),
         ]
 
-    def test_summary_years(self, sa_sync_conn):
-        """Première et dernière années des publications avec adresse, quelle que soit l'année demandée ; les publications de 2022 et 2025 sans adresse sont ignorées."""
-        person, _, _, _, _ = self._setup(sa_sync_conn)
-        for year in (2022, 2025):
-            publication = insert_publication(sa_sync_conn, publication_year=year)
-            insert_contribution(sa_sync_conn, publication, person_id=person, roles=["author"])
-
-        summary = PersonsQueries(sa_sync_conn).person_address_summary(person, year=2023)
-
-        assert (summary.first_year_with_address, summary.last_year_with_address) == (2023, 2024)
-
-    def test_address_publications_restricted_to_person_and_year(self, sa_sync_conn):
+    def test_address_publications_restricted_to_person(self, sa_sync_conn):
         person, publications, _, chu_address, _ = self._setup(sa_sync_conn)
 
         items = AddressesQueries(sa_sync_conn).get_address_publications(
-            chu_address, 20, person_id=person, year=2024
+            chu_address, 20, scope=person_scope(person)
         )
 
-        assert {p.id for p in items} == {publications["a"], publications["b"]}
+        assert {p.id for p in items} == {publications["a"], publications["b"], publications["old"]}

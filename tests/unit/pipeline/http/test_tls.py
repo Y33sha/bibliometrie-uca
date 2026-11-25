@@ -28,7 +28,7 @@ def test_chaque_appel_httpx2_du_pipeline_recoit_le_contexte():
     missing = [
         f"{path.relative_to(_PIPELINE.parent)}:{node.lineno}"
         for path in modules
-        for node in ast.walk(ast.parse(path.read_text()))
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Attribute)
         and isinstance(node.func.value, ast.Name)

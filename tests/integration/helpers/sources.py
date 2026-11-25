@@ -217,3 +217,39 @@ def insert_source_contribution_address(
         "source_contribution_addresses",
         {"source_contribution_id": source_contribution_id, "address_id": address_id},
     )
+
+
+def insert_aligned_source_contribution(
+    conn: Connection,
+    publication_id: int,
+    person_id: int,
+    *,
+    source: str = "openalex",
+    roles: list[str] | None = None,
+) -> int:
+    """Insère un enregistrement source de la publication et sa contribution source, alignée sur la contribution de la personne dans la publication. Renvoie l'`id` de la contribution source."""
+    source_record_id = insert_source_record(
+        conn,
+        publication_id,
+        source=source,
+        source_id=f"aligned-{publication_id}-{person_id}-{source}",
+    )
+    source_contribution_id = insert_source_contribution(
+        conn, source_record_id, source=source, roles=roles
+    )
+    conn.execute(
+        text("""
+            INSERT INTO aligned_source_contributions
+                (source_contribution_id, contribution_id, source_record_id, method)
+            SELECT :sc, g.id, :sr, 'reference'
+            FROM contributions g
+            WHERE g.publication_id = :p AND g.person_id = :person
+        """),
+        {
+            "sc": source_contribution_id,
+            "sr": source_record_id,
+            "p": publication_id,
+            "person": person_id,
+        },
+    )
+    return source_contribution_id

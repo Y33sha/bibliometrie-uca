@@ -7,16 +7,19 @@ from domain.documents.doc_types import DOC_TYPE_FAMILIES
 from domain.sources.registry import Source
 from infrastructure.read_models._common import (
     StructureRef,
-    page_count,
+)
+from infrastructure.read_models.addresses.models import (
+    ScopedAddressesResponse,
+    ScopedAddressSummary,
+)
+from infrastructure.read_models.addresses.scoped import (
+    person_scope,
+    scoped_address_summary,
+    scoped_addresses,
 )
 from infrastructure.read_models.persons.identifiers import person_identifiers
 from infrastructure.read_models.persons.laboratories import person_periods
 from infrastructure.read_models.persons.models import (
-    PersonAddressesResponse,
-    PersonAddressOut,
-    PersonAddressStruct,
-    PersonAddressStructureCount,
-    PersonAddressSummary,
     PersonProfileCore,
     PersonProfileResponse,
     PersonThesesResponse,
@@ -25,7 +28,11 @@ from infrastructure.read_models.persons.models import (
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
 from infrastructure.read_models.subjects.queries import entity_subjects
-from infrastructure.sql_fragments import has_author_role, in_clause, is_laboratory, is_raw_address
+from infrastructure.sql_fragments import (
+    has_author_role,
+    in_clause,
+    is_laboratory,
+)
 
 _THESIS_ROLES = (
     ContributionRole.THESIS_DIRECTOR,
@@ -39,28 +46,6 @@ _THESIS_ROLE_LABELS = {
     ContributionRole.JURY_PRESIDENT: "Président du jury",
     ContributionRole.JURY_MEMBER: "Membre du jury",
 }
-
-
-def _person_address_publications_cte(year: int | None) -> str:
-    """Renvoie les CTE `person_address_publications_all_years` : triplets (publication, adresse brute, année) des contributions sources des contributions de la personne `:pid` ; et `person_address_publications` : couples (publication, adresse brute) restreints aux publications de l'année `:year` si `year` est donnée."""
-    year_filter = "WHERE publication_year = :year" if year is not None else ""
-    return f"""
-        WITH person_address_publications_all_years AS (
-            SELECT DISTINCT g.publication_id, sca.address_id, p.publication_year
-            FROM contributions g
-            JOIN aligned_source_contributions m ON m.contribution_id = g.id
-            JOIN source_contribution_addresses sca
-              ON sca.source_contribution_id = m.source_contribution_id
-            JOIN addresses a ON a.id = sca.address_id
-            JOIN publications p ON p.id = g.publication_id
-            WHERE g.person_id = :pid AND {is_raw_address("a")}
-        ),
-        person_address_publications AS (
-            SELECT publication_id, address_id
-            FROM person_address_publications_all_years
-            {year_filter}
-        )
-    """
 
 
 class PersonDetailQueries:
@@ -190,98 +175,14 @@ class PersonDetailQueries:
         return PersonThesesResponse(sections=sections, total=len(rows), structures=structures)
 
     def person_addresses(
-        self, person_id: int, *, year: int | None, page: int, per_page: int
-    ) -> PersonAddressesResponse:
-        """Renvoie les adresses brutes des contributions sources des contributions de la personne, les plus fréquentes d'abord. `year` restreint aux publications de l'année."""
-        cte = _person_address_publications_cte(year)
-        binds = {"pid": person_id, "year": year}
-        total = self._conn.execute(
-            text(f"{cte} SELECT COUNT(DISTINCT address_id) FROM person_address_publications"),
-            binds,
-        ).scalar_one()
-        # Une page au-delà de la dernière ramène sur la dernière, plutôt que sur une liste vide.
-        page = min(page, page_count(total, per_page) or 1)
-        offset = (page - 1) * per_page
+        self, person_id: int, *, page: int, per_page: int
+    ) -> ScopedAddressesResponse:
+        """Renvoie les adresses brutes des publications de la personne (`scoped_addresses`)."""
+        return scoped_addresses(self._conn, person_scope(person_id), page=page, per_page=per_page)
 
-        rows = self._conn.execute(
-            text(f"""
-                {cte}
-                SELECT a.id, a.raw_text, COUNT(*) AS publication_count,
-                       (SELECT jsonb_agg(jsonb_build_object(
-                            'id', s.id, 'acronym', s.acronym, 'name', s.name))
-                        FROM address_structures ast
-                        JOIN structures s ON s.id = ast.structure_id
-                        WHERE ast.address_id = a.id
-                          AND ast.is_confirmed IS DISTINCT FROM FALSE
-                       ) AS structures
-                FROM person_address_publications pap
-                JOIN addresses a ON a.id = pap.address_id
-                GROUP BY a.id
-                ORDER BY publication_count DESC, a.raw_text
-                LIMIT :pg_limit OFFSET :pg_offset
-            """),
-            {**binds, "pg_limit": per_page, "pg_offset": offset},
-        ).all()
-        addresses = [
-            PersonAddressOut(
-                id=r.id,
-                raw_text=r.raw_text,
-                publication_count=r.publication_count,
-                structures=(
-                    [
-                        PersonAddressStruct(id=s["id"], acronym=s["acronym"], name=s["name"])
-                        for s in r.structures
-                    ]
-                    if r.structures
-                    else None
-                ),
-            )
-            for r in rows
-        ]
-        return PersonAddressesResponse(
-            total=total, page=page, per_page=per_page, addresses=addresses
-        )
-
-    def person_address_summary(self, person_id: int, *, year: int | None) -> PersonAddressSummary:
-        """Compte les publications avec adresse de la personne, puis, par structure, celles dont une adresse brute est rattachée à la structure. `year` restreint les comptes aux publications de l'année."""
-        cte = _person_address_publications_cte(year)
-        binds = {"pid": person_id, "year": year}
-        counts = self._conn.execute(
-            text(f"""
-                {cte}
-                SELECT MIN(publication_year) AS first_year_with_address,
-                       MAX(publication_year) AS last_year_with_address,
-                       (SELECT COUNT(DISTINCT publication_id)
-                        FROM person_address_publications) AS publications_with_address
-                FROM person_address_publications_all_years
-            """),
-            binds,
-        ).one()
-        structures = self._conn.execute(
-            text(f"""
-                {cte}
-                SELECT s.id, s.acronym, s.name,
-                       COUNT(DISTINCT pap.publication_id) AS publications
-                FROM person_address_publications pap
-                JOIN address_structures ast ON ast.address_id = pap.address_id
-                JOIN structures s ON s.id = ast.structure_id
-                WHERE ast.is_confirmed IS DISTINCT FROM FALSE
-                GROUP BY s.id
-                ORDER BY publications DESC, s.name
-            """),
-            binds,
-        ).all()
-        return PersonAddressSummary(
-            first_year_with_address=counts.first_year_with_address,
-            last_year_with_address=counts.last_year_with_address,
-            publications_with_address=counts.publications_with_address,
-            structures=[
-                PersonAddressStructureCount(
-                    id=r.id, acronym=r.acronym, name=r.name, publications=r.publications
-                )
-                for r in structures
-            ],
-        )
+    def person_address_summary(self, person_id: int) -> ScopedAddressSummary:
+        """Compte, par année et par structure, les publications avec adresse de la personne (`scoped_address_summary`)."""
+        return scoped_address_summary(self._conn, person_scope(person_id))
 
     def person_subjects(self, person_id: int, *, limit: int) -> list[SubjectFrequency]:
         """Renvoie les sujets des publications signées par la personne, les plus fréquents d'abord."""
