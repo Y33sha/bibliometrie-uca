@@ -178,10 +178,9 @@ class AddressesQueries:
         limit: int,
         *,
         person_id: int | None = None,
-        year: int | None = None,
         ranking: bool = False,
     ) -> list[AddressPublicationItem]:
-        """Renvoie les publications dont une contribution source porte l'adresse. `person_id` restreint aux contributions sources de la personne, `year` aux publications de l'année, `ranking` aux enregistrements sources des sources lues par les classements, sur les publications de la famille « publications »."""
+        """Renvoie les publications dont une contribution source porte l'adresse. `person_id` restreint aux contributions sources de la personne, `ranking` aux enregistrements sources des sources lues par les classements, sur les publications de la famille « publications »."""
         conditions = []
         if ranking:
             conditions.append(is_ranking_record("sr", "p"))
@@ -191,8 +190,6 @@ class AddressesQueries:
                 JOIN contributions g ON g.id = m.contribution_id
                 WHERE g.person_id = :person_id
             )""")
-        if year is not None:
-            conditions.append("p.publication_year = :year")
         extra_where = "".join(f" AND {c}" for c in conditions)
         rows = self._conn.execute(
             text(f"""
@@ -211,7 +208,7 @@ class AddressesQueries:
                 ORDER BY p.id, p.publication_year DESC
                 LIMIT :lim
             """),
-            {"id": addr_id, "lim": limit, "person_id": person_id, "year": year},
+            {"id": addr_id, "lim": limit, "person_id": person_id},
         ).all()
         return [
             AddressPublicationItem(

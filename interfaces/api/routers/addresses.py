@@ -144,16 +144,15 @@ def get_address_publications(
     addr_id: int,
     limit: int = Query(20, ge=1, le=500),
     person_id: int | None = Query(None),
-    year: int | None = Query(None),
     ranking: bool = Query(False),
     queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressPublicationsResponse:
-    """Renvoie un échantillon de publications liées à une adresse. `person_id` restreint aux contributions sources de la personne, `year` aux publications de l'année, `ranking` aux sources lues par les classements et à la famille « publications »."""
+    """Renvoie un échantillon de publications liées à une adresse. `person_id` restreint aux contributions sources de la personne, `ranking` aux sources lues par les classements et à la famille « publications »."""
     raw_text = queries.get_address_raw_text(addr_id)
     if raw_text is None:
         raise HTTPException(status_code=404, detail="Adresse introuvable")
     publications = queries.get_address_publications(
-        addr_id, limit, person_id=person_id, year=year, ranking=ranking
+        addr_id, limit, person_id=person_id, ranking=ranking
     )
     return AddressPublicationsResponse(
         address_id=addr_id, raw_text=raw_text, publications=publications

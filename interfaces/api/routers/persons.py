@@ -322,23 +322,21 @@ def person_theses(
 @router.get("/{person_id}/addresses", response_model=PersonAddressesResponse)
 def person_addresses(
     person_id: int,
-    year: int | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonAddressesResponse:
-    """Liste les adresses brutes des contributions sources de cette personne, issues des sources lues par les classements, sur les publications de la famille « publications », les plus fréquentes d'abord. `year` restreint aux publications de l'année."""
-    return queries.person_addresses(person_id, year=year, page=page, per_page=per_page)
+    """Liste les adresses brutes des contributions sources de cette personne, issues des sources lues par les classements, sur les publications de la famille « publications », les plus fréquentes d'abord."""
+    return queries.person_addresses(person_id, page=page, per_page=per_page)
 
 
 @router.get("/{person_id}/address-summary", response_model=PersonAddressSummary)
 def person_address_summary(
     person_id: int,
-    year: int | None = Query(None),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonAddressSummary:
-    """Compte les publications de cette personne de la famille « publications » avec une adresse brute dans une source lue par les classements, puis, par structure, celles dont une adresse brute est rattachée à la structure. `year` restreint aux publications de l'année."""
-    return queries.person_address_summary(person_id, year=year)
+    """Compte, par année, les publications de cette personne de la famille « publications » avec une adresse brute dans une source lue par les classements, puis, par structure, celles dont une adresse brute est rattachée à la structure."""
+    return queries.person_address_summary(person_id)
 
 
 @router.get("/{person_id}/subjects", response_model=list[SubjectFrequency])

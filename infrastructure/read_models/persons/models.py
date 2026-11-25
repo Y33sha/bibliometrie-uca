@@ -225,21 +225,24 @@ class PersonAddressesResponse(PaginatedResponse):
     addresses: list[PersonAddressOut]
 
 
-class PersonAddressStructureCount(PersonAddressStruct):
-    publications: int
-    """Nombre de publications de la personne dont une adresse est rattachée à la structure."""
+class PersonAddressYear(Model):
+    year: int
+    publications_with_address: int
+    """Nombre de publications de l'année dont une contribution source de la personne porte une adresse."""
+
+
+class PersonAddressStructureSeries(PersonAddressStruct):
+    publications: list[int]
+    """Nombre de publications dont une adresse est rattachée à la structure, pour chaque année de `PersonAddressSummary.years`, dans le même ordre."""
 
 
 class PersonAddressSummary(Model):
-    """Structures reconnues dans les adresses de la personne, comptées en publications."""
+    """Structures reconnues dans les adresses de la personne, comptées en publications par année."""
 
-    first_year_with_address: int | None
-    """Année de la plus ancienne publication de la personne dont une contribution source porte une adresse."""
-    last_year_with_address: int | None
-    """Année de la plus récente publication de la personne dont une contribution source porte une adresse."""
-    publications_with_address: int
-    """Nombre de publications de la personne dont une contribution source porte une adresse."""
-    structures: list[PersonAddressStructureCount]
+    years: list[PersonAddressYear]
+    """Années consécutives, de la plus ancienne à la plus récente publication avec adresse."""
+    structures: list[PersonAddressStructureSeries]
+    """Structures, de la plus fréquente à la moins fréquente sur toutes les années."""
 
 
 # ---------------------------------------------------------------------------

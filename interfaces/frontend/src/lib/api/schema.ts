@@ -539,7 +539,7 @@ export interface paths {
         };
         /**
          * Get Address Publications
-         * @description Renvoie un échantillon de publications liées à une adresse. `person_id` restreint aux contributions sources de la personne, `year` aux publications de l'année, `ranking` aux sources lues par les classements et à la famille « publications ».
+         * @description Renvoie un échantillon de publications liées à une adresse. `person_id` restreint aux contributions sources de la personne, `ranking` aux sources lues par les classements et à la famille « publications ».
          */
         get: operations["get_address_publications_api_addresses__addr_id__publications_get"];
         put?: never;
@@ -1391,7 +1391,7 @@ export interface paths {
         };
         /**
          * Person Addresses
-         * @description Liste les adresses brutes des contributions sources de cette personne, issues des sources lues par les classements, sur les publications de la famille « publications », les plus fréquentes d'abord. `year` restreint aux publications de l'année.
+         * @description Liste les adresses brutes des contributions sources de cette personne, issues des sources lues par les classements, sur les publications de la famille « publications », les plus fréquentes d'abord.
          */
         get: operations["person_addresses_api_persons__person_id__addresses_get"];
         put?: never;
@@ -1411,7 +1411,7 @@ export interface paths {
         };
         /**
          * Person Address Summary
-         * @description Compte les publications de cette personne de la famille « publications » avec une adresse brute dans une source lue par les classements, puis, par structure, celles dont une adresse brute est rattachée à la structure. `year` restreint aux publications de l'année.
+         * @description Compte, par année, les publications de cette personne de la famille « publications » avec une adresse brute dans une source lue par les classements, puis, par structure, celles dont une adresse brute est rattachée à la structure.
          */
         get: operations["person_address_summary_api_persons__person_id__address_summary_get"];
         put?: never;
@@ -4746,8 +4746,8 @@ export interface components {
             /** Name */
             name: string;
         };
-        /** PersonAddressStructureCount */
-        PersonAddressStructureCount: {
+        /** PersonAddressStructureSeries */
+        PersonAddressStructureSeries: {
             /** Id */
             id: number;
             /** Acronym */
@@ -4756,32 +4756,35 @@ export interface components {
             name: string;
             /**
              * Publications
-             * @description Nombre de publications de la personne dont une adresse est rattachée à la structure.
+             * @description Nombre de publications dont une adresse est rattachée à la structure, pour chaque année de `PersonAddressSummary.years`, dans le même ordre.
              */
-            publications: number;
+            publications: number[];
         };
         /**
          * PersonAddressSummary
-         * @description Structures reconnues dans les adresses de la personne, comptées en publications.
+         * @description Structures reconnues dans les adresses de la personne, comptées en publications par année.
          */
         PersonAddressSummary: {
             /**
-             * First Year With Address
-             * @description Année de la plus ancienne publication de la personne dont une contribution source porte une adresse.
+             * Years
+             * @description Années consécutives, de la plus ancienne à la plus récente publication avec adresse.
              */
-            first_year_with_address: number | null;
+            years: components["schemas"]["PersonAddressYear"][];
             /**
-             * Last Year With Address
-             * @description Année de la plus récente publication de la personne dont une contribution source porte une adresse.
+             * Structures
+             * @description Structures, de la plus fréquente à la moins fréquente sur toutes les années.
              */
-            last_year_with_address: number | null;
+            structures: components["schemas"]["PersonAddressStructureSeries"][];
+        };
+        /** PersonAddressYear */
+        PersonAddressYear: {
+            /** Year */
+            year: number;
             /**
              * Publications With Address
-             * @description Nombre de publications de la personne dont une contribution source porte une adresse.
+             * @description Nombre de publications de l'année dont une contribution source de la personne porte une adresse.
              */
             publications_with_address: number;
-            /** Structures */
-            structures: components["schemas"]["PersonAddressStructureCount"][];
         };
         /** PersonAddressesResponse */
         PersonAddressesResponse: {
@@ -7830,7 +7833,6 @@ export interface operations {
             query?: {
                 limit?: number;
                 person_id?: number | null;
-                year?: number | null;
                 ranking?: boolean;
             };
             header?: never;
@@ -9272,7 +9274,6 @@ export interface operations {
     person_addresses_api_persons__person_id__addresses_get: {
         parameters: {
             query?: {
-                year?: number | null;
                 page?: number;
                 per_page?: number;
             };
@@ -9306,9 +9307,7 @@ export interface operations {
     };
     person_address_summary_api_persons__person_id__address_summary_get: {
         parameters: {
-            query?: {
-                year?: number | null;
-            };
+            query?: never;
             header?: never;
             path: {
                 person_id: number;

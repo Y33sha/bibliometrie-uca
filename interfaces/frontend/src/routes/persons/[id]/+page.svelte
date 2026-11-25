@@ -22,8 +22,8 @@
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import AddressPublications from '#lib/components/AddressPublications.svelte';
 	import PublicationCountButton from '#lib/components/PublicationCountButton.svelte';
-	import BarChart, { barLabelSpace } from '#lib/components/charts/BarChart.svelte';
-	import YearSlider, { YEAR_TRACK_INSET } from '#lib/components/YearSlider.svelte';
+	import YearLineChart from '#lib/components/charts/YearLineChart.svelte';
+	import { chartColor } from '#lib/components/charts/palette.js';
 	import { confirmDialog } from '#lib/dialogs.svelte.js';
 	import TitleRow from '#lib/components/TitleRow.svelte';
 	import PersonCurationDrawer from '#lib/components/persons/PersonCurationDrawer.svelte';
@@ -68,54 +68,42 @@
 	let thesesStructures = $state<Record<string, ThesisStructInfo>>({});
 	let thesesLoaded = $state(false);
 
-	// Addresses tab : adresses et structures reconnues sur les publications d'une année.
-	const currentYear = new Date().getFullYear();
-	let addrYear = $state(currentYear);
+	// Addresses tab : adresses et structures reconnues sur les publications de toutes les années.
 	let addrSummary = $state<AddressSummary | null>(null);
-	const addrYearMin = $derived(Math.min(addrSummary?.first_year_with_address ?? currentYear, currentYear));
-	const addrYearMax = $derived(Math.min(addrSummary?.last_year_with_address ?? currentYear, currentYear));
 	const addresses = usePaginatedFetch<Address>({
 		endpoint: () => `/api/persons/${personId}/addresses`,
 		itemsKey: 'addresses',
 		apiKey: 'person-detail-addresses',
-		buildParams: () => new URLSearchParams({ year: String(addrYear) }),
+		buildParams: () => new URLSearchParams(),
 		pageParam: null,
 	});
-	// Publications avec adresse où figure chaque structure, et leur part.
-	const addrStructures = $derived(addrSummary?.structures ?? []);
-	const addrShare = (publications: number) => formatPercent(publications / (addrSummary?.publications_with_address || 1));
-	const publicationCount = (n: number) => formatCount(n, 'publication');
-	// Largeur réservée aux libellés des structures, à gauche de l'axe du graphique.
-	const ADDR_AXIS_WIDTH = 120;
-	// Place des pourcentages, à droite de l'axe du graphique.
-	const ADDR_LABEL_SPACE = barLabelSpace(true);
+	// Courbes des structures les plus fréquentes ; la palette garde une couleur distincte par courbe.
+	const ADDR_MAX_SERIES = 8;
+	const addrYears = $derived(addrSummary?.years ?? []);
+	const addrStructures = $derived((addrSummary?.structures ?? []).slice(0, ADDR_MAX_SERIES));
+	const addrHiddenStructures = $derived(Math.max((addrSummary?.structures.length ?? 0) - ADDR_MAX_SERIES, 0));
+	// Part des publications avec adresse de l'année où figure la structure ; aucune valeur pour une année sans publication avec adresse.
+	const addrSeries = $derived(
+		addrStructures.map((s, i) => ({
+			label: structureLabel(s),
+			color: chartColor(i),
+			values: s.publications.map((n, y) => {
+				const total = addrYears[y].publications_with_address;
+				return total ? n / total : null;
+			}),
+		}))
+	);
+	const addrDetail = (seriesIndex: number, yearIndex: number) =>
+		`${addrStructures[seriesIndex].publications[yearIndex]} sur ${formatCount(addrYears[yearIndex].publications_with_address, 'publication')}`;
 	let expandedAddrId = $state<number | null>(null);
 	let addrPublications = $state<AddressPublication[]>([]);
 	let addrPublicationsLoading = $state(false);
 
-	async function loadAddressSummary() {
-		addrSummary = await api<AddressSummary>(
-			`/api/persons/${personId}/address-summary?year=${addrYear}`,
-			{ key: 'person-detail-address-summary' }
-		);
-	}
-
-	function loadAddressTab() {
-		expandedAddrId = null;
-		addresses.page = 1;
-		loadAddressSummary();
-		addresses.load();
-	}
-
-	// Ouverture de l'onglet : bornes du curseur lues, puis année la plus récente du curseur.
 	async function openAddressTab() {
-		await loadAddressSummary();
-		if (addrYear === addrYearMax) {
-			addresses.load();
-			return;
-		}
-		addrYear = addrYearMax;
-		loadAddressTab();
+		addresses.load();
+		addrSummary = await api<AddressSummary>(`/api/persons/${personId}/address-summary`, {
+			key: 'person-detail-address-summary',
+		});
 	}
 
 	async function toggleAddressPublications(addrId: number) {
@@ -126,7 +114,7 @@
 		expandedAddrId = addrId;
 		addrPublications = [];
 		addrPublicationsLoading = true;
-		const params = new URLSearchParams({ person_id: String(personId), year: String(addrYear), ranking: 'true', limit: '500' });
+		const params = new URLSearchParams({ person_id: String(personId), ranking: 'true', limit: '500' });
 		const data = await api<AddressPublicationsResponse>(`/api/addresses/${addrId}/publications?${params}`, {
 			key: 'person-detail-address-publications',
 		});
@@ -306,30 +294,12 @@
 	{#if activeTab === 'addresses'}
 		<div class="tab-content">
 			<div class="addr-overview">
-				<h2>Structures reconnues dans les adresses</h2>
-				<div class="addr-year">
-					<div class="addr-year-label">Année <strong>{addrYear}</strong></div>
-					<YearSlider min={addrYearMin} max={addrYearMax} bind:value={addrYear} onchange={loadAddressTab} />
-				</div>
+				<h2>Part des publications avec adresse où figure chaque structure</h2>
 				{#if addrStructures.length}
-					<!-- Axe des valeurs aligné sur la piste du curseur ; libellés des structures et pourcentages en débord. -->
-					<div
-						style:margin-left="{YEAR_TRACK_INSET - ADDR_AXIS_WIDTH}px"
-						style:width="calc(100% + {ADDR_AXIS_WIDTH + ADDR_LABEL_SPACE - 2 * YEAR_TRACK_INSET}px)"
-					>
-						<BarChart
-							labels={addrStructures.map((s) => structureLabel(s))}
-							values={addrStructures.map((s) => s.publications)}
-							datasetLabel="Publications avec adresse"
-							barLabel={addrShare}
-							tooltipLabel={publicationCount}
-							max={addrSummary?.publications_with_address}
-							horizontal
-							prominentLabels
-							categoryAxisWidth={ADDR_AXIS_WIDTH}
-							height={32 * addrStructures.length + 40}
-						/>
-					</div>
+					<YearLineChart years={addrYears.map((y) => y.year)} series={addrSeries} format={formatPercent} detail={addrDetail} max={1} />
+					{#if addrHiddenStructures}
+						<p class="addr-counts">{formatCount(addrHiddenStructures, 'autre structure')} dans le tableau des adresses.</p>
+					{/if}
 				{:else if addrSummary}
 					<p class="addr-counts">Aucune structure reconnue.</p>
 				{/if}
@@ -407,18 +377,11 @@
 
 	/* Addresses tab */
 	.addr-overview {
-		width: 300px;
+		max-width: 720px;
 		margin: 0 auto 16px;
 	}
 	.addr-overview h2 { font-size: var(--fs-base); font-weight: 600; margin: 0 0 8px; }
-	.addr-year {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		margin-bottom: 20px;
-	}
-	.addr-year-label { font-size: var(--fs-md); }
-	.addr-counts { font-size: var(--fs-sm); color: var(--text-secondary); margin: 0; }
+	.addr-counts { font-size: var(--fs-sm); color: var(--text-secondary); margin: 4px 0 0; text-align: center; }
 	.addr-cell { font-size: var(--fs-sm); color: var(--muted); word-break: break-all; }
 	.addr-publications { padding: 0 12px 12px 24px; }
 </style>
