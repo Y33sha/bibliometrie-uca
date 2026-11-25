@@ -26,7 +26,7 @@ Chaque contribution source entrante retrouve en base la contribution source de m
 
 Une contribution source retrouvée avec d'autres informations du contributeur (identifiants ajoutés ou retirés par la source) les reçoit en place. Sa contribution est alors marquée pour la redécision de sa personne.
 
-Un enregistrement source garde ses contributions sources en l'état si la partie auteurs de son payload est inchangée depuis la dernière normalisation. L'option `--normalize-full` vide l'empreinte de cette partie pour tous les enregistrements sources des sources normalisées : leurs contributions sources se resynchronisent à leur prochaine normalisation.
+Un enregistrement source garde ses contributions sources en l'état si la partie auteurs de son payload est inchangée depuis la dernière normalisation. L'option `--resync-contributions` de la [réinjection](#archivage-du-payload-brut) vide l'empreinte de cette partie pour les enregistrements sources réinjectés : leurs contributions sources se resynchronisent à leur normalisation. Elle sert à appliquer une règle de normalisation des auteurs modifiée.
 
 ## Listes d'auteurs d'INSPIRE-HEP (`withhold_openalex_authors`)
 

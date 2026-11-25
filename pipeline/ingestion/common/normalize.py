@@ -36,7 +36,6 @@ from pipeline.ingestion.common.source_contribution_store import (
     SourceContributionStore,
     delete_orphan_addresses,
     delete_orphan_contributor_information,
-    mark_source_contributions_to_resync,
 )
 from pipeline.ingestion.common.source_records import (
     SourceRecordStore,
@@ -68,12 +67,9 @@ def build_normalizer(
 
 
 def _normalize(source: str) -> TaskRun:
-    """Renvoie l'exécution de la normalisation de `source`, avec sa ligne de la table d'observabilité. Avec `--normalize-full`, tous les enregistrements sources de la source sont d'abord marqués à resynchroniser."""
+    """Renvoie l'exécution de la normalisation de `source`, avec sa ligne de la table d'observabilité."""
 
     def run(ctx: PhaseContext) -> PhaseMetrics:
-        if ctx.options.normalize_full:
-            with ctx.open_tx() as conn:
-                mark_source_contributions_to_resync(conn, source)
         with ctx.open_tx() as conn:
             normalizer = build_normalizer(source, conn, ctx.logger, archive=ctx.options.raw_store)
             stats = normalizer.run()

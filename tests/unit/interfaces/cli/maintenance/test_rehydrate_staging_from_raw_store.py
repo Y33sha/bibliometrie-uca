@@ -87,6 +87,7 @@ def lancer(monkeypatch):
         conn = _FakeConnection()
         mises_a_jour: list[tuple[str, str]] = []
         creees: list[tuple[str, str, str | None]] = []
+        marquees: list[tuple[str, list[str]]] = []
 
         def _rehydrate(c, source, source_id, raw_data):
             mises_a_jour.append((source, source_id))
@@ -101,12 +102,19 @@ def lancer(monkeypatch):
         monkeypatch.setattr(module, "rehydrate_or_create_staging_row", _rehydrate_or_create)
         monkeypatch.setattr(
             module,
+            "mark_source_contributions_to_resync",
+            lambda c, source, source_ids: marquees.append((source, list(source_ids))) or 0,
+        )
+        monkeypatch.setattr(
+            module,
             "get_sync_engine",
             lambda: SimpleNamespace(connect=lambda: _contexte(conn)),
         )
         monkeypatch.setattr(sys, "argv", ["rehydrate", *arguments])
         main()
-        return SimpleNamespace(conn=conn, mises_a_jour=mises_a_jour, creees=creees)
+        return SimpleNamespace(
+            conn=conn, mises_a_jour=mises_a_jour, creees=creees, marquees=marquees
+        )
 
     return _lancer
 
@@ -122,6 +130,25 @@ def test_lignes_presentes_mises_a_jour(lancer):
     assert resultat.mises_a_jour == [("hal", "hal-1")]
     assert resultat.creees == []
     assert resultat.conn.commits == 1
+
+
+def test_resynchronisation_des_seuls_enregistrements_sources_rehydrates(lancer):
+    """Une clé sans ligne de `staging` reste hors de la resynchronisation."""
+    resultat = lancer(
+        {"hal": {"hal-1": {}, "hal-2": {}}},
+        "--sources",
+        "hal",
+        "--resync-contributions",
+        lignes_presentes={"hal-1"},
+    )
+
+    assert resultat.marquees == [("hal", ["hal-1"])]
+
+
+def test_sans_option_aucune_resynchronisation(lancer):
+    resultat = lancer({"hal": {"hal-1": {}}}, "--sources", "hal", lignes_presentes={"hal-1"})
+
+    assert resultat.marquees == []
 
 
 def test_cle_sans_ligne_ignoree(lancer):

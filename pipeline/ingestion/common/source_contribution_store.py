@@ -177,17 +177,20 @@ _WITHHOLD_SQL = text(
 """Suppression des contributions sources des enregistrements sources `:ids` (`SourceContributionStore.withhold_source_contributions`). Toutes les sous-requêtes lisent l'état antérieur à la suppression."""
 
 
-def mark_source_contributions_to_resync(conn: Connection, source: str) -> int:
-    """Vide l'empreinte du bloc auteurs des enregistrements sources de `source`. Renvoie le nombre d'enregistrements sources marqués.
+def mark_source_contributions_to_resync(
+    conn: Connection, source: str, source_ids: Sequence[str]
+) -> int:
+    """Vide l'empreinte du bloc auteurs des enregistrements sources `source_ids` de `source`. Renvoie le nombre d'enregistrements sources marqués.
 
     La prochaine normalisation de ces enregistrements sources synchronise leurs contributions sources.
     """
     return conn.execute(
         text("""
             UPDATE source_records SET authors_hash = NULL
-            WHERE source = :source AND authors_hash IS NOT NULL
+            WHERE source = :source AND source_id = ANY(:source_ids)
+              AND authors_hash IS NOT NULL
         """),
-        {"source": source},
+        {"source": source, "source_ids": list(source_ids)},
     ).rowcount
 
 

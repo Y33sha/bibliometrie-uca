@@ -123,13 +123,6 @@ _RUN_FLAGS = (
         "archivage des données brutes",
     ),
     _RunFlag(
-        "--normalize-full",
-        "À la phase normalize, marque tous les enregistrements sources des sources normalisées : "
-        "chacun resynchronise ses contributions sources à sa prochaine normalisation, même si son "
-        "bloc auteurs est inchangé. Sert à appliquer une règle de normalisation des auteurs modifiée.",
-        "contributions sources resynchronisées",
-    ),
-    _RunFlag(
         "--rebuild-publications",
         "À la phase publications, reconstruit toutes les publications, pour appliquer une "
         "évolution des règles de clés sur tout le stock.",

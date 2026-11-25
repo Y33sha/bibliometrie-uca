@@ -500,7 +500,7 @@ def test_enregistrement_source_marque_applique_une_regle_modifiee(sa_sync_conn):
     _sync(conn, source_record, ["Dupont, Jean"])
     source_contribution_id = _source_contributions(conn, source_record)[0][0]
 
-    assert mark_source_contributions_to_resync(conn, "crossref") == 1
+    assert mark_source_contributions_to_resync(conn, "crossref", ["10.9999/sync"]) == 1
     _sync(conn, source_record, ["Dupont, Jean"], _build_upper)
 
     assert _source_contributions(conn, source_record)[0] == (source_contribution_id, "DUPONT, JEAN")

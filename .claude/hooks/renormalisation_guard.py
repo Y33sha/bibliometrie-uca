@@ -19,8 +19,8 @@ CYCLE = """Rappel du cycle :
 - L'acquisition upsert les payloads des sources dans `staging`. Une ligne entre en file de normalisation (`queues.staging_normalization_queue`) seulement si son payload a changé (`raw_hash` distinct) et n'est pas tronqué, ou quand `fetch_truncated` la complète ou lève sa marque de troncature.
 - `normalize` traite seulement les lignes en file. `clear_payload` archive le payload dans le raw store, puis vide `raw_data`.
 - Une notice déjà normalisée ne repasse donc pas par `normalize` d'elle-même. Rejouer la normalisation d'un stock passe par `interfaces/cli/maintenance/rehydrate_staging_from_raw_store.py`.
-- `--normalize-full` ne remet aucune notice en file : il vide l'empreinte du bloc auteurs des notices des sources normalisées, qui resynchronisent leurs signatures à leur prochaine normalisation, même à bloc auteurs inchangé.
-- Rejouer la normalisation d'un stock est une opération lourde : réhydratation, normalisation avec `--normalize-full`, puis toutes les phases aval sur ce qui a changé (`author_grouping` compris). Elle prend des heures. La réserver aux cas où le gain est évident ; pour remettre le stock en conformité après un changement de normalize, préférer un script oneshot."""
+- L'option `--resync-contributions` de la réhydratation vide l'empreinte du bloc auteurs des notices réhydratées, qui resynchronisent leurs signatures à leur normalisation, même à bloc auteurs inchangé.
+- Rejouer la normalisation d'un stock est une opération lourde : réhydratation (avec `--resync-contributions` pour une règle des auteurs modifiée), normalisation, puis toutes les phases aval sur ce qui a changé (`author_grouping` compris). Elle prend des heures. La réserver aux cas où le gain est évident ; pour remettre le stock en conformité après un changement de normalize, préférer un script oneshot."""
 
 RAPPEL_REPONSE = f"""Ta réponse précédente emploie « renormaliser ». {CYCLE}
 
