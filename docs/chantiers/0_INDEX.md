@@ -5,7 +5,6 @@
 ### En cours
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
-- [Modèle open access des revues](DATA_modele-open-access-des-revues.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 - [Retrait de la source ScanR](DATA_source-scanr.md)
 
@@ -18,6 +17,7 @@
 
 ## Chantiers archivés
 
+- 2026-11-25 — [Modèle open access des revues](archived/2026-11-25_DATA_modele-open-access-des-revues.md)
 - 2026-11-25 — [Refactorisation : normalisation](archived/2026-11-25_CODE_refacto-normalisation.md)
 - 2026-11-24 — [Vérification des affiliations des sources](archived/2026-11-24_DATA_verification-affiliations.md)
 - 2026-11-24 — [Détection des fausses attributions](archived/2026-11-24_DATA_detection-fausses-attributions.md)

@@ -10,6 +10,8 @@ OpenAlex donne l'année de ce passage (`oa_flip_year`). Avant cette année, un a
 
 - Le modèle pris en compte est celui de l'année de parution (`domain/serials/oa_model_history.py`). L'année du passage vient d'OpenAlex, sinon du DOAJ. Une revue née en open access intégral d'après OpenAlex garde son modèle pour toutes ses publications. Sans année connue, le modèle est inconnu, donc `hybrid`.
 - Le modèle d'une revue vient d'OpenAlex au niveau de la revue (`openalex_is_oa`). Diamond vient du DOAJ et du Diamond Discovery Hub. Un modèle saisi à la main reste en l'état.
+- Unpaywall reste une source distincte. Son verdict rend ouvertes 207 publications du périmètre, et il couvre les publications sans work OpenAlex.
+- `green` prime sur `bronze` : une copie d'archive a une licence ou une autorisation de diffusion, une copie `bronze` n'en a pas.
 
 ## Phasage
 
@@ -24,7 +26,7 @@ OpenAlex donne l'année de ce passage (`oa_flip_year`). Avant cette année, un a
 
 ### Phase 3 — Apport d'Unpaywall
 
-- [ ] Mesurer ce que les verdicts d'Unpaywall ajoutent au statut open access des works d'OpenAlex. Décider si Unpaywall reste une source distincte.
+- [x] Mesurer ce que les verdicts d'Unpaywall ajoutent au statut open access des works d'OpenAlex. Décider si Unpaywall reste une source distincte.
 
 ## Questions ouvertes
 
