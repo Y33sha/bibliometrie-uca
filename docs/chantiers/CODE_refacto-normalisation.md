@@ -20,8 +20,8 @@ Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy
 
 ### Phase 2 — Documents écartés et erreurs
 
-- [ ] Un document écarté faute de métadonnées compte comme une erreur : « Crossref : 115 documents normalisés, 22 erreurs » désigne 22 suppléments (`.supp1`, `.g001`), écartés à raison. `process_work` renvoie un booléen à trois états (`True`, `False`, `None`). Une énumération de l'issue d'une ligne le remplace : normalisée, écartée, vide. `NormalizeStats` gagne un compteur des documents écartés, distinct des erreurs.
-- [ ] Le commit périodique se déclenche sur `processed + skipped`, sans les documents écartés. Le déclencheur devient la taille de `done_ids`. `DEFAULT_BATCH_SIZE`, redéfini par chaque source, devient `BATCH_SIZE`.
+- [x] Un document écarté faute de métadonnées compte comme une erreur : « Crossref : 115 documents normalisés, 22 erreurs » désigne 22 suppléments (`.supp1`, `.g001`), écartés à raison. `process_work` renvoie un booléen à trois états (`True`, `False`, `None`). Une énumération de l'issue d'une ligne le remplace : normalisée, écartée, vide. `NormalizeStats` gagne un compteur des documents écartés, distinct des erreurs.
+- [x] Le commit périodique se déclenche sur `processed + skipped`, sans les documents écartés. Le déclencheur devient la taille de `done_ids`. `DEFAULT_BATCH_SIZE`, redéfini par chaque source, devient `BATCH_SIZE`.
 
 ### Phase 3 — Patron `SourceNormalizer`
 
@@ -31,7 +31,7 @@ Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy
 ### Phase 4 — Docstrings
 
 - [ ] Docstring du module `normalize` : la phrase sur le TEI de HAL rejoint `pipeline/ingestion/hal/normalize.py`. La liste des tâches redit la déclaration de la phase, et la phrase sur le `VACUUM` redit `maintenance=`. Suppression des deux.
-- [ ] Les docstrings perdent leur connaissance de la CLI et de l'exécuteur : `--normalize-full` dans `_normalize`, « la ligne affiche « rien à faire » » dans `_report`, « ferme la section de normalisation » dans `_prune`. Celle de `_reject` dit « compté comme document incomplet », et le code le compte comme erreur : à aligner sur la phase 2.
+- [ ] La docstring de `_normalize` connaît la CLI (`--normalize-full`).
 - [ ] La phrase de l'étape `removals` nomme les documents disparus avant les enregistrements sources INSPIRE-HEP, dans l'ordre inverse des tâches.
 
 ## Questions ouvertes

@@ -7,6 +7,7 @@ from sqlalchemy import Connection, text
 
 from infrastructure.db.queues import Queue
 from pipeline.ingestion.common.normalize import build_normalizer
+from pipeline.ingestion.common.normalizer import RowOutcome
 from pipeline.ingestion.common.staging import StagingStore
 from tests.integration.helpers.queues import mark
 
@@ -92,6 +93,10 @@ def normalize_pending(conn: Connection, source: str) -> int:
     normalizer = build_normalizer(source, conn, logging.getLogger("test"), archive=False)
     store = StagingStore(conn)
     ids = store.snapshot_pending(source)
-    normalized = sum(1 for row in store.fetch_staging_by_ids(ids) if normalizer.process_work(row))
+    normalized = sum(
+        1
+        for row in store.fetch_staging_by_ids(ids)
+        if normalizer.process_work(row) is RowOutcome.NORMALIZED
+    )
     store.forget_normalized(ids)
     return normalized

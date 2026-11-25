@@ -9,6 +9,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, replace
+from enum import Enum, auto
 from typing import ClassVar
 
 from sqlalchemy import Connection
@@ -57,6 +58,16 @@ class PublisherFacts:
         object.__setattr__(self, "name", to_plain_text(self.name))
 
 
+class RowOutcome(Enum):
+    """Issue du traitement d'une ligne de `staging`."""
+
+    NORMALIZED = auto()
+    DISCARDED = auto()
+    """Document refusé : son enregistrement source est supprimé."""
+    EMPTY = auto()
+    """Ligne sans payload, sautée."""
+
+
 @dataclass(frozen=True, slots=True)
 class NormalizeStats:
     """Bilan d'une normalisation de source."""
@@ -66,8 +77,8 @@ class NormalizeStats:
     skipped: int
     """Lignes vides sautées."""
     errors: int
-    """Documents en erreur ou refusés."""
-    incomplete: tuple[str, ...] = ()
+    """Documents en erreur, laissés en file."""
+    discarded: tuple[str, ...] = ()
     """Identifiants natifs des documents refusés."""
     unknown_doc_types: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     """Identifiants natifs des documents normalisés au type absent de la table de la source, par type de la source."""
@@ -80,7 +91,8 @@ class SourceNormalizer(ABC):
     """
 
     SOURCE: ClassVar[str] = ""
-    DEFAULT_BATCH_SIZE: ClassVar[int] = 500
+    BATCH_SIZE: ClassVar[int] = 500
+    """Lignes traitées entre deux commits."""
     FETCH_SUB_BATCH: ClassVar[int] = 50
     """Lignes de `staging` chargées par sous-lot. En mémoire, un payload JSONB désérialisé occupe 3 à 5 fois sa taille brute."""
 
@@ -209,13 +221,13 @@ class SourceNormalizer(ABC):
             )
         self._staging.clear_payload(row)
 
-    def process_work(self, row: StagingRow) -> bool | None:
-        """Traite une ligne de `staging`. Renvoie vrai pour un document normalisé, `None` pour une ligne vide, sautée, et faux pour un document refusé.
+    def process_work(self, row: StagingRow) -> RowOutcome:
+        """Traite une ligne de `staging` et renvoie son issue.
 
         Un document sans titre, sans année, au titre trop long (`is_overlong_title`) ou refusé par la source ne fonde aucune publication (`_reject`).
         """
         if not row.raw_data:
-            return None
+            return RowOutcome.EMPTY
         doc = self.parse(row)
         if doc is None:
             return self._reject(row)
@@ -225,13 +237,13 @@ class SourceNormalizer(ABC):
         ):
             return self._reject(row)
         self.normalize_record(row, doc)
-        return True
+        return RowOutcome.NORMALIZED
 
-    def _reject(self, row: StagingRow) -> bool:
-        """Écarte un document refusé : son enregistrement source est supprimé, son payload vidé. Renvoie faux, compté comme document incomplet."""
+    def _reject(self, row: StagingRow) -> RowOutcome:
+        """Écarte un document refusé : son enregistrement source est supprimé, son payload vidé."""
         self._staging.discard_source_record(row.id)
         self._staging.clear_payload(row)
-        return False
+        return RowOutcome.DISCARDED
 
     def preload_caches(self) -> None:  # noqa: B027 (hook optionnel)
         """Charge les caches de la source, avant la boucle sur les lignes."""
@@ -245,13 +257,13 @@ class SourceNormalizer(ABC):
             batch_ids = work_ids[start : start + self.FETCH_SUB_BATCH]
             yield from self._staging.fetch_staging_by_ids(batch_ids)
 
-    def _process_one(self, row: StagingRow) -> bool | None:
+    def _process_one(self, row: StagingRow) -> RowOutcome:
         """Traite une ligne dans un SAVEPOINT : une ligne en erreur est annulée, et le lot en cours continue."""
         with savepoint(self.conn, on_rollback_failure=self.conn.rollback):
             return self.process_work(row)
 
     def run(self) -> NormalizeStats:
-        """Normalise les lignes en file, avec un commit tous les `DEFAULT_BATCH_SIZE` enregistrements, et renvoie le bilan.
+        """Normalise les lignes en file, avec un commit toutes les `BATCH_SIZE` lignes traitées, et renvoie le bilan.
 
         Chaque commit retire de la file les lignes traitées depuis le précédent. Une ligne en erreur reste en file pour le run suivant.
         """
@@ -270,8 +282,7 @@ class SourceNormalizer(ABC):
             processed = 0
             skipped = 0
             errors = 0
-            # Documents refusés par `process_work`.
-            incomplete: list[str] = []
+            discarded: list[str] = []
             # Lignes traitées depuis le dernier commit, à retirer de la file avec lui.
             done_ids: list[int] = []
 
@@ -291,16 +302,15 @@ class SourceNormalizer(ABC):
                         continue
 
                     done_ids.append(row.id)
-                    if result is True:
-                        processed += 1
-                    elif result is None:
-                        skipped += 1
-                    else:
-                        errors += 1
-                        incomplete.append(row.source_id)
+                    match result:
+                        case RowOutcome.NORMALIZED:
+                            processed += 1
+                        case RowOutcome.EMPTY:
+                            skipped += 1
+                        case RowOutcome.DISCARDED:
+                            discarded.append(row.source_id)
 
-                    done = processed + skipped
-                    if done > 0 and done % self.DEFAULT_BATCH_SIZE == 0:
+                    if len(done_ids) >= self.BATCH_SIZE:
                         commit()
 
             commit()
@@ -310,7 +320,7 @@ class SourceNormalizer(ABC):
                 processed,
                 skipped,
                 errors,
-                incomplete=tuple(incomplete),
+                discarded=tuple(discarded),
                 unknown_doc_types={
                     raw_type: tuple(ids)
                     for raw_type, ids in self._record_store.unknown_doc_types.items()

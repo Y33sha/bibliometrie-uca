@@ -203,7 +203,7 @@ def build_theses_author_records(block: AuthorBlock) -> list[AuthorRecord]:
 
 class ThesesNormalizer(SourceNormalizer):
     SOURCE = "theses"
-    DEFAULT_BATCH_SIZE = 100
+    BATCH_SIZE = 100
 
     def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
         return get_title(doc), get_publication_year(doc)

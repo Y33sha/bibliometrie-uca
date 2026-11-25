@@ -118,16 +118,16 @@ def test_le_recapitulatif_d_une_source_suit_sa_ligne_de_bilan(lancer, caplog):
         3,
         0,
         1,
-        incomplete=("hal-1",),
+        discarded=("hal-1",),
         unknown_doc_types={"study-registration": ("hal-2", "hal-3")},
     )
     with caplog.at_level(logging.INFO, logger="test"):
         lancer([], bilan=bilan, disparues=2, retraits=4)
     messages = [record.getMessage() for record in caplog.records]
-    debut = messages.index("  └─ HAL : 3 documents normalisés, 1 erreur")
+    debut = messages.index("  └─ HAL : 3 documents normalisés, 1 document écarté, 1 erreur")
     assert messages[debut : debut + 11] == [
-        "  └─ HAL : 3 documents normalisés, 1 erreur",
-        "     1 document aux métadonnées incomplètes ou non conformes",
+        "  └─ HAL : 3 documents normalisés, 1 document écarté, 1 erreur",
+        "     documents écartés aux métadonnées incomplètes ou non conformes",
         "     hal-1",
         "     2 documents de type inconnu « study-registration »",
         "     hal-2",
@@ -141,11 +141,12 @@ def test_le_recapitulatif_d_une_source_suit_sa_ligne_de_bilan(lancer, caplog):
 
 
 def test_la_table_porte_une_ligne_par_source(lancer):
-    metrics = lancer([], bilan=NormalizeStats(3, 1, 2))
+    metrics = lancer([], bilan=NormalizeStats(3, 1, 2, discarded=("hal-1",)))
     (ligne,) = metrics.details["table"]["rows"]
     assert {k: v for k, v in ligne.items() if k != "duration_s"} == {
         "key": "hal",
         "processed": 3,
         "skipped": 1,
+        "discarded": 1,
         "errors": 2,
     }

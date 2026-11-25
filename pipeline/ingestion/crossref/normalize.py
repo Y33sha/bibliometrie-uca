@@ -327,7 +327,7 @@ def crossref_source_record(
 
 class CrossrefNormalizer(SourceNormalizer):
     SOURCE = "crossref"
-    DEFAULT_BATCH_SIZE = 100
+    BATCH_SIZE = 100
 
     def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
         return get_title(doc), get_publication_year(doc)

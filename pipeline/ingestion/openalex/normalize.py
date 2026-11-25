@@ -433,7 +433,7 @@ def extract_openalex_author_block(work: Mapping[str, JsonValue]) -> AuthorBlock:
 
 class OpenalexNormalizer(SourceNormalizer):
     SOURCE = "openalex"
-    DEFAULT_BATCH_SIZE = 500
+    BATCH_SIZE = 500
 
     def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
         return get_title(doc), get_publication_year(doc)

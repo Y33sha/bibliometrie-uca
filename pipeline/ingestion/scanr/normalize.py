@@ -319,7 +319,7 @@ def extract_scanr_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:
 
 class ScanrNormalizer(SourceNormalizer):
     SOURCE = "scanr"
-    DEFAULT_BATCH_SIZE = 100
+    BATCH_SIZE = 100
 
     def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
         return get_title(doc), as_int(doc.get("year"))

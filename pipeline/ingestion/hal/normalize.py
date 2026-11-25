@@ -570,7 +570,7 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
 class HalNormalizer(SourceNormalizer):
     SOURCE = "hal"
-    DEFAULT_BATCH_SIZE = 500
+    BATCH_SIZE = 500
 
     def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
         return get_title(doc), as_int(doc.get("producedDateY_i"))

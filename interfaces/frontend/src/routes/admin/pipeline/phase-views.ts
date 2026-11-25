@@ -164,6 +164,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
         columns: [
           { key: "processed", label: "Traités" },
           { key: "skipped", label: "Ignorés" },
+          { key: "discarded", label: "Écartés" },
           { key: "errors", label: "Erreurs" },
           { key: "duration_s", label: "Durée", duration: true },
         ],

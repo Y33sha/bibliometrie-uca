@@ -82,6 +82,7 @@ def _normalize(source: str) -> TaskRun:
             "key": source,
             "processed": stats.processed,
             "skipped": stats.skipped,
+            "discarded": len(stats.discarded),
             "errors": stats.errors,
         }
         return metrics
@@ -90,23 +91,24 @@ def _normalize(source: str) -> TaskRun:
 
 
 def _report(stats: NormalizeStats) -> str | None:
-    """Renvoie la ligne de bilan d'une source : documents normalisés, erreurs. `None` sans document traité, et la ligne affiche « rien à faire »."""
+    """Renvoie la ligne de bilan d'une source : documents normalisés, documents écartés, erreurs. `None` sans document traité."""
     parts = []
     if stats.processed:
         parts.append(quantity(stats.processed, "document normalisé", "documents normalisés"))
+    if stats.discarded:
+        parts.append(quantity(len(stats.discarded), "document écarté", "documents écartés"))
     if stats.errors:
         parts.append(quantity(stats.errors, "erreur"))
     return ", ".join(parts) or None
 
 
 def _notes(stats: NormalizeStats) -> list[ReportNote]:
-    """Renvoie le récapitulatif d'une source : documents refusés, puis documents par type inconnu."""
+    """Renvoie le récapitulatif d'une source : documents écartés, puis documents par type inconnu."""
     notes = []
-    if stats.incomplete:
+    if stats.discarded:
         notes.append(
             ReportNote(
-                f"{quantity(len(stats.incomplete), 'document')} aux métadonnées incomplètes ou non conformes",
-                stats.incomplete,
+                "documents écartés aux métadonnées incomplètes ou non conformes", stats.discarded
             )
         )
     for raw_type, identifiers in sorted(stats.unknown_doc_types.items()):

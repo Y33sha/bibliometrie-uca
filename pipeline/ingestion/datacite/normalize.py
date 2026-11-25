@@ -253,7 +253,7 @@ def datacite_source_record(
 
 class DataciteNormalizer(SourceNormalizer):
     SOURCE = "datacite"
-    DEFAULT_BATCH_SIZE = 100
+    BATCH_SIZE = 100
 
     def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
         return get_title(doc), extract_datacite_publication_year(doc, max_year=today().year + 1)

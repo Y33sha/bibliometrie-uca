@@ -2,7 +2,7 @@
 
 Couvre la séquence d'écriture `normalize_record`, le tri de `process_work` sur les métadonnées minimales, et la méthode `run()` :
 - aucun document en attente ;
-- succès, documents ignorés et erreurs mêlés, commit par lot, bilan ;
+- documents normalisés, lignes vides et documents écartés mêlés, commit par lot, bilan ;
 - exception dans `process_work` (rollback au SAVEPOINT, document laissé en file) ;
 - `KeyboardInterrupt` (rollback du lot en cours, exception relevée) ;
 - exception fatale hors de la boucle (rollback, exception relevée) ;
@@ -24,6 +24,7 @@ from pipeline.ingestion.common import normalizer as normalizer_module
 from pipeline.ingestion.common.normalizer import (
     Document,
     PublisherFacts,
+    RowOutcome,
     SourceNormalizer,
 )
 from pipeline.ingestion.common.source_contributions import AuthorBlock, AuthorRecord
@@ -58,6 +59,9 @@ class _FakeStaging:
         return [r for r in self.pending_rows if r.id in ids_set]
 
 
+_NORMALIZED, _DISCARDED, _EMPTY = RowOutcome.NORMALIZED, RowOutcome.DISCARDED, RowOutcome.EMPTY
+
+
 class _StubNorm(SourceNormalizer):
     """Normaliseur dont l'analyse d'une ligne est sans objet pour le test."""
 
@@ -84,7 +88,7 @@ class _StubNorm(SourceNormalizer):
 class _Norm(_StubNorm):
     """Normaliseur instrumenté pour observer `run()`."""
 
-    DEFAULT_BATCH_SIZE = 2
+    BATCH_SIZE = 2
 
     def __init__(
         self,
@@ -100,15 +104,15 @@ class _Norm(_StubNorm):
         self.preload_called = False
         self.cleanup_called = False
 
-    def process_work(self, row: StagingRow) -> bool | None:
+    def process_work(self, row: StagingRow) -> RowOutcome:
         self.processed_rows.append(row)
         if row.source_id in self.raises_on:
             raise RuntimeError(f"boom on {row.source_id}")
-        # Renvoie le résultat de même position dans `results` (True, None ou False).
+        # Renvoie l'issue de même position dans `results`.
         idx = len(self.processed_rows) - 1
         if idx < len(self.results):
             return self.results[idx]
-        return True
+        return RowOutcome.NORMALIZED
 
     def preload_caches(self):
         self.preload_called = True
@@ -136,28 +140,36 @@ class TestRunHappyPath:
         assert [r.source_id for r in norm.processed_rows] == ["r1", "r2", "r3"]
         assert norm.cleanup_called is True
 
-    def test_mixes_success_skip_error(self):
-        """`True` → processed, `None` → skipped, `False` → errors."""
+    def test_chaque_issue_a_son_compteur(self):
+        """Un document écarté compte à part des erreurs."""
         staging = _FakeStaging()
-        staging.pending_rows = [_row("ok"), _row("skip"), _row("err")]
-        norm = _Norm(staging, results=[True, None, False])
+        staging.pending_rows = [_row("ok"), _row("vide"), _row("ecarte")]
+        norm = _Norm(staging, results=[_NORMALIZED, _EMPTY, _DISCARDED])
         stats = norm.run()
-        assert (stats.processed, stats.skipped, stats.errors) == (1, 1, 1)
+        assert (stats.processed, stats.skipped, stats.errors) == (1, 1, 0)
+        assert stats.discarded == ("ecarte",)
 
-    def test_le_bilan_porte_les_documents_refuses_et_les_types_inconnus(self):
+    def test_le_bilan_porte_les_types_inconnus(self):
         staging = _FakeStaging()
-        staging.pending_rows = [_row("ok"), _row("err")]
-        norm = _Norm(staging, results=[True, False])
+        staging.pending_rows = [_row("ok")]
+        norm = _Norm(staging)
         norm._record_store.unknown_doc_types = {"study-registration": ["ok"]}
         stats = norm.run()
-        assert stats.incomplete == ("err",)
         assert stats.unknown_doc_types == {"study-registration": ("ok",)}
 
-    def test_le_commit_tombe_a_chaque_lot(self):
-        """Avec DEFAULT_BATCH_SIZE=2 sur quatre documents : deux commits de lot, plus celui de fin."""
+    def test_les_documents_ecartes_comptent_dans_le_lot(self):
+        """Avec BATCH_SIZE=2, deux documents écartés suivis de deux normalisés : deux commits de lot, plus celui de fin."""
         staging = _FakeStaging()
         staging.pending_rows = [_row(s) for s in ("a", "b", "c", "d")]
-        norm = _Norm(staging, results=[True, True, True, True])
+        norm = _Norm(staging, results=[_DISCARDED, _DISCARDED, _NORMALIZED, _NORMALIZED])
+        norm.run()
+        assert norm.conn.commit.call_count == 3
+
+    def test_le_commit_tombe_a_chaque_lot(self):
+        """Avec BATCH_SIZE=2 sur quatre documents : deux commits de lot, plus celui de fin."""
+        staging = _FakeStaging()
+        staging.pending_rows = [_row(s) for s in ("a", "b", "c", "d")]
+        norm = _Norm(staging)
         norm.run()
         assert norm.conn.commit.call_count == 3
         assert staging.forgotten == [r.id for r in staging.pending_rows]
@@ -167,7 +179,7 @@ class TestRunWorkException:
     def test_savepoint_rollback_continues_batch(self):
         staging = _FakeStaging()
         staging.pending_rows = [_row("a"), _row("b")]
-        norm = _Norm(staging, results=[True, True], raises_on={"a"})
+        norm = _Norm(staging, raises_on={"a"})
         norm.run()
         # Le deuxième document est traité après le rollback du premier.
         assert "b" in [r.source_id for r in norm.processed_rows]
@@ -255,7 +267,7 @@ class TestProcessWorkMinimalMetadata:
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         row = StagingRow(id=1, source_id="a", doi=None, raw_data={})
-        assert norm.process_work(row) is None
+        assert norm.process_work(row) is _EMPTY
         staging.clear_payload.assert_not_called()
         staging.discard_source_record.assert_not_called()
 
@@ -264,7 +276,7 @@ class TestProcessWorkMinimalMetadata:
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         row = StagingRow(id=7, source_id="W3131333980", doi=None, raw_data={"title": "T"})
-        assert norm.process_work(row) is False
+        assert norm.process_work(row) is _DISCARDED
         staging.discard_source_record.assert_called_once_with(7)
         staging.clear_payload.assert_called_once_with(row)
         assert norm.normalized == []
@@ -275,7 +287,7 @@ class TestProcessWorkMinimalMetadata:
         norm = _MinimalNorm(staging)
         norm.parse = lambda row: None  # type: ignore[method-assign]
         row = StagingRow(id=3, source_id="c", doi=None, raw_data={"title": "T", "year": 2020})
-        assert norm.process_work(row) is False
+        assert norm.process_work(row) is _DISCARDED
         staging.discard_source_record.assert_called_once_with(3)
         staging.clear_payload.assert_called_once_with(row)
 
@@ -287,7 +299,7 @@ class TestProcessWorkMinimalMetadata:
         row = StagingRow(
             id=4, source_id="W7223893444", doi=None, raw_data={"title": title, "year": 2026}
         )
-        assert norm.process_work(row) is False
+        assert norm.process_work(row) is _DISCARDED
         staging.discard_source_record.assert_called_once_with(4)
         assert norm.normalized == []
 
@@ -295,7 +307,7 @@ class TestProcessWorkMinimalMetadata:
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         row = StagingRow(id=2, source_id="b", doi=None, raw_data={"title": "T", "year": 2020})
-        assert norm.process_work(row) is True
+        assert norm.process_work(row) is _NORMALIZED
         assert norm.normalized == [row]
         staging.discard_source_record.assert_not_called()
 

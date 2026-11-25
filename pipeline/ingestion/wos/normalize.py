@@ -503,7 +503,7 @@ def extract_wos_author_block(rec: Mapping[str, JsonValue]) -> AuthorBlock:
 
 class WosNormalizer(SourceNormalizer):
     SOURCE = "wos"
-    DEFAULT_BATCH_SIZE = 500
+    BATCH_SIZE = 500
 
     def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
         return as_str(doc.get("title")), as_int(doc.get("publication_year"))
