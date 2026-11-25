@@ -148,6 +148,20 @@ def test_un_embargo_sans_copie_ouverte():
     assert _status([], embargoed=True) == "embargoed"
 
 
+def test_sous_embargo_le_verdict_green_laisse_l_embargo():
+    """Unpaywall ignore l'embargo d'un dépôt HAL : son verdict `green` laisse la publication sous embargo."""
+    assert _status([], "green", embargoed=True) == "embargoed"
+
+
+def test_sous_embargo_une_copie_d_archive_ouverte_donne_green():
+    copy = _copy("https://iris.unitn.it/x", platform_type=PlatformType.REPOSITORY)
+    assert _status([copy], "green", embargoed=True) == "green"
+
+
+def test_sous_embargo_un_verdict_editeur_releve():
+    assert _status([], "bronze", embargoed=True) == "bronze"
+
+
 def test_une_copie_fermee_d_une_publication_sous_embargo():
     copy = _copy("https://hal.science/hal-01607327", is_oa=False)
     assert _status([copy]) == "closed"

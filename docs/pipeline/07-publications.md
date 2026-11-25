@@ -52,4 +52,4 @@ La consolidation calcule seule les métadonnées d'une publication, depuis ses e
 
 Le modèle de la revue est celui de l'année de parution. Une revue entièrement en open access ou diamant est sur abonnement avant l'année de son passage à l'open access intégral, donnée par OpenAlex, sinon par le DOAJ. Sans cette année, son modèle est inconnu, sauf pour une revue née en open access intégral d'après OpenAlex.
 
-Le verdict d'Unpaywall relève ces accès, sans les abaisser : `gold`, `hybrid` ou `diamond` vaut une copie ouverte chez l'éditeur sous licence, `bronze` sans licence, `green` une copie d'archive ouverte. Un brevet a le statut `unknown`.
+Le verdict d'Unpaywall relève ces accès, sans les abaisser : `gold`, `hybrid` ou `diamond` vaut une copie ouverte chez l'éditeur sous licence, `bronze` sans licence, `green` une copie d'archive ouverte. Sous embargo actif, un verdict `green` laisse la publication sous embargo : Unpaywall ignore l'embargo d'un dépôt HAL. Un brevet a le statut `unknown`.
