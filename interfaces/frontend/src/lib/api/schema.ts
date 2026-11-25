@@ -1585,7 +1585,7 @@ export interface paths {
          * Set Person Exclusion
          * @description Exclut une personne pour le motif donné, ou la retient avec `exclusion: null`.
          *
-         *     Renvoie 404 sur une personne introuvable (`set_exclusion`).
+         *     Renvoie 422 sur l'exclusion d'une personne qui a une fiche RH, 404 sur une personne introuvable (`set_exclusion`).
          */
         patch: operations["set_person_exclusion_api_persons__person_id__exclusion_patch"];
         trace?: never;
@@ -4745,7 +4745,7 @@ export interface components {
         };
         /**
          * PersonExclusion
-         * @description Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'interface publique et du périmètre. Ses formes de nom servent au matching.
+         * @description Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'interface publique et du périmètre. Ses formes de nom servent au matching. Une personne qui a une fiche RH est valide.
          * @enum {string}
          */
         PersonExclusion: "not_a_person" | "out_of_perimeter";

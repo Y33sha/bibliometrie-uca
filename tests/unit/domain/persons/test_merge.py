@@ -40,4 +40,13 @@ class TestMergeDirection:
     ],
 )
 def test_merged_exclusion_keeps_strongest(target, source, expected):
-    assert merged_exclusion(target, source) == expected
+    assert merged_exclusion(target, source, has_hr_record=False) == expected
+
+
+def test_merged_person_with_hr_record_is_valid():
+    assert (
+        merged_exclusion(
+            PersonExclusion.NOT_A_PERSON, PersonExclusion.OUT_OF_PERIMETER, has_hr_record=True
+        )
+        is None
+    )

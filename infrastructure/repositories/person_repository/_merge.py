@@ -85,7 +85,7 @@ def _merge_contributions(conn: Connection, target_id: int, source_id: int) -> No
 
 
 def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
-    """Pose sur la conservée la plus forte des deux exclusions (`merged_exclusion`)."""
+    """Pose sur la conservée l'exclusion de la personne fusionnée (`merged_exclusion`). La conservée porte la fiche RH de la fusion (`merge_direction`)."""
     rows: dict[int, str | None] = {
         r.id: r.exclusion
         for r in conn.execute(
@@ -94,7 +94,12 @@ def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
         )
     }
     target, source = (PersonExclusion(e) if e else None for e in (rows[target_id], rows[source_id]))
-    exclusion = merged_exclusion(target, source)
+    has_hr_record = bool(
+        conn.execute(
+            text("SELECT EXISTS (SELECT 1 FROM hr_records WHERE person_id = :t)"), {"t": target_id}
+        ).scalar()
+    )
+    exclusion = merged_exclusion(target, source, has_hr_record=has_hr_record)
     conn.execute(
         text("UPDATE persons SET exclusion = CAST(:e AS person_exclusion) WHERE id = :t"),
         {"e": exclusion.value if exclusion else None, "t": target_id},

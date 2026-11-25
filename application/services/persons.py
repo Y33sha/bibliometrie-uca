@@ -26,7 +26,7 @@ from domain.persons.identifiers import (
     normalized_identifier_value,
 )
 from domain.persons.merge import merge_direction
-from domain.persons.person import PersonExclusion
+from domain.persons.person import PersonExclusion, check_exclusion
 
 
 class DetachResult(TypedDict):
@@ -79,8 +79,11 @@ class PersonService:
     def set_exclusion(self, person_id: int, exclusion: PersonExclusion | None) -> None:
         """Exclut une personne pour le motif `exclusion`, ou retire l'exclusion avec `None`. Recalcule ensuite l'appartenance au périmètre de ses publications.
 
-        Lève `NotFoundError` si la personne est introuvable.
+        Raises:
+            ValidationError: exclusion d'une personne qui a une fiche RH.
+            NotFoundError: personne introuvable.
         """
+        check_exclusion(exclusion, has_hr_record=bool(self._persons.ids_with_rh([person_id])))
         self._persons.set_exclusion(person_id, exclusion)
         self._perimeter_recompute.refresh_publications_of_person(person_id)
         emit_event(

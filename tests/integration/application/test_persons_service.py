@@ -32,6 +32,7 @@ from tests.integration.helpers.contributions import (
     insert_contribution,
 )
 from tests.integration.helpers.persons import (
+    insert_hr_record,
     insert_person,
     insert_person_identifier,
     insert_person_name_form,
@@ -423,6 +424,13 @@ class TestSetExclusion:
         with pytest.raises(NotFoundError):
             service.set_exclusion(999999, PersonExclusion.NOT_A_PERSON)
 
+    def test_refuses_person_with_hr_record(self, sa_sync_conn, service):
+        p = _person(sa_sync_conn)
+        insert_hr_record(sa_sync_conn, p)
+        with pytest.raises(ValidationError):
+            service.set_exclusion(p, PersonExclusion.OUT_OF_PERIMETER)
+        assert self._exclusion(sa_sync_conn, p) is None
+
     def test_refreshes_in_perimeter_of_own_publications_only(self, sa_sync_conn, service):
         excluded = _person(sa_sync_conn, last_name="Exclue", first_name="Ée")
         other = _person(sa_sync_conn, last_name="Autre", first_name="Personne")
@@ -656,6 +664,18 @@ class TestMergePerson:
         assert (
             _scalar(sa_sync_conn, "SELECT exclusion FROM persons WHERE id = :p", p=target)
             == expected
+        )
+
+    def test_merged_person_with_hr_record_is_valid(self, sa_sync_conn, repo, service):
+        target = _person(sa_sync_conn)
+        source = _person(sa_sync_conn, last_name="Dupond")
+        repo.set_exclusion(source, PersonExclusion.NOT_A_PERSON)
+        insert_hr_record(sa_sync_conn, target)
+
+        service.merge_person(target, source)
+
+        assert (
+            _scalar(sa_sync_conn, "SELECT exclusion FROM persons WHERE id = :p", p=target) is None
         )
 
 
