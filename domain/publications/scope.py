@@ -57,6 +57,8 @@ _PARATEXT_TITLES = frozenset(
         "Acknowledgments",
         "Bibliographie",
         "Bibliographie sélective",
+        "Collaborateurs",
+        "Contributeurs",
         "Contributors",
         "Front Matter",
         "Frontmatter",

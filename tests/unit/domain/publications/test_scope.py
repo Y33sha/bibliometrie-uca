@@ -116,7 +116,7 @@ class TestIsMatchable:
             assert is_matchable(record._replace(withdrawn_duplicate_dois=frozenset({duplicate})))
 
     def test_paratext_title_is_excluded(self):
-        for title in ("List of Contributors", "README.txt", "Table des matières"):
+        for title in ("List of Contributors", "Collaborateurs", "README.txt", "Table des matières"):
             assert not is_matchable(_facts(title=normalized_title(title)))
 
     def test_authored_front_text_is_kept(self):
