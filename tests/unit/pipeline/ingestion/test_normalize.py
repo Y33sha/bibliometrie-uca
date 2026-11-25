@@ -23,7 +23,6 @@ from domain.serials.issns import SerialIssn
 from pipeline.ingestion.common import normalizer as normalizer_module
 from pipeline.ingestion.common.normalizer import (
     Document,
-    NormalizeStats,
     PublisherFacts,
     SourceNormalizer,
 )
@@ -143,7 +142,16 @@ class TestRunHappyPath:
         staging.pending_rows = [_row("ok"), _row("skip"), _row("err")]
         norm = _Norm(staging, results=[True, None, False])
         stats = norm.run()
-        assert stats == NormalizeStats(processed=1, skipped=1, errors=1)
+        assert (stats.processed, stats.skipped, stats.errors) == (1, 1, 1)
+
+    def test_le_bilan_porte_les_documents_refuses_et_les_types_inconnus(self):
+        staging = _FakeStaging()
+        staging.pending_rows = [_row("ok"), _row("err")]
+        norm = _Norm(staging, results=[True, False])
+        norm._record_store.unknown_doc_types = {"study-registration": ["ok"]}
+        stats = norm.run()
+        assert stats.incomplete == ("err",)
+        assert stats.unknown_doc_types == {"study-registration": ("ok",)}
 
     def test_le_commit_tombe_a_chaque_lot(self):
         """Avec DEFAULT_BATCH_SIZE=2 sur quatre documents : deux commits de lot, plus celui de fin."""

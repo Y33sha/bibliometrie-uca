@@ -45,12 +45,8 @@ from pipeline.ingestion.common.source_records import (
 from pipeline.ingestion.common.staging import StagingStore
 from pipeline.ingestion.common.subjects import SourceRecordSubjectStore
 from pipeline.runtime.context import PhaseContext
-from pipeline.runtime.observability.log_format import (
-    BRANCH,
-    LAST_BRANCH,
-    quantity,
-)
-from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.log_format import quantity
+from pipeline.runtime.observability.metrics import PhaseMetrics, ReportNote
 from pipeline.transformation.persons.arbitration import ARBITRATE_IDENTIFIERS
 
 
@@ -81,8 +77,7 @@ def _normalize(source: str) -> TaskRun:
         with ctx.open_tx() as conn:
             normalizer = build_normalizer(source, conn, ctx.logger, archive=ctx.options.raw_store)
             stats = normalizer.run()
-        metrics = PhaseMetrics()
-        metrics.report = _report(stats)
+        metrics = PhaseMetrics(report=_report(stats), notes=_notes(stats))
         metrics.details["row"] = {
             "key": source,
             "processed": stats.processed,
@@ -104,36 +99,54 @@ def _report(stats: NormalizeStats) -> str | None:
     return ", ".join(parts) or None
 
 
+def _notes(stats: NormalizeStats) -> list[ReportNote]:
+    """Renvoie le récapitulatif d'une source : documents refusés, puis documents par type inconnu."""
+    notes = []
+    if stats.incomplete:
+        notes.append(
+            ReportNote(
+                f"{quantity(len(stats.incomplete), 'document')} aux métadonnées incomplètes ou non conformes",
+                stats.incomplete,
+            )
+        )
+    for raw_type, identifiers in sorted(stats.unknown_doc_types.items()):
+        notes.append(
+            ReportNote(
+                f"{quantity(len(identifiers), 'document')} de type inconnu « {raw_type} »",
+                identifiers,
+            )
+        )
+    return notes
+
+
 def _withhold_authors(ctx: PhaseContext) -> PhaseMetrics:
     """Supprime les contributions sources des enregistrements sources OpenAlex du même document qu'un enregistrement source INSPIRE-HEP."""
     with ctx.open_tx() as conn:
         withheld = withhold_covered_source_contributions(conn, ctx.logger)
+    report = None
     if withheld:
-        ctx.logger.info(
-            "%s%s (listes d'auteurs d'INSPIRE-HEP)",
-            BRANCH,
+        report = (
             quantity(
                 withheld,
                 "contribution source OpenAlex supprimée",
                 "contributions sources OpenAlex supprimées",
-            ),
+            )
+            + " (listes d'auteurs d'INSPIRE-HEP)"
         )
-    return PhaseMetrics(extras={"withheld": withheld})
+    return PhaseMetrics(extras={"withheld": withheld}, report=report)
 
 
 def _prune(ctx: PhaseContext) -> PhaseMetrics:
-    """Supprime les enregistrements sources des documents disparus de leur source, et ferme la section de normalisation."""
+    """Supprime les enregistrements sources des documents disparus de leur source."""
     with ctx.open_tx() as conn:
         disappeared = delete_disappeared_source_records(conn)
+    report = "aucun document disparu de sa source"
     if disappeared:
-        ctx.logger.info(
-            "%s%s (disparus de leur source)",
-            LAST_BRANCH,
-            quantity(disappeared, "document supprimé", "documents supprimés"),
+        report = (
+            quantity(disappeared, "document supprimé", "documents supprimés")
+            + " (disparus de leur source)"
         )
-    else:
-        ctx.logger.info("%saucun document disparu de sa source", LAST_BRANCH)
-    return PhaseMetrics(extras={"disappeared": disappeared})
+    return PhaseMetrics(extras={"disappeared": disappeared}, report=report)
 
 
 def _cleanup(delete: Callable[[Connection], int], deleted_one: str, deleted_many: str) -> TaskRun:
@@ -288,6 +301,7 @@ _CHILDREN = (
                 run=_prune,
             ),
         ),
+        section="Contributions sources en double et documents disparus",
     ),
     Step(
         "cleanup",

@@ -50,6 +50,7 @@ class FakeSourceRecordStore:
 
     def __init__(self) -> None:
         self.upserted_documents: list[SourceRecordUpsert] = []
+        self.unknown_doc_types: dict[str, list[str]] = {}
 
     def upsert_source_record(self, row: SourceRecordUpsert) -> int:
         self.upserted_documents.append(row)

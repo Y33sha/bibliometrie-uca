@@ -1,6 +1,6 @@
 """Exécution des phases et de leurs tâches (`pipeline.graph`).
 
-Une tâche déclare sa fonction d'exécution et son affichage. L'exécuteur ouvre la section de la tâche, titre de son étape de premier niveau ou `Task.section`, puis l'exécute. Une tâche réseau passe par l'accès à sa source. L'exécuteur range ensuite la durée de la tâche dans le contexte, écrit sa ligne de bilan et lance sa maintenance.
+Une tâche déclare sa fonction d'exécution et son affichage. L'exécuteur ouvre la section de la tâche, titre de son étape de premier niveau ou `Task.section`, puis l'exécute. Une tâche réseau passe par l'accès à sa source. L'exécuteur range ensuite la durée de la tâche dans le contexte, écrit sa ligne de bilan suivie de ses notes (`PhaseMetrics.notes`) et lance sa maintenance.
 """
 
 from __future__ import annotations
@@ -16,11 +16,12 @@ from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
     BRANCH,
+    BRANCH_CONTINUATION,
     LAST_BRANCH,
     nothing_to_do,
     open_section,
 )
-from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.metrics import PhaseMetrics, ReportNote
 from pipeline.runtime.parallel import run_parallel
 
 
@@ -42,6 +43,7 @@ def execute_tasks(children: Sequence[Step | Task], ctx: PhaseContext) -> dict[st
             tree.write(
                 task,
                 None if silent else _report(task, metrics),
+                metrics.notes,
                 _maintain(task, ctx),
                 silent=silent,
             )
@@ -80,22 +82,34 @@ class _Tree:
         self,
         task: Task,
         report: str | None,
+        notes: Sequence[ReportNote],
         maintenance: Sequence[str],
         *,
         silent: bool,
     ) -> None:
-        """Écrit sous la section de la tâche sa ligne de bilan, s'il y en a une, et une ligne par opération de maintenance. Ferme la section après sa dernière tâche."""
+        """Écrit sous la section de la tâche sa ligne de bilan, s'il y en a une, suivie de ses notes, puis une ligne par opération de maintenance. Ferme la section après sa dernière tâche.
+
+        Le trait vertical de la branche longe les notes, sauf sous la dernière ligne de la section. Les notes restent visibles au terminal, même sous une ligne de bilan masquée : la barre d'avancement en tient lieu.
+        """
         section = self._sections[task.name]
         self._open(section)
         self._opened = section
         self._quiet = self._quiet and silent
         closing = self._closing.get(task.name, True)
-        lines = [*([report] if report is not None else []), *maintenance]
-        for rank, line in enumerate(lines):
+        lines: list[tuple[str, Sequence[ReportNote]]] = [
+            *([(report, notes)] if report is not None else []),
+            *((line, ()) for line in maintenance),
+        ]
+        for rank, (line, line_notes) in enumerate(lines):
             last = closing and rank == len(lines) - 1
             self._logger.info(
                 "%s%s", LAST_BRANCH if last else BRANCH, line, extra={"detail": section is None}
             )
+            margin = " " * len(LAST_BRANCH) if last else BRANCH_CONTINUATION
+            for note in line_notes:
+                self._logger.info("%s%s", margin, note.text)
+                for case in note.cases:
+                    self._logger.info("%s%s", margin, case, extra={"detail": True})
         if section is not None and closing and self._quiet:
             nothing_to_do(self._logger)
 

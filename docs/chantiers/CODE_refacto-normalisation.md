@@ -12,10 +12,10 @@ Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy
 
 ### Phase 1 — Journal
 
-- [ ] Le récapitulatif des documents écartés s'écrit pendant la normalisation, avant la ligne de bilan de sa source, écrite par l'exécuteur au retour de la tâche. Il s'affiche donc sous la source précédente : les 22 documents écartés de Crossref suivent « OPS : rien à faire ». Les identifiants remontent dans les métriques de la tâche, et l'exécuteur les écrit sous la ligne de bilan.
-- [ ] L'avertissement « Type de document inconnu » (`source_records._doc_type`) s'écrit une fois par document, hors de l'arbre, à chaque normalisation du même document. Les types inconnus se comptent par type et rejoignent le récapitulatif de la source : « 6 documents de type inconnu `study-registration` ».
-- [ ] Une exception sur un document s'écrit sans sa pile d'appels (`slog.error(f"Erreur sur …")`). Passage à `logger.exception`.
-- [ ] `_withhold_authors` et `_prune` dessinent eux-mêmes leur branche (`BRANCH`, `LAST_BRANCH`), et `_prune` se sait dernière ligne de la section. Les deux tâches passent par `metrics.report`, comme les suppressions de lignes orphelines.
+- [x] Le récapitulatif des documents écartés s'écrit pendant la normalisation, avant la ligne de bilan de sa source, écrite par l'exécuteur au retour de la tâche. Il s'affiche donc sous la source précédente : les 22 documents écartés de Crossref suivent « OPS : rien à faire ». Les identifiants remontent dans les métriques de la tâche, et l'exécuteur les écrit sous la ligne de bilan.
+- [x] L'avertissement « Type de document inconnu » (`source_records._doc_type`) s'écrit une fois par document, hors de l'arbre, à chaque normalisation du même document. Les types inconnus se comptent par type et rejoignent le récapitulatif de la source : « 6 documents de type inconnu `study-registration` ».
+- [x] Une exception sur un document s'écrit sans sa pile d'appels (`slog.error(f"Erreur sur …")`). Passage à `logger.exception`.
+- [x] `_withhold_authors` et `_prune` dessinent eux-mêmes leur branche (`BRANCH`, `LAST_BRANCH`), et `_prune` se sait dernière ligne de la section. Les deux tâches passent par `metrics.report`, comme les suppressions de lignes orphelines.
 
 ### Phase 2 — Documents écartés et erreurs
 

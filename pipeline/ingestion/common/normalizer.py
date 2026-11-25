@@ -8,8 +8,8 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, replace
-from typing import ClassVar, NamedTuple
+from dataclasses import dataclass, field, replace
+from typing import ClassVar
 
 from sqlalchemy import Connection
 
@@ -38,11 +38,7 @@ from pipeline.ingestion.common.source_contributions import (
 from pipeline.ingestion.common.source_records import SourceRecordStore, SourceRecordUpsert
 from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.ingestion.common.subjects import SourceRecordSubjectStore
-from pipeline.runtime.observability.log_format import (
-    BRANCH_CONTINUATION,
-    quantity,
-    source_branch,
-)
+from pipeline.runtime.observability.log_format import source_branch
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.progress import track_progress
 
@@ -61,7 +57,8 @@ class PublisherFacts:
         object.__setattr__(self, "name", to_plain_text(self.name))
 
 
-class NormalizeStats(NamedTuple):
+@dataclass(frozen=True, slots=True)
+class NormalizeStats:
     """Bilan d'une normalisation de source."""
 
     processed: int
@@ -70,6 +67,10 @@ class NormalizeStats(NamedTuple):
     """Lignes vides sautées."""
     errors: int
     """Documents en erreur ou refusés."""
+    incomplete: tuple[str, ...] = ()
+    """Identifiants natifs des documents refusés."""
+    unknown_doc_types: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    """Identifiants natifs des documents normalisés au type absent de la table de la source, par type de la source."""
 
 
 class SourceNormalizer(ABC):
@@ -249,21 +250,6 @@ class SourceNormalizer(ABC):
         with savepoint(self.conn, on_rollback_failure=self.conn.rollback):
             return self.process_work(row)
 
-    def _summarize_incomplete(self, identifiers: list[str]) -> None:
-        """Récapitule sous la barre de la source les documents laissés de côté.
-
-        Le trait vertical se prolonge d'une ligne à l'autre : le récapitulatif appartient à la branche de sa source. Ces lignes passent par le journal nu ; le préfixe de la source romprait l'alignement.
-        """
-        if not identifiers:
-            return
-        self.logger.info(
-            "%s%s aux métadonnées incomplètes ou non conformes",
-            BRANCH_CONTINUATION,
-            quantity(len(identifiers), "document"),
-        )
-        for identifier in identifiers:
-            self.logger.info("%s%s", BRANCH_CONTINUATION, identifier)
-
     def run(self) -> NormalizeStats:
         """Normalise les lignes en file, avec un commit tous les `DEFAULT_BATCH_SIZE` enregistrements, et renvoie le bilan.
 
@@ -284,7 +270,7 @@ class SourceNormalizer(ABC):
             processed = 0
             skipped = 0
             errors = 0
-            # Documents laissés de côté par `process_work` faute de métadonnées exploitables : récapitulés sous la barre en fin de boucle.
+            # Documents refusés par `process_work`.
             incomplete: list[str] = []
             # Lignes traitées depuis le dernier commit, à retirer de la file avec lui.
             done_ids: list[int] = []
@@ -299,8 +285,8 @@ class SourceNormalizer(ABC):
                     progress.advance()
                     try:
                         result = self._process_one(row)
-                    except Exception as e:
-                        slog.error(f"Erreur sur {row.source_id}: {e}")
+                    except Exception:
+                        slog.exception("Erreur sur %s", row.source_id)
                         errors += 1
                         continue
 
@@ -320,8 +306,16 @@ class SourceNormalizer(ABC):
             commit()
             self.cleanup()
 
-            self._summarize_incomplete(incomplete)
-            return NormalizeStats(processed, skipped, errors)
+            return NormalizeStats(
+                processed,
+                skipped,
+                errors,
+                incomplete=tuple(incomplete),
+                unknown_doc_types={
+                    raw_type: tuple(ids)
+                    for raw_type, ids in self._record_store.unknown_doc_types.items()
+                },
+            )
 
         except KeyboardInterrupt:
             # Ctrl+C interrompt souvent un `conn.execute()` : la transaction est alors avortée, et `commit()` lèverait `PendingRollbackError`.
