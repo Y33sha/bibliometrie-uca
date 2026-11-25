@@ -1,15 +1,6 @@
 """Phase `normalize` : normalisation de `staging` vers les enregistrements sources, les contributions sources et les adresses.
 
-Les enregistrements sources sont écrits sans publication. La phase `publications` les rattache à une publication. Pour HAL, les ORCID et IdRef sont lus dans le TEI.
-
-Tâches de la phase, dans l'ordre (`pipeline.graph`) :
-
-1. la normalisation de chaque source retenue, dans l'ordre de `SOURCE_PRIORITY` ;
-2. la suppression des contributions sources des enregistrements sources OpenAlex du même document qu'un enregistrement source INSPIRE-HEP (`domain.source_records.inspire_author_lists`) ;
-3. la suppression des enregistrements sources des documents disparus de leur source ;
-4. la suppression des informations du contributeur sans contribution source : la normalisation réassigne des contributions sources, et les étapes précédentes suppriment des contributions sources ;
-5. la suppression des adresses orphelines, pour la même raison. L'exécuteur lance ensuite le `VACUUM` de `staging`, vidé de ses payloads : `VACUUM FULL` en mode full, simple dans les autres modes ;
-6. l'arbitrage des identifiants de personne (`pipeline.transformation.persons.arbitration`).
+Les enregistrements sources sont écrits sans publication. La phase `publications` les rattache à une publication.
 """
 
 from __future__ import annotations
@@ -239,7 +230,7 @@ _CHILDREN = (
     ),
     Step(
         "removals",
-        "documents disparus, enregistrements sources INSPIRE-HEP → enregistrements sources disparus et contributions sources OpenAlex en double supprimés",
+        "enregistrements sources INSPIRE-HEP, documents disparus → contributions sources OpenAlex en double et enregistrements sources disparus supprimés",
         (
             Task(
                 "withhold_openalex_authors",
@@ -301,6 +292,7 @@ _CHILDREN = (
         ),
         section="Contributions sources en double et documents disparus",
     ),
+    # La normalisation réassigne des contributions sources, et l'étape `removals` en supprime : des informations du contributeur et des adresses perdent leur dernière contribution source.
     Step(
         "cleanup",
         "contributions sources → informations du contributeur et adresses sans contribution source supprimées",

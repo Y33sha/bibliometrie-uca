@@ -7,6 +7,7 @@ Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy
 ## Décisions
 
 - Périmètre de la fiche : phase `normalize` (`pipeline/ingestion/common/normalize.py`) et patron `SourceNormalizer` (`pipeline/ingestion/common/normalizer.py`). Les normaliseurs de chaque source respectent le patron et restent hors périmètre.
+- `--normalize-full` de `run_pipeline` devient l'option `--resync-contributions` de `rehydrate_staging_from_raw_store` : seule, elle était sans effet visible.
 - Le compteur des documents écartés de la phase 2 est stocké dans `pipeline_phase_executions` : une clé s'ajoute à la table de la phase, avec sa colonne dans l'administration.
 
 ## Phasage
@@ -30,11 +31,10 @@ Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy
 
 ### Phase 4 — Docstrings
 
-- [ ] Docstring du module `normalize` : la phrase sur le TEI de HAL rejoint `pipeline/ingestion/hal/normalize.py`. La liste des tâches redit la déclaration de la phase, et la phrase sur le `VACUUM` redit `maintenance=`. Suppression des deux.
-- [ ] La docstring de `_normalize` connaît la CLI (`--normalize-full`).
-- [ ] La phrase de l'étape `removals` nomme les documents disparus avant les enregistrements sources INSPIRE-HEP, dans l'ordre inverse des tâches.
+- [x] Docstring du module `normalize` : la phrase sur le TEI de HAL rejoint `pipeline/ingestion/hal/normalize.py`. La liste des tâches redit la déclaration de la phase, et la phrase sur le `VACUUM` redit `maintenance=`. Suppression des deux.
+- [x] La docstring de `_normalize` connaît la CLI (`--normalize-full`).
+- [x] La phrase de l'étape `removals` nomme les documents disparus avant les enregistrements sources INSPIRE-HEP, dans l'ordre inverse des tâches.
 
 ## Questions ouvertes
 
 - La clé `disappeared_pruned` de `assemble` n'a aucun lecteur.
-- `--normalize-full` vide l'empreinte du bloc auteurs. Un enregistrement source déjà normalisé repasse par `normalize` seulement si son payload revient dans `staging`, par `rehydrate_staging_from_raw_store` ou un changement chez la source. Seule, l'option ne produit rien de visible. La rattacher à la commande de réinjection supprimerait une option de `run_pipeline` et le piège.

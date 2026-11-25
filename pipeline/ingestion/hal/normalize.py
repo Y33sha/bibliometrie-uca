@@ -1,4 +1,7 @@
-"""Normalisation des enregistrements sources HAL."""
+"""Normalisation des enregistrements sources HAL.
+
+Le TEI joint au dépôt (`label_xml`) donne les ISBN, le diplôme d'un mémoire DUMAS, l'embargo et les mots-clés. Il donne aussi, pour chaque auteur, son nom, ses identifiants (ORCID, IdRef, idHAL), ses ROR et ses structures.
+"""
 
 from collections.abc import Mapping
 from datetime import date
