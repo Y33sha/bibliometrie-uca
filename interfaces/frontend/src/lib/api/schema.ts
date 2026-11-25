@@ -539,7 +539,7 @@ export interface paths {
         };
         /**
          * Get Address Publications
-         * @description Renvoie un échantillon de publications liées à une adresse. `person_id` restreint aux contributions sources de la personne, `year` aux publications de l'année.
+         * @description Renvoie un échantillon de publications liées à une adresse. `person_id` restreint aux contributions sources de la personne, `year` aux publications de l'année, `ranking` aux sources lues par les classements et à la famille « publications ».
          */
         get: operations["get_address_publications_api_addresses__addr_id__publications_get"];
         put?: never;
@@ -1391,7 +1391,7 @@ export interface paths {
         };
         /**
          * Person Addresses
-         * @description Liste les adresses brutes des contributions sources de cette personne, les plus fréquentes d'abord. `year` restreint aux publications de l'année.
+         * @description Liste les adresses brutes des contributions sources de cette personne, issues des sources lues par les classements, sur les publications de la famille « publications », les plus fréquentes d'abord. `year` restreint aux publications de l'année.
          */
         get: operations["person_addresses_api_persons__person_id__addresses_get"];
         put?: never;
@@ -1411,7 +1411,7 @@ export interface paths {
         };
         /**
          * Person Address Summary
-         * @description Compte les publications de cette personne, puis, par structure, celles dont une adresse brute est rattachée à la structure. `year` restreint aux publications de l'année.
+         * @description Compte les publications de cette personne de la famille « publications » avec une adresse brute dans une source lue par les classements, puis, par structure, celles dont une adresse brute est rattachée à la structure. `year` restreint aux publications de l'année.
          */
         get: operations["person_address_summary_api_persons__person_id__address_summary_get"];
         put?: never;
@@ -7831,6 +7831,7 @@ export interface operations {
                 limit?: number;
                 person_id?: number | null;
                 year?: number | null;
+                ranking?: boolean;
             };
             header?: never;
             path: {

@@ -12,6 +12,8 @@ Le bouton « Qualité de la détection » liste les rattachements créés ou rej
 
 En session d'administration, la fiche d'une personne et celle d'une structure ont un onglet Adresses. Il montre les seules [adresses brutes](../../glossaire.md#adresse-brute). La phase [`affiliations`](../../pipeline/04-affiliations.md) en écarte les libellés HAL et les noms seuls.
 
+L'onglet de la personne mesure le rattachement de ses publications dans les bases lues par les classements internationaux : WoS et OpenAlex. Il retient seulement les adresses de ces deux sources, sur les articles, les reviews, les communications, les ouvrages et les chapitres. Par structure, il compte les publications dont une adresse est rattachée à la structure.
+
 ## Pays des adresses `/admin/countries`
 
 Correction des pays des adresses. Une correction se propage aux publications, sans relancer le pipeline.

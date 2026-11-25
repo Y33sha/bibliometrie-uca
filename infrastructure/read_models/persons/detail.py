@@ -25,7 +25,13 @@ from infrastructure.read_models.persons.models import (
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
 from infrastructure.read_models.subjects.queries import entity_subjects
-from infrastructure.sql_fragments import has_author_role, in_clause, is_laboratory, is_raw_address
+from infrastructure.sql_fragments import (
+    has_author_role,
+    in_clause,
+    is_laboratory,
+    is_ranking_record,
+    is_raw_address,
+)
 
 _THESIS_ROLES = (
     ContributionRole.THESIS_DIRECTOR,
@@ -42,18 +48,20 @@ _THESIS_ROLE_LABELS = {
 
 
 def _person_address_publications_cte(year: int | None) -> str:
-    """Renvoie les CTE `person_address_publications_all_years` : triplets (publication, adresse brute, année) des contributions sources des contributions de la personne `:pid` ; et `person_address_publications` : couples (publication, adresse brute) restreints aux publications de l'année `:year` si `year` est donnée."""
+    """Renvoie les CTE `person_address_publications_all_years` : triplets (publication, adresse brute, année) des contributions sources des contributions de la personne `:pid`, issues des sources lues par les classements, sur les publications de la famille « publications » ; et `person_address_publications` : couples (publication, adresse brute) restreints aux publications de l'année `:year` si `year` est donnée."""
     year_filter = "WHERE publication_year = :year" if year is not None else ""
     return f"""
         WITH person_address_publications_all_years AS (
             SELECT DISTINCT g.publication_id, sca.address_id, p.publication_year
             FROM contributions g
             JOIN aligned_source_contributions m ON m.contribution_id = g.id
+            JOIN source_contributions sc ON sc.id = m.source_contribution_id
+            JOIN source_records sr ON sr.id = sc.source_record_id
             JOIN source_contribution_addresses sca
               ON sca.source_contribution_id = m.source_contribution_id
             JOIN addresses a ON a.id = sca.address_id
             JOIN publications p ON p.id = g.publication_id
-            WHERE g.person_id = :pid AND {is_raw_address("a")}
+            WHERE g.person_id = :pid AND {is_raw_address("a")} AND {is_ranking_record("sr", "p")}
         ),
         person_address_publications AS (
             SELECT publication_id, address_id

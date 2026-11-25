@@ -21,7 +21,7 @@ from tests.integration.helpers.structures import insert_structure
 _in_perimeter_contribution = partial(insert_contribution, in_perimeter=True)
 
 
-def _source_contribution(conn, publication_id, *, source="hal", roles=None):
+def _source_contribution(conn, publication_id, *, source="openalex", roles=None):
     """Insère une contribution source sur un enregistrement source de la publication, d'identifiant source unique."""
     source_record_id = insert_source_record(
         conn, publication_id, source=source, source_id=f"detail-{publication_id}-{source}"
@@ -156,6 +156,31 @@ class TestMemberReads:
 
         assert [address.id for address in response.addresses] == [raw_address]
         assert summary.publications_with_address == 1
+
+    def test_addresses_from_ranking_sources_on_publications_only(self, sa_sync_conn):
+        """Les adresses d'un enregistrement HAL et celles d'un jeu de données sont absentes des adresses, du compte des publications avec adresse et des publications de l'adresse."""
+        person = insert_person(sa_sync_conn, "Adressee")
+        shared = insert_address(sa_sync_conn, "Institut Pascal, Aubière, France")
+        kept = None
+        for doc_type, source in (("article", "wos"), ("article", "hal"), ("dataset", "openalex")):
+            publication = insert_publication(sa_sync_conn, doc_type=doc_type)
+            insert_contribution(sa_sync_conn, publication, person_id=person, roles=["author"])
+            member = _source_contribution(sa_sync_conn, publication, source=source)
+            _join_contribution(sa_sync_conn, member, publication_id=publication, person_id=person)
+            insert_source_contribution_address(sa_sync_conn, member[0], address_id=shared)
+            if source == "wos":
+                kept = publication
+        queries = PersonsQueries(sa_sync_conn)
+
+        response = queries.person_addresses(person, year=None, page=1, per_page=50)
+        summary = queries.person_address_summary(person, year=None)
+        items = AddressesQueries(sa_sync_conn).get_address_publications(
+            shared, 20, person_id=person, ranking=True
+        )
+
+        assert [(a.id, a.publication_count) for a in response.addresses] == [(shared, 1)]
+        assert summary.publications_with_address == 1
+        assert [p.id for p in items] == [kept]
 
 
 class TestAddressesByYear:

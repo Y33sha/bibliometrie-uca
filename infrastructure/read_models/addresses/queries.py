@@ -21,7 +21,7 @@ from infrastructure.read_models.addresses.models import (
     StructureLinkState,
 )
 from infrastructure.read_models.sql_fragments import contributor_display_name
-from infrastructure.sql_fragments import address_country_conditions
+from infrastructure.sql_fragments import address_country_conditions, is_ranking_record
 
 _RECOGNIZED_LINK = (
     "((asx.matched_form_id IS NOT NULL AND asx.is_confirmed IS NULL) OR asx.is_confirmed = TRUE)"
@@ -173,10 +173,18 @@ class AddressesQueries:
         return row.raw_text if row else None
 
     def get_address_publications(
-        self, addr_id: int, limit: int, *, person_id: int | None = None, year: int | None = None
+        self,
+        addr_id: int,
+        limit: int,
+        *,
+        person_id: int | None = None,
+        year: int | None = None,
+        ranking: bool = False,
     ) -> list[AddressPublicationItem]:
-        """Renvoie les publications dont une contribution source porte l'adresse. `person_id` restreint aux contributions sources de la personne, `year` aux publications de l'année."""
+        """Renvoie les publications dont une contribution source porte l'adresse. `person_id` restreint aux contributions sources de la personne, `year` aux publications de l'année, `ranking` aux enregistrements sources des sources lues par les classements, sur les publications de la famille « publications »."""
         conditions = []
+        if ranking:
+            conditions.append(is_ranking_record("sr", "p"))
         if person_id is not None:
             conditions.append("""sca.source_contribution_id IN (
                 SELECT m.source_contribution_id FROM aligned_source_contributions m

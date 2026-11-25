@@ -126,7 +126,7 @@
 		expandedAddrId = addrId;
 		addrPublications = [];
 		addrPublicationsLoading = true;
-		const params = new URLSearchParams({ person_id: String(personId), year: String(addrYear), limit: '500' });
+		const params = new URLSearchParams({ person_id: String(personId), year: String(addrYear), ranking: 'true', limit: '500' });
 		const data = await api<AddressPublicationsResponse>(`/api/addresses/${addrId}/publications?${params}`, {
 			key: 'person-detail-address-publications',
 		});
