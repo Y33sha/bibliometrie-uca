@@ -51,7 +51,7 @@ Mesure exploratoire du 2026-11-24 (`data/experiments/fausses-attributions/embedd
 
 ### Phase 1 — Jeu de paires et indices
 
-Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py`, `indices.py`), hors pipeline. Jeu du 2026-11-24 : 29 455 paires de 1 101 personnes, 28 188 positives, 1 267 négatives (rejets 861, homonymes par le nom 283, autres candidates d'une forme ambiguë 126, verdicts 14). Les personnes sont celles du jeu des embeddings.
+Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py`, `indices.py`), hors pipeline. Les personnes sont celles du jeu des embeddings. Les contributions aux seuls rôles de jury de thèse sont écartées, du jeu comme des profils. Jeu du 2026-11-25 : 29 433 paires avec indices, de 1 099 personnes, dont 1 263 négatives. Négatives avant le calcul des indices : rejets 857, homonymes par le nom 283, autres candidates d'une forme ambiguë 126, verdicts 14.
 
 - [x] Embeddings des publications, modèle `paraphrase-multilingual-MiniLM-L12-v2`.
 - [x] Positifs : épinglages, confirmations, verdicts « de la personne ». S'y ajoutent les contributions rattachées par un identifiant donné par au moins deux sources, ou par un ORCID de Crossref, DataCite, INSPIRE-HEP ou du `raw_orcid` d'OpenAlex. HAL et ScanR seuls sont exclus : l'ORCID de ScanR seul est faux une fois sur deux.
@@ -63,18 +63,31 @@ Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py
 
 ### Phase 2 — Régression logistique
 
-- [x] Entraînement et évaluation en cinq plis groupés par personne (`modele_logistique.py`), le 2026-11-24.
-  - Détection : AUC de 0,992, aire sous la courbe précision-rappel des négatifs de 0,89. Les 100 paires les moins bien notées sont toutes négatives.
-  - Tranche difficile, publications de 100 contributions au plus, hors des 6 personnes à plus de 50 négatifs (21 125 paires, 214 négatives) : AUC de 0,991, aire de 0,82, 95 négatives parmi les 100 paires les moins bien notées. Au seuil qui signale 1 % des positives, 188 négatives sur 214 sont signalées : rejets 77 sur 85, homonymes par le nom 65 sur 66, verdicts 11 sur 12, autres candidates 35 sur 51.
-  - Résolution, sur 349 contributions disputées entre la personne juste et au moins une autre candidate : le modèle désigne la personne juste dans 346 cas. La cascade de départage rejouée sur les indices décide 338 cas, dont 336 justes.
-  - Le nombre de contributions de la publication a un coefficient de −2,8 : les rejets viennent souvent des grandes collaborations. Les positifs, rattachés par identifiant, en comptent moins.
-- [x] Ablation par famille d'indices : sans le contenu (embeddings, thèmes, sous-champs), l'aire tombe de 0,89 à 0,74 ; sans le réseau, à 0,83 ; sans le contexte, elle reste à 0,90. Seuls, la similarité d'embeddings donne une AUC de 0,986, les coauteurs pondérés 0,854.
-- [ ] Évaluation sur des positifs rattachés par le nom ou par IdRef, plus proches des contributions à juger que les positifs rattachés par ORCID.
+- [x] Entraînement et évaluation en cinq plis groupés par personne (`modele_logistique.py`), le 2026-11-25.
+  - Détection : AUC de 0,992, aire sous la courbe précision-rappel des négatifs de 0,91. Les 100 paires les moins bien notées sont toutes négatives.
+  - Tranche difficile, publications de 100 contributions au plus, hors des 6 personnes à plus de 50 négatifs (21 105 paires, 212 négatives) : AUC de 0,991, aire de 0,82, 95 négatives parmi les 100 paires les moins bien notées. Au seuil qui signale 1 % des positives, 189 négatives sur 212 sont signalées : rejets 75 sur 83, homonymes par le nom 66 sur 66, verdicts 11 sur 12, autres candidates 37 sur 51.
+  - Résolution, sur 349 contributions disputées entre la personne juste et au moins une autre candidate : le modèle désigne la personne juste dans 348 cas. La cascade de départage rejouée sur les indices décide 338 cas, dont 336 justes.
+  - Le nombre de contributions de la publication a un coefficient de −2,6 : les rejets viennent souvent des grandes collaborations. Les positifs, rattachés par identifiant, en comptent moins.
+- [x] Ablation par famille d'indices : sans le contenu (embeddings, thèmes, sous-champs), l'aire tombe de 0,91 à 0,73 ; sans le réseau, à 0,86 ; sans le contexte, elle reste à 0,90. Seuls, la similarité d'embeddings donne une AUC de 0,988, les coauteurs pondérés 0,853.
+- [x] Évaluation hors entraînement (`echantillon_phase2.py`, `analyse_phase2.py`), le 2026-11-25. 33 647 contributions rattachées des personnes du jeu, hors des paires d'entraînement, notées par le modèle entraîné sur tout le jeu. Verdicts de l'administration sur 60 d'entre elles, présentées sans note dans un ordre mélangé (`verdicts_phase2/`).
+
+  | Strate | Homonymes | De la personne | Incertaines |
+  |---|---|---|---|
+  | 30 contributions les moins bien notées | 12 | 14 | 4 |
+  | 30 contributions tirées au hasard | 0 | 30 | 0 |
+
+  - Précision des alertes : 12 sur 26 tranchées. AUC de 0,87 sur les 56 contributions tranchées.
+  - Les 30 contributions basses ont une note de 0,001 au plus : les probabilités ne sont pas calibrées pour le stock.
+  - 11 des 18 contributions basses rattachées par le nom sont de la personne : publications éloignées de ses autres publications, sans coauteur partagé. Les positifs d'entraînement, rattachés par ORCID, comptent peu de cas de ce genre.
+  - Le modèle sans le nombre de contributions de la publication donne une AUC de 0,85.
+- [ ] Verdicts versés à l'entraînement, avec les 76 verdicts des alertes par embeddings.
+- [ ] Indices supplémentaires : coauteur à fiche RH dans la publication, adresse rattachée à une structure RH de la personne.
+- [ ] Calibration sur les verdicts.
+- [ ] Nouveau tirage des 30 contributions les moins bien notées, jugé à l'aveugle.
 
 ### Phase 3 — Arbres de gradient
 
 - [ ] Arbres de gradient (`HistGradientBoosting`), comparés à la régression logistique.
-- [ ] Calibration des probabilités.
 
 ### Phase 4 — Apprentissage actif
 
