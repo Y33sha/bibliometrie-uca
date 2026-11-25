@@ -1,11 +1,10 @@
 """Tests de l'enchaînement de la phase `publishing`, exécutée tâche par tâche dans l'ordre du graphe."""
 
-import dataclasses
-
 from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
 from pipeline.transformation.publishing import publishing
+from tests.helpers.phase_tree import with_runs
 
 _PHASE = next(phase for phase in PHASES if phase.name == "publishing")
 _CHAMPS = tuple(task.name for task in _PHASE.tasks)
@@ -28,9 +27,8 @@ def _run(
 
         return run
 
-    tasks = tuple(dataclasses.replace(task, run=runner(task.name)) for task in _PHASE.tasks)
     return run_phase(
-        dataclasses.replace(_PHASE, children=tasks),
+        with_runs(_PHASE, {champ: runner(champ) for champ in _CHAMPS}),
         contexte(credentials_missing=lambda _source: credentials_missing),
     )
 

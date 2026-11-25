@@ -4,6 +4,7 @@ Le retrait des contributions sources OpenAlex au profit d'INSPIRE-HEP, puis celu
 """
 
 import dataclasses
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -14,6 +15,7 @@ from pipeline.ingestion.common.normalizer import NormalizeStats
 from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
+from tests.helpers.phase_tree import with_runs
 
 _NORMALIZE = next(phase for phase in PHASES if phase.name == "normalize")
 
@@ -26,6 +28,7 @@ def lancer(contexte, monkeypatch):
         appels: list[str],
         *,
         disparues: int = 0,
+        retraits: int = 0,
         bilan: NormalizeStats = NormalizeStats(3, 0, 0),
         **options,
     ):
@@ -37,7 +40,7 @@ def lancer(contexte, monkeypatch):
 
         monkeypatch.setattr(normalize, "build_normalizer", normaliseur)
         monkeypatch.setattr(
-            normalize, "withhold_covered_source_contributions", appel("withhold", 0)
+            normalize, "withhold_covered_source_contributions", appel("withhold", retraits)
         )
         monkeypatch.setattr(
             normalize, "delete_disappeared_source_records", appel("prune", disparues)
@@ -47,12 +50,7 @@ def lancer(contexte, monkeypatch):
             "cleanup_orphan_addresses": appel("cleanup_addresses", PhaseMetrics()),
             "arbitrate_identifiers": appel("arbitrate", PhaseMetrics(extras={"neutralized": 2})),
         }
-        phase = dataclasses.replace(
-            _NORMALIZE,
-            children=tuple(
-                dataclasses.replace(t, run=nettoyages.get(t.name, t.run)) for t in _NORMALIZE.tasks
-            ),
-        )
+        phase = with_runs(_NORMALIZE, nettoyages)
         ctx = contexte(**{"mode": "daily", "sources": {"hal"}, **options})
         return run_phase(phase, dataclasses.replace(ctx, maintain=appels.append))
 
@@ -85,11 +83,6 @@ def test_le_mode_full_reecrit_le_staging(lancer):
     assert appels[-2:] == ["VACUUM FULL staging", "arbitrate"]
 
 
-def test_le_decompte_des_retraits_part_dans_les_metriques(lancer):
-    metrics = lancer([], disparues=7)
-    assert metrics.details["disappeared_pruned"] == 7
-
-
 def test_les_identifiants_neutralises_partent_dans_les_metriques(lancer):
     metrics = lancer([])
     assert metrics.details["summary"]["identifiers_neutralized"] == 2
@@ -114,12 +107,41 @@ def test_sans_document_la_maintenance_tourne_quand_meme(lancer):
     ]
 
 
+def test_le_recapitulatif_d_une_source_suit_sa_ligne_de_bilan(lancer, caplog):
+    """Les documents refusés et les types inconnus suivent la ligne de bilan de leur source. La dernière ligne de la section des suppressions la ferme."""
+    bilan = NormalizeStats(
+        3,
+        0,
+        1,
+        discarded=("hal-1",),
+        unknown_doc_types={"study-registration": ("hal-2", "hal-3")},
+    )
+    with caplog.at_level(logging.INFO, logger="test"):
+        lancer([], bilan=bilan, disparues=2, retraits=4)
+    messages = [record.getMessage() for record in caplog.records]
+    debut = messages.index("  └─ HAL : 3 documents normalisés, 1 document écarté, 1 erreur")
+    assert messages[debut : debut + 11] == [
+        "  └─ HAL : 3 documents normalisés, 1 document écarté, 1 erreur",
+        "     documents écartés aux métadonnées incomplètes ou non conformes",
+        "     hal-1",
+        "     2 documents de type inconnu « study-registration »",
+        "     hal-2",
+        "     hal-3",
+        "",
+        "▶ Contributions sources en double et documents disparus",
+        "  ├─ 4 contributions sources OpenAlex supprimées (listes d'auteurs d'INSPIRE-HEP)",
+        "  └─ 2 documents supprimés (disparus de leur source)",
+        "",
+    ]
+
+
 def test_la_table_porte_une_ligne_par_source(lancer):
-    metrics = lancer([], bilan=NormalizeStats(3, 1, 2))
+    metrics = lancer([], bilan=NormalizeStats(3, 1, 2, discarded=("hal-1",)))
     (ligne,) = metrics.details["table"]["rows"]
     assert {k: v for k, v in ligne.items() if k != "duration_s"} == {
         "key": "hal",
         "processed": 3,
         "skipped": 1,
+        "discarded": 1,
         "errors": 2,
     }

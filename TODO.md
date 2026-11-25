@@ -8,7 +8,7 @@
 * [ ] déduplication par métadonnées: ajouter condition journal_id pour les articles? container title pour les chapitres?
 * [ ] règles de priorité entre sources pour les métadonnées: assouplir selon les cas de figure (notice OpenAlex ou ScanR dérivées de HAL => HAL doit primer) / annoter un corpus et trouver une bonne fonction de décision
 # Données
-* [ ] conserver l'historique des structures
+* [ ] conserver l'historique des structures + possibilité de fusionner des structures
 * [ ] financements (projets ANR, projets européens)
 * [ ] publications fermées, sans localisation éditeur, avec revue OA: chercher des moyens de retrouver les localisations éditeur (URL des revues)
 * [ ] revue dans une liste officielle, avec type autre que "revue": auditer
@@ -16,7 +16,6 @@
 * [ ] référentiel des conférences?
 # UI
 ## Admin
-* [ ] fusionner structures
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 * [ ] page bilan pipeline à toiletter
 ## Publique

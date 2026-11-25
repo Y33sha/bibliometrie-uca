@@ -3,7 +3,6 @@
 La phase relève deux bilans, avant la détection et après le choix du pays, et en tire un entonnoir : adresses sans pays au départ, adresses dotées d'un pays par la passe, adresses restantes. Les tâches ont leurs propres tests.
 """
 
-import dataclasses
 from unittest.mock import patch
 
 import pytest
@@ -13,6 +12,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import execute_tasks
 from pipeline.transformation.countries import countries as step
 from pipeline.transformation.countries.countries import AddressCountryStatus
+from tests.helpers.phase_tree import with_runs
 
 _PLACE_NAMES = in_transaction(lambda conn, logger: PhaseMetrics(new=6))
 """Détection par nom de lieu remplacée, dans sa transaction."""
@@ -34,11 +34,8 @@ class _FakeCountryQueries:
 
 
 def _run(contexte) -> dict[str, PhaseMetrics]:
-    tasks = tuple(
-        dataclasses.replace(t, run=_PLACE_NAMES) if t.name == "detect_by_place_name" else t
-        for t in step.PHASE.tasks
-    )
-    return execute_tasks(tasks, contexte(mode="daily"))
+    phase = with_runs(step.PHASE, {"detect_by_place_name": _PLACE_NAMES})
+    return execute_tasks(phase.children, contexte(mode="daily"))
 
 
 def _bilan(total: int, with_country: int) -> AddressCountryStatus:

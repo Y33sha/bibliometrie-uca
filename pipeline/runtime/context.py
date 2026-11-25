@@ -43,7 +43,6 @@ class RunOptions:
     rebuild_persons: bool = False
     rebuild_subjects: bool = False
     raw_store: bool = False
-    normalize_full: bool = False
 
     @property
     def policy(self) -> ModePolicy:

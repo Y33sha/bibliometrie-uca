@@ -1,15 +1,6 @@
 """Phase `normalize` : normalisation de `staging` vers les enregistrements sources, les contributions sources et les adresses.
 
-Les enregistrements sources sont écrits sans publication. La phase `publications` les rattache à une publication. Pour HAL, les ORCID et IdRef sont lus dans le TEI.
-
-Tâches de la phase, dans l'ordre (`pipeline.graph`) :
-
-1. la normalisation de chaque source retenue, dans l'ordre de `SOURCE_PRIORITY` ;
-2. la suppression des contributions sources des enregistrements sources OpenAlex du même document qu'un enregistrement source INSPIRE-HEP (`domain.source_records.inspire_author_lists`) ;
-3. la suppression des enregistrements sources des documents disparus de leur source ;
-4. la suppression des informations du contributeur sans contribution source : la normalisation réassigne des contributions sources, et les étapes précédentes suppriment des contributions sources ;
-5. la suppression des adresses orphelines, pour la même raison. L'exécuteur lance ensuite le `VACUUM` de `staging`, vidé de ses payloads : `VACUUM FULL` en mode full, simple dans les autres modes ;
-6. l'arbitrage des identifiants de personne (`pipeline.transformation.persons.arbitration`).
+Les enregistrements sources sont écrits sans publication. La phase `publications` les rattache à une publication.
 """
 
 from __future__ import annotations
@@ -36,7 +27,6 @@ from pipeline.ingestion.common.source_contribution_store import (
     SourceContributionStore,
     delete_orphan_addresses,
     delete_orphan_contributor_information,
-    mark_source_contributions_to_resync,
 )
 from pipeline.ingestion.common.source_records import (
     SourceRecordStore,
@@ -45,12 +35,8 @@ from pipeline.ingestion.common.source_records import (
 from pipeline.ingestion.common.staging import StagingStore
 from pipeline.ingestion.common.subjects import SourceRecordSubjectStore
 from pipeline.runtime.context import PhaseContext
-from pipeline.runtime.observability.log_format import (
-    BRANCH,
-    LAST_BRANCH,
-    quantity,
-)
-from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.log_format import quantity
+from pipeline.runtime.observability.metrics import PhaseMetrics, ReportNote
 from pipeline.transformation.persons.arbitration import ARBITRATE_IDENTIFIERS
 
 
@@ -72,21 +58,18 @@ def build_normalizer(
 
 
 def _normalize(source: str) -> TaskRun:
-    """Renvoie l'exécution de la normalisation de `source`, avec sa ligne de la table d'observabilité. Avec `--normalize-full`, tous les enregistrements sources de la source sont d'abord marqués à resynchroniser."""
+    """Renvoie l'exécution de la normalisation de `source`, avec sa ligne de la table d'observabilité."""
 
     def run(ctx: PhaseContext) -> PhaseMetrics:
-        if ctx.options.normalize_full:
-            with ctx.open_tx() as conn:
-                mark_source_contributions_to_resync(conn, source)
         with ctx.open_tx() as conn:
             normalizer = build_normalizer(source, conn, ctx.logger, archive=ctx.options.raw_store)
             stats = normalizer.run()
-        metrics = PhaseMetrics()
-        metrics.report = _report(stats)
+        metrics = PhaseMetrics(report=_report(stats), notes=_notes(stats))
         metrics.details["row"] = {
             "key": source,
             "processed": stats.processed,
             "skipped": stats.skipped,
+            "discarded": len(stats.discarded),
             "errors": stats.errors,
         }
         return metrics
@@ -95,45 +78,64 @@ def _normalize(source: str) -> TaskRun:
 
 
 def _report(stats: NormalizeStats) -> str | None:
-    """Renvoie la ligne de bilan d'une source : documents normalisés, erreurs. `None` sans document traité, et la ligne affiche « rien à faire »."""
+    """Renvoie la ligne de bilan d'une source : documents normalisés, documents écartés, erreurs. `None` sans document traité."""
     parts = []
     if stats.processed:
         parts.append(quantity(stats.processed, "document normalisé", "documents normalisés"))
+    if stats.discarded:
+        parts.append(quantity(len(stats.discarded), "document écarté", "documents écartés"))
     if stats.errors:
         parts.append(quantity(stats.errors, "erreur"))
     return ", ".join(parts) or None
+
+
+def _notes(stats: NormalizeStats) -> list[ReportNote]:
+    """Renvoie le récapitulatif d'une source : documents écartés, puis documents par type inconnu."""
+    notes = []
+    if stats.discarded:
+        notes.append(
+            ReportNote(
+                "documents écartés aux métadonnées incomplètes ou non conformes", stats.discarded
+            )
+        )
+    for raw_type, identifiers in sorted(stats.unknown_doc_types.items()):
+        notes.append(
+            ReportNote(
+                f"{quantity(len(identifiers), 'document')} de type inconnu « {raw_type} »",
+                identifiers,
+            )
+        )
+    return notes
 
 
 def _withhold_authors(ctx: PhaseContext) -> PhaseMetrics:
     """Supprime les contributions sources des enregistrements sources OpenAlex du même document qu'un enregistrement source INSPIRE-HEP."""
     with ctx.open_tx() as conn:
         withheld = withhold_covered_source_contributions(conn, ctx.logger)
+    report = None
     if withheld:
-        ctx.logger.info(
-            "%s%s (listes d'auteurs d'INSPIRE-HEP)",
-            BRANCH,
+        report = (
             quantity(
                 withheld,
                 "contribution source OpenAlex supprimée",
                 "contributions sources OpenAlex supprimées",
-            ),
+            )
+            + " (listes d'auteurs d'INSPIRE-HEP)"
         )
-    return PhaseMetrics(extras={"withheld": withheld})
+    return PhaseMetrics(extras={"withheld": withheld}, report=report)
 
 
 def _prune(ctx: PhaseContext) -> PhaseMetrics:
-    """Supprime les enregistrements sources des documents disparus de leur source, et ferme la section de normalisation."""
+    """Supprime les enregistrements sources des documents disparus de leur source."""
     with ctx.open_tx() as conn:
         disappeared = delete_disappeared_source_records(conn)
+    report = "aucun document disparu de sa source"
     if disappeared:
-        ctx.logger.info(
-            "%s%s (disparus de leur source)",
-            LAST_BRANCH,
-            quantity(disappeared, "document supprimé", "documents supprimés"),
+        report = (
+            quantity(disappeared, "document supprimé", "documents supprimés")
+            + " (disparus de leur source)"
         )
-    else:
-        ctx.logger.info("%saucun document disparu de sa source", LAST_BRANCH)
-    return PhaseMetrics(extras={"disappeared": disappeared})
+    return PhaseMetrics(extras={"disappeared": disappeared}, report=report)
 
 
 def _cleanup(delete: Callable[[Connection], int], deleted_one: str, deleted_many: str) -> TaskRun:
@@ -228,7 +230,7 @@ _CHILDREN = (
     ),
     Step(
         "removals",
-        "documents disparus, enregistrements sources INSPIRE-HEP → enregistrements sources disparus et contributions sources OpenAlex en double supprimés",
+        "enregistrements sources INSPIRE-HEP, documents disparus → contributions sources OpenAlex en double et enregistrements sources disparus supprimés",
         (
             Task(
                 "withhold_openalex_authors",
@@ -288,7 +290,9 @@ _CHILDREN = (
                 run=_prune,
             ),
         ),
+        section="Contributions sources en double et documents disparus",
     ),
+    # La normalisation réassigne des contributions sources, et l'étape `removals` en supprime : des informations du contributeur et des adresses perdent leur dernière contribution source.
     Step(
         "cleanup",
         "contributions sources → informations du contributeur et adresses sans contribution source supprimées",
@@ -324,7 +328,7 @@ _CHILDREN = (
 
 
 def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
-    """Renvoie les métriques de la phase : documents normalisés, table des sources, enregistrements sources disparus supprimés, identifiants neutralisés par l'arbitrage."""
+    """Renvoie les métriques de la phase : documents normalisés, table des sources, identifiants neutralisés par l'arbitrage."""
     rows = [
         {**cast("dict[str, object]", metrics.details["row"]), "duration_s": metrics.duration_s}
         for metrics in by_task.values()
@@ -333,9 +337,6 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
     metrics = PhaseMetrics()
     metrics.add(seen=sum(cast("int", row["processed"]) for row in rows))
     metrics.details["table"] = {"rows": rows}
-    metrics.details["disappeared_pruned"] = by_task["prune_disappeared"].extras.get(
-        "disappeared", 0
-    )
     arbitration = by_task[ARBITRATE_IDENTIFIERS.name].extras
     metrics.details["summary"] = {
         "identifiers_neutralized": arbitration.get("neutralized", 0),

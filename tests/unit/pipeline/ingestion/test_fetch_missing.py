@@ -3,7 +3,6 @@
 Les fonctions des tâches sont remplacées : la phase se teste sans I/O.
 """
 
-import dataclasses
 import logging
 from collections.abc import Callable
 
@@ -13,6 +12,7 @@ from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured
 from pipeline.task_runner import run_phase
+from tests.helpers.phase_tree import with_runs
 
 _FETCH_MISSING = next(phase for phase in PHASES if phase.name == "fetch_missing")
 
@@ -48,9 +48,8 @@ class FetchMissingPhase:
             target = name.removeprefix("doi.")
             return lambda ctx: fetch_doi_one(ctx, target)
 
-        self.phase: Phase = dataclasses.replace(
-            _FETCH_MISSING,
-            children=tuple(dataclasses.replace(t, run=run(t.name)) for t in _FETCH_MISSING.tasks),
+        self.phase: Phase = with_runs(
+            _FETCH_MISSING, {t.name: run(t.name) for t in _FETCH_MISSING.tasks}
         )
 
     def run(self, ctx) -> PhaseMetrics:

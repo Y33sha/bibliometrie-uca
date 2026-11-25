@@ -200,10 +200,12 @@ class TestUpsertSourceRecord:
         )
 
     def test_unknown_doc_type_gives_other(self, sa_sync_conn):
+        """Un type absent de la table de la source donne `other`. Le store retient l'identifiant natif de l'enregistrement source sous ce type."""
         staging_id = _thesis_staging(sa_sync_conn)
-        source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(
-            _row(staging_id, raw_doc_type="StudyRegistration")
-        )
+        store = SourceRecordStore(sa_sync_conn)
+        row = _row(staging_id, raw_doc_type="StudyRegistration")
+        source_record_id = store.upsert_source_record(row)
+        assert store.unknown_doc_types == {"StudyRegistration": [row.source_id]}
         assert (
             sa_sync_conn.execute(
                 text("SELECT doc_type FROM source_records WHERE id = :id"),

@@ -175,13 +175,15 @@ class SourceRecordStore:
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
         self._language_forms: dict[str, str] | None = None
+        self.unknown_doc_types: dict[str, list[str]] = {}
+        """Identifiants natifs des enregistrements sources écrits avec un type absent de la table de leur source, par type de la source."""
 
     def upsert_source_record(self, row: SourceRecordUpsert) -> int:
         """Écrit l'enregistrement source et ses identifiants, et renvoie son id."""
         params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
         params["title"] = clean_title(row.title)
         params["title_normalized"] = normalized_title(row.title)
-        params["doc_type"] = _doc_type(row)
+        params["doc_type"] = self._doc_type(row)
         container_title = optional_plain_text(row.container_title)
         if container_title and names_ebook_platform(container_title):
             container_title = None
@@ -199,22 +201,15 @@ class SourceRecordStore:
             self._language_forms = fetch_language_forms(self._conn)
         return self._language_forms
 
-
-def _doc_type(row: SourceRecordUpsert) -> str | None:
-    """Renvoie le type du référentiel correspondant au type de la source (`map_doc_type`). Un type absent de la table de sa source donne `other` et est journalisé."""
-    if row.raw_doc_type is None:
-        return None
-    doc_type = map_doc_type(row.raw_doc_type, row.source)
-    if doc_type is None:
-        logger.warning(
-            "Type de document inconnu (%s %s) : %r",
-            row.source,
-            row.source_id,
-            row.raw_doc_type,
-            extra={"detail": True},
-        )
-        return "other"
-    return doc_type
+    def _doc_type(self, row: SourceRecordUpsert) -> str | None:
+        """Renvoie le type du référentiel correspondant au type de la source (`map_doc_type`). Un type absent de la table de sa source donne `other` et rejoint `unknown_doc_types`."""
+        if row.raw_doc_type is None:
+            return None
+        doc_type = map_doc_type(row.raw_doc_type, row.source)
+        if doc_type is None:
+            self.unknown_doc_types.setdefault(row.raw_doc_type, []).append(row.source_id)
+            return "other"
+        return doc_type
 
 
 def fetch_language_forms(conn: Connection) -> dict[str, str]:

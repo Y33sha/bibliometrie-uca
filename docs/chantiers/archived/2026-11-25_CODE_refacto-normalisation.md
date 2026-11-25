@@ -1,0 +1,41 @@
+# Chantier — Refactorisation : normalisation
+
+## Contexte
+
+Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy of Software Design* (John Ousterhout). La [fiche précédente](2026-11-17_CODE_refacto-fin-du-moissonnage.md) couvre la fin du moissonnage.
+
+## Décisions
+
+- Périmètre de la fiche : phase `normalize` (`pipeline/ingestion/common/normalize.py`) et patron `SourceNormalizer` (`pipeline/ingestion/common/normalizer.py`). Les normaliseurs de chaque source respectent le patron et restent hors périmètre.
+- `--normalize-full` de `run_pipeline` devient l'option `--resync-contributions` de `rehydrate_staging_from_raw_store` : seule, elle était sans effet visible.
+- La clé `disappeared_pruned` des métriques de la phase, sans lecteur, est supprimée.
+- Le compteur des documents écartés de la phase 2 est stocké dans `pipeline_phase_executions` : une clé s'ajoute à la table de la phase, avec sa colonne dans l'administration.
+
+## Phasage
+
+### Phase 1 — Journal
+
+- [x] Le récapitulatif des documents écartés s'écrit pendant la normalisation, avant la ligne de bilan de sa source, écrite par l'exécuteur au retour de la tâche. Il s'affiche donc sous la source précédente : les 22 documents écartés de Crossref suivent « OPS : rien à faire ». Les identifiants remontent dans les métriques de la tâche, et l'exécuteur les écrit sous la ligne de bilan.
+- [x] L'avertissement « Type de document inconnu » (`source_records._doc_type`) s'écrit une fois par document, hors de l'arbre, à chaque normalisation du même document. Les types inconnus se comptent par type et rejoignent le récapitulatif de la source : « 6 documents de type inconnu `study-registration` ».
+- [x] Une exception sur un document s'écrit sans sa pile d'appels (`slog.error(f"Erreur sur …")`). Passage à `logger.exception`.
+- [x] `_withhold_authors` et `_prune` dessinent eux-mêmes leur branche (`BRANCH`, `LAST_BRANCH`), et `_prune` se sait dernière ligne de la section. Les deux tâches passent par `metrics.report`, comme les suppressions de lignes orphelines.
+
+### Phase 2 — Documents écartés et erreurs
+
+- [x] Un document écarté faute de métadonnées compte comme une erreur : « Crossref : 115 documents normalisés, 22 erreurs » désigne 22 suppléments (`.supp1`, `.g001`), écartés à raison. `process_work` renvoie un booléen à trois états (`True`, `False`, `None`). Une énumération de l'issue d'une ligne le remplace : normalisée, écartée, vide. `NormalizeStats` gagne un compteur des documents écartés, distinct des erreurs.
+- [x] Le commit périodique se déclenche sur `processed + skipped`, sans les documents écartés. Le déclencheur devient la taille de `done_ids`. `DEFAULT_BATCH_SIZE`, redéfini par chaque source, devient `BATCH_SIZE`.
+
+### Phase 3 — Patron `SourceNormalizer`
+
+- [x] `run` commence par `self.conn.rollback()`, sur une transaction ouverte par l'appelant juste avant. Suppression.
+- [x] Le crochet `cleanup` vide un cache juste avant l'abandon du normaliseur, construit pour un seul `run`. Seul OpenAlex le définit. Suppression du crochet.
+
+### Phase 4 — Docstrings
+
+- [x] Docstring du module `normalize` : la phrase sur le TEI de HAL rejoint `pipeline/ingestion/hal/normalize.py`. La liste des tâches redit la déclaration de la phase, et la phrase sur le `VACUUM` redit `maintenance=`. Suppression des deux.
+- [x] La docstring de `_normalize` connaît la CLI (`--normalize-full`).
+- [x] La phrase de l'étape `removals` nomme les documents disparus avant les enregistrements sources INSPIRE-HEP, dans l'ordre inverse des tâches.
+
+## Questions ouvertes
+
+Aucune.

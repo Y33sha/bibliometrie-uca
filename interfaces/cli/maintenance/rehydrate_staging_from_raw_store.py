@@ -13,11 +13,13 @@ Modes :
 La normalisation se lance ensuite, avec les phases qui la suivent :
     run_pipeline --from normalize --sources <sources>
 
+`--resync-contributions` vide l'empreinte du bloc auteurs des enregistrements sources réhydratés : leur normalisation resynchronise leurs contributions sources, même à bloc auteurs inchangé. Sert à appliquer une règle de normalisation des auteurs modifiée.
+
 `--doi-prefix` limite une source à identifiant natif DOI (crossref, datacite) aux DOI d'un préfixe. `--id-prefix` limite toute source aux identifiants d'un préfixe. `--doc-type` limite toute source aux enregistrements sources en base d'un type de document. La normalisation traite ensuite seulement ces lignes.
 
 Usage :
     uv run python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
-        --sources hal,openalex [--full] [--dry-run]
+        --sources hal,openalex [--full] [--resync-contributions] [--dry-run]
     uv run python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
         --sources crossref --doi-prefix 10.70675
     uv run python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
@@ -31,7 +33,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 
 from sqlalchemy import Connection, bindparam, text
 
@@ -41,8 +43,11 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.queues import Queue, enqueue_sql
 from infrastructure.observability.log import setup_logger
-from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
+from infrastructure.raw_store import RawStore, UnreadablePayloadError, get_raw_store
 from pipeline.ingestion.common.change_detection import change_detection_hash
+from pipeline.ingestion.common.source_contribution_store import (
+    mark_source_contributions_to_resync,
+)
 from pipeline.ingestion.payload_readers import payload_reader
 
 log = setup_logger("rehydrate_staging_from_raw_store", os.path.dirname(__file__))
@@ -154,6 +159,86 @@ def _parse_sources(raw: str) -> list[str]:
     return sources
 
 
+def _rehydrate_source(
+    conn: Connection,
+    store: RawStore,
+    source: str,
+    source_ids: Iterable[str],
+    *,
+    full: bool,
+    resync_contributions: bool,
+) -> None:
+    """Réhydrate les lignes `source_ids` de `source`, avec un commit tous les `_COMMIT_BATCH` payloads, et journalise le bilan.
+
+    Avec `full`, une clé sans ligne recrée sa ligne. Avec `resync_contributions`, chaque commit vide l'empreinte du bloc auteurs des enregistrements sources réhydratés depuis le précédent.
+    """
+    inserted = 0
+    updated = 0
+    orphans = 0
+    unreadable = 0
+    seen = 0
+    marked = 0
+    # Lignes réhydratées depuis le dernier commit.
+    rehydrated: list[str] = []
+
+    def commit() -> None:
+        nonlocal marked
+        if resync_contributions and rehydrated:
+            marked += mark_source_contributions_to_resync(conn, source, rehydrated)
+        conn.commit()
+        rehydrated.clear()
+
+    for source_id in source_ids:
+        try:
+            raw_data = json.loads(store.get(source, source_id))
+        except UnreadablePayloadError, ValueError:
+            unreadable += 1
+            log.warning(
+                "%s/%s : payload illisible au raw store (ligne staging inchangée)",
+                source,
+                source_id,
+            )
+            continue
+        if full:
+            doi = _doi_for(source, raw_data)
+            if rehydrate_or_create_staging_row(conn, source, source_id, doi, raw_data):
+                inserted += 1
+            else:
+                updated += 1
+            rehydrated.append(source_id)
+        elif rehydrate_staging_row(conn, source, source_id, raw_data):
+            updated += 1
+            rehydrated.append(source_id)
+        else:
+            orphans += 1
+            log.warning("%s/%s : aucune ligne staging (orpheline, ignorée)", source, source_id)
+
+        seen += 1
+        if seen % _COMMIT_BATCH == 0:
+            commit()
+            log.info("%s : %d traités...", source, seen)
+
+    commit()
+    if resync_contributions:
+        log.info("%s : %d enregistrements sources à resynchroniser", source, marked)
+    if full:
+        log.info(
+            "%s : %d insérés, %d mis à jour, tous en file de normalisation, %d illisibles",
+            source,
+            inserted,
+            updated,
+            unreadable,
+        )
+    else:
+        log.info(
+            "%s : %d mis à jour et en file de normalisation, %d orphelins ignorés, %d illisibles",
+            source,
+            updated,
+            orphans,
+            unreadable,
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -165,6 +250,12 @@ def main() -> None:
         "--full",
         action="store_true",
         help="Réinsère aussi les clés orphelines (après un TRUNCATE staging).",
+    )
+    parser.add_argument(
+        "--resync-contributions",
+        action="store_true",
+        help="Vide l'empreinte du bloc auteurs des enregistrements sources réhydratés : leur "
+        "normalisation resynchronise leurs contributions sources.",
     )
     parser.add_argument(
         "--doi-prefix",
@@ -214,58 +305,14 @@ def main() -> None:
 
     with engine.connect() as conn:
         for source in sources:
-            inserted = 0
-            updated = 0
-            orphans = 0
-            unreadable = 0
-            seen = 0
-            for source_id in keys(source):
-                try:
-                    raw_data = json.loads(store.get(source, source_id))
-                except UnreadablePayloadError, ValueError:
-                    unreadable += 1
-                    log.warning(
-                        "%s/%s : payload illisible au raw store (ligne staging inchangée)",
-                        source,
-                        source_id,
-                    )
-                    continue
-                if args.full:
-                    doi = _doi_for(source, raw_data)
-                    if rehydrate_or_create_staging_row(conn, source, source_id, doi, raw_data):
-                        inserted += 1
-                    else:
-                        updated += 1
-                elif rehydrate_staging_row(conn, source, source_id, raw_data):
-                    updated += 1
-                else:
-                    orphans += 1
-                    log.warning(
-                        "%s/%s : aucune ligne staging (orpheline, ignorée)", source, source_id
-                    )
-
-                seen += 1
-                if seen % _COMMIT_BATCH == 0:
-                    conn.commit()
-                    log.info("%s : %d traités...", source, seen)
-
-            conn.commit()
-            if args.full:
-                log.info(
-                    "%s : %d insérés, %d mis à jour, tous en file de normalisation, %d illisibles",
-                    source,
-                    inserted,
-                    updated,
-                    unreadable,
-                )
-            else:
-                log.info(
-                    "%s : %d mis à jour et en file de normalisation, %d orphelins ignorés, %d illisibles",
-                    source,
-                    updated,
-                    orphans,
-                    unreadable,
-                )
+            _rehydrate_source(
+                conn,
+                store,
+                source,
+                keys(source),
+                full=args.full,
+                resync_contributions=args.resync_contributions,
+            )
 
     log.info(
         "Terminé. Relancer le pipeline depuis la normalisation : "

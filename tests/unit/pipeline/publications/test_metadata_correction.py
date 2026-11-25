@@ -5,11 +5,10 @@ Quatre passes se succèdent. La correction unaire reclasse le type de document d
 La phase assemble ensuite un bilan : les compteurs des passes, et la ventilation par règle déclenchée, de la plus fréquente à la moins fréquente.
 """
 
-import dataclasses
-
 from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
+from tests.helpers.phase_tree import with_runs
 
 _PHASE = next(p for p in PHASES if p.name == "metadata_correction")
 
@@ -21,9 +20,7 @@ def _run(contexte, **by_task: PhaseMetrics):
     def run(name):
         return lambda _ctx: ordre.append(name) or by_task.get(name, PhaseMetrics())
 
-    phase = dataclasses.replace(
-        _PHASE, children=tuple(dataclasses.replace(t, run=run(t.name)) for t in _PHASE.tasks)
-    )
+    phase = with_runs(_PHASE, {t.name: run(t.name) for t in _PHASE.tasks})
     return run_phase(phase, contexte()), ordre
 
 

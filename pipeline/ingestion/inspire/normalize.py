@@ -140,7 +140,7 @@ def inspire_source_record(
 
 class InspireNormalizer(SourceNormalizer):
     SOURCE = "inspire"
-    DEFAULT_BATCH_SIZE = 50
+    BATCH_SIZE = 50
     FETCH_SUB_BATCH = 10
     """Une fiche de grande collaboration pèse environ 1,5 Mo."""
 

@@ -86,6 +86,14 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
 """Libellés des compteurs propres à une phase, au singulier. Un couple (singulier, pluriel) sert quand le pluriel ne se forme pas par un `s` final."""
 
 
+@dataclass(frozen=True, slots=True)
+class ReportNote:
+    """Ligne écrite sous la ligne de bilan d'une tâche, suivie d'une ligne par cas. Le terminal masque les cas, le journal les garde."""
+
+    text: str
+    cases: tuple[str, ...] = ()
+
+
 @dataclass
 class PhaseMetrics:
     """Compteurs d'une exécution de phase."""
@@ -108,6 +116,8 @@ class PhaseMetrics:
 
     Hors comparaison : deux relevés aux mêmes compteurs sont égaux, quels que soient leurs libellés.
     """
+    notes: list[ReportNote] = field(default_factory=list, compare=False)
+    """Lignes écrites sous la ligne de bilan de la tâche, comme le récapitulatif des documents écartés."""
     duration_s: float | None = field(default=None, compare=False)
     """Durée d'une tâche en secondes, mesurée par l'exécuteur ; `merge` l'ignore."""
 

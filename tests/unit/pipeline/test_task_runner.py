@@ -6,7 +6,7 @@ import threading
 import pytest
 
 from pipeline.graph import Block, Phase, Step, Task
-from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.metrics import PhaseMetrics, ReportNote
 from pipeline.task_runner import execute_tasks, run_phase
 
 
@@ -82,6 +82,32 @@ def test_la_derniere_ligne_d_une_phase_sans_section_la_ferme(contexte, caplog):
     assert [(record.getMessage(), record.detail) for record in caplog.records] == [
         ("  ├─ HAL : 1 nouveau", True),
         ("  └─ OpenAlex : 2 nouveaux", True),
+    ]
+
+
+def test_les_notes_suivent_la_ligne_de_bilan_et_ses_cas_vont_au_seul_journal(contexte, caplog):
+    """Le trait vertical longe les notes d'une ligne suivie d'autres lignes. Sous la dernière ligne de la section, une marge en tient lieu."""
+
+    def _metriques(report: str) -> PhaseMetrics:
+        return PhaseMetrics(report=report, notes=[ReportNote("1 cas", ("c1",))])
+
+    tasks = (
+        Task("a", run=lambda _ctx: _metriques("a"), section="S", label="A"),
+        Task("b", run=lambda _ctx: _metriques("b"), section="S", label="B"),
+    )
+
+    with caplog.at_level(logging.INFO, logger="test"):
+        execute_tasks(tasks, contexte())
+
+    assert [(record.getMessage(), getattr(record, "detail", False)) for record in caplog.records][
+        2:
+    ] == [
+        ("  ├─ A : a", False),
+        ("  │  1 cas", False),
+        ("  │  c1", True),
+        ("  └─ B : b", False),
+        ("     1 cas", False),
+        ("     c1", True),
     ]
 
 

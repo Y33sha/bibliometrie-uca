@@ -1,4 +1,7 @@
-"""Normalisation des enregistrements sources HAL."""
+"""Normalisation des enregistrements sources HAL.
+
+Le TEI joint au dépôt (`label_xml`) donne les ISBN, le diplôme d'un mémoire DUMAS, l'embargo et les mots-clés. Il donne aussi, pour chaque auteur, son nom, ses identifiants (ORCID, IdRef, idHAL), ses ROR et ses structures.
+"""
 
 from collections.abc import Mapping
 from datetime import date
@@ -570,7 +573,7 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
 class HalNormalizer(SourceNormalizer):
     SOURCE = "hal"
-    DEFAULT_BATCH_SIZE = 500
+    BATCH_SIZE = 500
 
     def minimal_metadata(self, doc: Document) -> tuple[str | None, int | None]:
         return get_title(doc), as_int(doc.get("producedDateY_i"))
