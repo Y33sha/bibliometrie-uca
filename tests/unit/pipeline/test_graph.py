@@ -99,7 +99,7 @@ def _schema() -> tuple[dict[str, set[str]], set[str]]:
     columns: dict[str, set[str]] = {}
     views: set[str] = set()
     current: set[str] | None = None
-    for line in _SCHEMA.read_text().splitlines():
+    for line in _SCHEMA.read_text(encoding="utf-8").splitlines():
         if table := re.match(r"CREATE TABLE \w+\.(\w+) \($", line):
             current = columns.setdefault(table.group(1), set())
         elif view := re.match(r"CREATE (?:MATERIALIZED )?VIEW \w+\.(\w+) AS", line):

@@ -21,7 +21,9 @@ _SEARCH = f"{_OPS}/rest-services/published-data/search/biblio"
 _FAMILY_PATH = f"{_OPS}/rest-services/family/publication/docdb"
 _APPLICATION_PATH = f"{_OPS}/rest-services/family/application/docdb"
 _FAMILY = json.loads(
-    (Path(__file__).parents[2] / "unit/pipeline/ingestion/ops/family_FR1658141.json").read_text()
+    (Path(__file__).parents[2] / "unit/pipeline/ingestion/ops/family_FR1658141.json").read_text(
+        encoding="utf-8"
+    )
 )
 
 
