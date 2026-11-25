@@ -4,7 +4,7 @@
 	import { formatCount } from '#lib/plural.js';
 	import { formatPercent } from '#lib/utils.js';
 
-	// Barres par année : le total de l'année en gris ; la part choisie, en couleur, superposée au bas de chaque barre.
+	// Barres par année : le total de l'année en gris ; la part choisie, en couleur, superposée au bas de chaque barre. Le gris, presque opaque, reste visible sur les années atténuées (année en cours et années ultérieures).
 	let {
 		years,
 		totals,
@@ -44,7 +44,7 @@
 				labels: years.map(String),
 				datasets: [
 					...(part ? [{ label: part.label, data: [...part.values], backgroundColor: partColor, order: 0, ...bar }] : []),
-					{ label: totalLabel, data: [...totals], backgroundColor: `${cssColor('text-faint')}66`, order: 1, ...bar },
+					{ label: totalLabel, data: [...totals], backgroundColor: `${cssColor('text-faint')}cc`, order: 1, ...bar },
 				],
 			},
 			options: {
