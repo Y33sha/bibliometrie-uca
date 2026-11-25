@@ -5,7 +5,7 @@
 3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
 4. Sinon : `embargoed` sous embargo ; `closed` avec une copie déclarée fermée, un verdict, ou pour une publication fermée par nature (`is_restricted`) ; `unknown` sans aucune information.
 
-Le verdict d'Unpaywall relève les accès, jamais ne les abaisse. Un brevet a le statut `unknown` (`has_oa_status`).
+Le verdict d'Unpaywall relève les accès chez l'éditeur, jamais ne les abaisse. Un verdict `green` relève seulement l'information : Unpaywall classe en archive des plateformes d'éditeurs (OpenEdition, Cairn), compte comme ouvertes les notices HAL sans fichier et ignore l'embargo d'un dépôt. Un brevet a le statut `unknown` (`has_oa_status`).
 """
 
 from collections.abc import Iterable, Mapping
@@ -36,7 +36,7 @@ class OpenAccessFacts:
     """La publication a une copie déclarée fermée, un verdict d'Unpaywall, ou elle est fermée par nature (`is_restricted`)."""
 
     def raised_by(self, unpaywall: str | None) -> OpenAccessFacts:
-        """Renvoie les accès relevés par le verdict d'Unpaywall : `gold`, `hybrid` ou `diamond` valent une copie ouverte chez l'éditeur sous licence, `bronze` sans licence, `green` une copie d'archive ouverte."""
+        """Renvoie les accès relevés par le verdict d'Unpaywall : `gold`, `hybrid` ou `diamond` valent une copie ouverte chez l'éditeur sous licence, `bronze` sans licence. Tout verdict informe sur la publication."""
         if unpaywall is None:
             return self
         raised = replace(self, informed=True)
@@ -44,8 +44,6 @@ class OpenAccessFacts:
             return replace(raised, publisher_open=True, publisher_licensed=True)
         if unpaywall == OaStatus.BRONZE:
             return replace(raised, publisher_open=True)
-        if unpaywall == OaStatus.GREEN:
-            return replace(raised, archive_open=True)
         return raised
 
 

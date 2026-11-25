@@ -33,6 +33,15 @@ describe('personFilters', () => {
 		expect(filters.filter(isAvailable).map((f) => f.key)).toEqual(expect.arrayContaining(['exclusion', 'pending']));
 	});
 
+	it("en session admin, retient les personnes valides dans l'onglet d'un laboratoire, sans filtre Statut", () => {
+		admin = true;
+		const filters = personFilters(12);
+		const params = new URLSearchParams();
+		appendFilterParams(filters, initialValues(filters), params);
+		expect(params.get('exclusion')).toBe('none');
+		expect(filters.filter(isAvailable).map((f) => f.key)).not.toContain('exclusion');
+	});
+
 	it("présélectionne le laboratoire de l'onglet d'un laboratoire", () => {
 		expect(initialValues(personFilters(12)).checkbox.labs).toEqual(['12']);
 	});

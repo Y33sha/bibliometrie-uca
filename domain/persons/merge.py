@@ -33,7 +33,9 @@ _EXCLUSION_STRENGTH = {
 
 
 def merged_exclusion(
-    target: PersonExclusion | None, source: PersonExclusion | None
+    target: PersonExclusion | None, source: PersonExclusion | None, *, has_hr_record: bool
 ) -> PersonExclusion | None:
-    """Renvoie l'exclusion de la personne fusionnée : `not_a_person` l'emporte sur `out_of_perimeter`, qui l'emporte sur l'absence d'exclusion."""
+    """Renvoie l'exclusion de la personne fusionnée. Une personne fusionnée qui a une fiche RH est valide. Sinon, `not_a_person` l'emporte sur `out_of_perimeter`, qui l'emporte sur l'absence d'exclusion."""
+    if has_hr_record:
+        return None
     return max(target, source, key=_EXCLUSION_STRENGTH.__getitem__)

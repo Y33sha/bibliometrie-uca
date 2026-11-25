@@ -19,7 +19,7 @@
 	// Vue-liste des personnes réutilisable. Utilisée par :
 	// - `/persons` (annuaire autonome avec sync URL)
 	// - `/structures/[id]?tab=persons` (labo fixe via `labId`, sans sync URL ; la facette Laboratoires y présélectionne le labo)
-	// La session admin y gagne les facettes Statut et À confirmer, les personnes sans contribution ni fiche RH, la colonne des publications du périmètre hors page de laboratoire, et une icône qui ouvre le volet de la personne.
+	// La session admin y gagne la facette À confirmer, les personnes sans contribution ni fiche RH, la facette Statut et la colonne des publications du périmètre hors page de laboratoire, et une icône qui ouvre le volet de la personne.
 	let {
 		apiKey = 'persons-dir',
 		labId,

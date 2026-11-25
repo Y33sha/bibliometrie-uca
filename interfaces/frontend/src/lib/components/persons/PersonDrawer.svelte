@@ -153,23 +153,25 @@
       </div>
       <div class="drawer-head-actions">
         <IconButton icon="edit" label="Modifier le nom" onclick={startEdit} />
-        <select
-          class="select exclusion-select"
-          class:excluded={!!person.exclusion}
-          use:tooltip={'Statut de la personne'}
-          aria-label="Statut de la personne"
-          value={person.exclusion ?? ""}
-          onchange={(e) =>
-            onsetExclusion(
-              person.id,
-              ((e.currentTarget as HTMLSelectElement).value || null) as PersonExclusion | null,
-            )}
-        >
-          <option value="">{PERSON_VALID_LABEL}</option>
-          {#each Object.entries(personExclusionLabels) as [value, label] (value)}
-            <option {value}>{label}</option>
-          {/each}
-        </select>
+        {#if !person.has_rh}
+          <select
+            class="select exclusion-select"
+            class:excluded={!!person.exclusion}
+            use:tooltip={'Statut de la personne'}
+            aria-label="Statut de la personne"
+            value={person.exclusion ?? ""}
+            onchange={(e) =>
+              onsetExclusion(
+                person.id,
+                ((e.currentTarget as HTMLSelectElement).value || null) as PersonExclusion | null,
+              )}
+          >
+            <option value="">{PERSON_VALID_LABEL}</option>
+            {#each Object.entries(personExclusionLabels) as [value, label] (value)}
+              <option {value}>{label}</option>
+            {/each}
+          </select>
+        {/if}
       </div>
     {/if}
   </div>

@@ -429,7 +429,7 @@ def set_person_exclusion(
 ) -> OkResponse:
     """Exclut une personne pour le motif donné, ou la retient avec `exclusion: null`.
 
-    Renvoie 404 sur une personne introuvable (`set_exclusion`).
+    Renvoie 422 sur l'exclusion d'une personne qui a une fiche RH, 404 sur une personne introuvable (`set_exclusion`).
     """
     persons.set_exclusion(person_id, body.exclusion)
     return OkResponse()

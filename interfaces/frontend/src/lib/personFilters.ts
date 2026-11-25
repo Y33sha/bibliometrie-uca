@@ -1,5 +1,5 @@
 /**
- * Registre des filtres de l'annuaire des personnes. La session admin y gagne les filtres À confirmer et Statut ; hors session admin, l'annuaire retient les personnes valides.
+ * Registre des filtres de l'annuaire des personnes. La session admin y gagne le filtre À confirmer, et le filtre Statut hors page de laboratoire. Sans filtre Statut, l'annuaire retient les personnes valides.
  */
 import type { FilterGroup, ListFilter } from '#lib/filterRegistry.js';
 import { IDENTIFIER_ITEMS, PENDING_ITEMS } from '#lib/filterItems.js';
@@ -90,7 +90,8 @@ export function personFilters(labId?: number, labHasMembers = true): ListFilter[
 				],
 			},
 			defaultSelection: () => ['none'],
-			fixed: () => (isAdmin() ? null : 'none'),
+			// La page d'un laboratoire retient les personnes valides.
+			fixed: () => (isAdmin() && labId == null ? null : 'none'),
 		},
 	];
 }

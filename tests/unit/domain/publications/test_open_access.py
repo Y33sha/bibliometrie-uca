@@ -71,7 +71,7 @@ def test_le_modele_de_la_revue_seul_ne_donne_aucun_statut():
 
 @pytest.mark.parametrize(
     ("verdict", "expected"),
-    [("gold", "gold"), ("bronze", "bronze"), ("green", "green"), ("closed", "closed")],
+    [("gold", "gold"), ("bronze", "bronze"), ("green", "closed"), ("closed", "closed")],
 )
 def test_le_verdict_d_unpaywall_releve(verdict, expected):
     facts = OpenAccessFacts().raised_by(verdict)
@@ -146,6 +146,25 @@ def test_un_brevet_a_le_statut_inconnu():
 
 def test_un_embargo_sans_copie_ouverte():
     assert _status([], embargoed=True) == "embargoed"
+
+
+def test_le_verdict_green_laisse_une_copie_editeur_bronze():
+    """Unpaywall classe en archive des plateformes d'éditeurs : son verdict `green` laisse le statut `bronze`."""
+    copy = _copy("https://books.openedition.org/x")
+    assert _status([copy], "green") == "bronze"
+
+
+def test_sous_embargo_le_verdict_green_laisse_l_embargo():
+    assert _status([], "green", embargoed=True) == "embargoed"
+
+
+def test_sous_embargo_une_copie_d_archive_ouverte_donne_green():
+    copy = _copy("https://iris.unitn.it/x", platform_type=PlatformType.REPOSITORY)
+    assert _status([copy], "green", embargoed=True) == "green"
+
+
+def test_sous_embargo_un_verdict_editeur_releve():
+    assert _status([], "bronze", embargoed=True) == "bronze"
 
 
 def test_une_copie_fermee_d_une_publication_sous_embargo():
