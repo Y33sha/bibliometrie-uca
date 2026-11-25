@@ -415,6 +415,10 @@ class StructuresQueries:
         members_count = self._conn.execute(
             text(f"SELECT COUNT(*) FROM persons p WHERE {members_where}"), members_binds
         ).scalar_one()
+        hr_persons_count = self._conn.execute(
+            text("SELECT COUNT(DISTINCT person_id) FROM hr_periods WHERE structure_id = :id"),
+            {"id": structure_id},
+        ).scalar_one()
 
         return StructureDetailResponse(
             structure=StructureOut(
@@ -433,6 +437,7 @@ class StructuresQueries:
             forms=[_name_form_from_row(r) for r in form_rows],
             theses_count=theses_row.n,
             members_count=members_count,
+            hr_persons_count=hr_persons_count,
         )
 
     def get_structure_addresses(

@@ -182,6 +182,7 @@ class TestGetLaboratory:
         assert isinstance(res.theses_count, int)
 
     def test_members_count_counts_retained_current_members(self, sa_sync_conn):
+        """Seule la personne retenue et présente compte parmi les membres ; les trois personnes à période de présence, passée ou actuelle, comptent dans le référentiel RH."""
         lab = insert_structure(sa_sync_conn, "LAB-MEMBERS")
         present = insert_person(sa_sync_conn, "Presenty")
         insert_hr_period(sa_sync_conn, present, unit_label="LAB", structure_id=lab)
@@ -199,6 +200,7 @@ class TestGetLaboratory:
 
         assert res is not None
         assert res.members_count == 1
+        assert res.hr_persons_count == 3
 
 
 class TestGetLaboratoryAddresses:

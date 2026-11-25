@@ -40,6 +40,7 @@
 	let lab: Structure | null = $state(null);
 	let thesesCount = $state(0);
 	let membersCount = $state(0);
+	let hrPersonsCount = $state(0);
 	let error = $state(false);
 
 	// L'onglet « Adresses » est réservé à la session admin.
@@ -72,6 +73,7 @@
 			lab = profileData.structure;
 			thesesCount = profileData.theses_count;
 			membersCount = profileData.members_count;
+			hrPersonsCount = profileData.hr_persons_count;
 			return true;
 		} catch {
 			error = true;
@@ -198,7 +200,12 @@
 	<!-- Tab: Adresses -->
 	{#if activeTab === 'addresses'}
 		<div class="tab-content">
-			<ScopedAddresses endpoint={`/api/structures/${labId}`} scope={{ lab_id: String(labId) }} preferredStructureId={lab.id} apiKey="lab" />
+			<!-- L'onglet lit les publications des membres pendant leur présence : sans période de présence, il est vide. -->
+			{#if hrPersonsCount > 0}
+				<ScopedAddresses endpoint={`/api/structures/${labId}`} scope={{ lab_id: String(labId) }} preferredStructureId={lab.id} apiKey="lab" />
+			{:else}
+				<p class="no-results">Aucune personne du référentiel RH n'est rattachée à la structure.</p>
+			{/if}
 		</div>
 	{/if}
 

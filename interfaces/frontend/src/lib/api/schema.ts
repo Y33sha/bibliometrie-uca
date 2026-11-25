@@ -6316,6 +6316,11 @@ export interface components {
              * @description Personnes retenues à période de présence actuelle dans la structure.
              */
             members_count: number;
+            /**
+             * Hr Persons Count
+             * @description Personnes à période de présence, actuelle ou passée, dans la structure.
+             */
+            hr_persons_count: number;
         };
         /** StructureInfo */
         StructureInfo: {

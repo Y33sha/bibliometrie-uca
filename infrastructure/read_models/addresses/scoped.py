@@ -131,36 +131,30 @@ def scoped_addresses(
 
 def scoped_address_summary(conn: Connection, scope: AddressScope) -> ScopedAddressSummary:
     """Compte, par année, les publications avec adresse du périmètre, puis, par structure, celles dont une adresse brute est rattachée à la structure. Les publications sans année sont ignorées."""
-    cte = _cte(scope)
-    counts = dict(
-        conn.execute(
-            text(f"""
-                {cte}
-                SELECT publication_year, COUNT(DISTINCT publication_id)
-                FROM scoped_address_publications
-                WHERE publication_year IS NOT NULL
-                GROUP BY publication_year
-            """),
-            scope.binds,
-        ).all()
-    )
-    years = list(range(min(counts), max(counts) + 1)) if counts else []
+    # Un seul parcours du périmètre : `GROUPING SETS` compte les publications par année (`is_total`), puis par année et par structure. La jointure externe garde dans les totaux les publications sans structure reconnue.
     rows = conn.execute(
         text(f"""
-            {cte}
-            SELECT s.id, s.acronym, s.name, sap.publication_year,
-                   COUNT(DISTINCT sap.publication_id) AS publications
+            {_cte(scope)}
+            SELECT GROUPING(s.id) = 1 AS is_total, s.id, s.acronym, s.name,
+                   sap.publication_year, COUNT(DISTINCT sap.publication_id) AS publications
             FROM scoped_address_publications sap
-            JOIN address_structures ast ON ast.address_id = sap.address_id
-            JOIN structures s ON s.id = ast.structure_id
-            WHERE ast.is_confirmed IS DISTINCT FROM FALSE
-              AND sap.publication_year IS NOT NULL
-            GROUP BY s.id, sap.publication_year
+            LEFT JOIN address_structures ast
+              ON ast.address_id = sap.address_id AND ast.is_confirmed IS DISTINCT FROM FALSE
+            LEFT JOIN structures s ON s.id = ast.structure_id
+            WHERE sap.publication_year IS NOT NULL
+            GROUP BY GROUPING SETS (
+                (sap.publication_year),
+                (sap.publication_year, s.id, s.acronym, s.name)
+            )
         """),
         scope.binds,
     ).all()
+    counts = {r.publication_year: r.publications for r in rows if r.is_total}
+    years = list(range(min(counts), max(counts) + 1)) if counts else []
     structures: dict[int, ScopedAddressStructureSeries] = {}
     for r in rows:
+        if r.is_total or r.id is None:
+            continue
         series = structures.get(r.id)
         if series is None:
             series = structures[r.id] = ScopedAddressStructureSeries(

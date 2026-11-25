@@ -116,6 +116,8 @@ class StructureDetailResponse(Model):
     theses_count: int
     members_count: int
     """Personnes retenues à période de présence actuelle dans la structure."""
+    hr_persons_count: int
+    """Personnes à période de présence, actuelle ou passée, dans la structure."""
 
 
 class StructurePartner(Model):
