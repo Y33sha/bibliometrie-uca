@@ -3,7 +3,6 @@
 Chaque tâche ouvre sa propre transaction. La résolution des adresses et la pose des indices de périmètre lisent le périmètre des personnes.
 """
 
-import dataclasses
 from unittest.mock import patch
 
 import pytest
@@ -16,6 +15,7 @@ from pipeline.transformation.structures import affiliations as phase, perimeter
 from pipeline.transformation.structures.address_resolution import ResolutionStats
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 from pipeline.transformation.structures.perimeter_evidence import InPerimeterSyncCounts
+from tests.helpers.phase_tree import with_runs
 
 PERIMETRE = [10, 20]
 
@@ -37,12 +37,7 @@ def _phase() -> Phase:
         "detect_concatenated_addresses": in_transaction(lambda _conn, _logger: PhaseMetrics()),
     }
     affiliations = next(p for p in PHASES if p.name == "affiliations")
-    return dataclasses.replace(
-        affiliations,
-        children=tuple(
-            dataclasses.replace(t, run=remplacees.get(t.name, t.run)) for t in affiliations.tasks
-        ),
-    )
+    return with_runs(affiliations, remplacees)
 
 
 def _run(contexte, *, processed=7, in_perimeter=3):

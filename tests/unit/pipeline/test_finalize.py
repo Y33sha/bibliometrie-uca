@@ -3,7 +3,6 @@
 Les tests vérifient l'enchaînement des tâches et la boucle de purge. Celle-ci supprime par lots jusqu'à épuisement, commite chaque lot et rapporte son total dans le résumé de la phase.
 """
 
-import dataclasses
 from contextlib import ExitStack
 from unittest.mock import patch
 
@@ -12,6 +11,7 @@ from pipeline.phases import PHASES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import run_phase
 from pipeline.transformation import finalize as phase
+from tests.helpers.phase_tree import with_runs
 
 _FINALIZE = next(p for p in PHASES if p.name == "finalize")
 _SUPPRESSIONS = {
@@ -70,13 +70,7 @@ def _finalize(appels: list[str], suppressions: dict[str, int] | None = None) -> 
     def run(nom: str):
         return in_transaction(_suppression(appels, nom, suppressions.get(nom, 0)))
 
-    return dataclasses.replace(
-        _FINALIZE,
-        children=tuple(
-            dataclasses.replace(t, run=run(_RECORDED[t.name])) if t.name in _RECORDED else t
-            for t in _FINALIZE.tasks
-        ),
-    )
+    return with_runs(_FINALIZE, {name: run(nom) for name, nom in _RECORDED.items()})
 
 
 def _patch_sql(counts: _Counts) -> list:
