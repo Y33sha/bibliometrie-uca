@@ -25,8 +25,8 @@ Suite de la relecture du pipeline dans l'ordre d'exécution, selon *A Philosophy
 
 ### Phase 3 — Patron `SourceNormalizer`
 
-- [ ] `run` commence par `self.conn.rollback()`, sur une transaction ouverte par l'appelant juste avant. Suppression.
-- [ ] Le crochet `cleanup` vide un cache juste avant l'abandon du normaliseur, construit pour un seul `run`. Seul OpenAlex le définit. Suppression du crochet.
+- [x] `run` commence par `self.conn.rollback()`, sur une transaction ouverte par l'appelant juste avant. Suppression.
+- [x] Le crochet `cleanup` vide un cache juste avant l'abandon du normaliseur, construit pour un seul `run`. Seul OpenAlex le définit. Suppression du crochet.
 
 ### Phase 4 — Docstrings
 

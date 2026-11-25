@@ -87,7 +87,7 @@ class NormalizeStats:
 class SourceNormalizer(ABC):
     """Normalisation d'une source : la sous-classe analyse une ligne de `staging`, le patron écrit.
 
-    Une sous-classe définit `SOURCE`, `minimal_metadata`, `source_record`, `author_block` et `author_records`. `parse`, `publisher`, `container_facts`, `locations`, `embargo`, `subjects`, `withholds_authors`, `preload_caches` et `cleanup` ont un comportement par défaut.
+    Une sous-classe définit `SOURCE`, `minimal_metadata`, `source_record`, `author_block` et `author_records`. `parse`, `publisher`, `container_facts`, `locations`, `embargo`, `subjects`, `withholds_authors` et `preload_caches` ont un comportement par défaut.
     """
 
     SOURCE: ClassVar[str] = ""
@@ -248,9 +248,6 @@ class SourceNormalizer(ABC):
     def preload_caches(self) -> None:  # noqa: B027 (hook optionnel)
         """Charge les caches de la source, avant la boucle sur les lignes."""
 
-    def cleanup(self) -> None:  # noqa: B027 (hook optionnel)
-        """Libère les caches en mémoire, après le dernier commit."""
-
     def _iter_rows(self, work_ids: list[int]) -> Iterator[StagingRow]:
         """Itère les lignes `work_ids` par sous-lots de `FETCH_SUB_BATCH`."""
         for start in range(0, len(work_ids), self.FETCH_SUB_BATCH):
@@ -267,9 +264,7 @@ class SourceNormalizer(ABC):
 
         Chaque commit retire de la file les lignes traitées depuis le précédent. Une ligne en erreur reste en file pour le run suivant.
         """
-        self.conn.rollback()
-
-        # Préfixe `[source]` sur les lignes de la boucle (progression, bilan) : dans un run multi-sources, chaque batch reste rattaché à sa source sans remonter au bandeau.
+        # Préfixe `[source]` sur les lignes de la boucle (progression, erreurs) : dans un run multi-sources, chaque batch reste rattaché à sa source sans remonter au bandeau.
         slog = scoped_logger(self.logger, self.SOURCE)
 
         try:
@@ -314,7 +309,6 @@ class SourceNormalizer(ABC):
                         commit()
 
             commit()
-            self.cleanup()
 
             return NormalizeStats(
                 processed,

@@ -102,7 +102,6 @@ class _Norm(_StubNorm):
         self.raises_on = raises_on or set()
         self.processed_rows: list[StagingRow] = []
         self.preload_called = False
-        self.cleanup_called = False
 
     def process_work(self, row: StagingRow) -> RowOutcome:
         self.processed_rows.append(row)
@@ -116,9 +115,6 @@ class _Norm(_StubNorm):
 
     def preload_caches(self):
         self.preload_called = True
-
-    def cleanup(self):
-        self.cleanup_called = True
 
 
 class TestRunNoWork:
@@ -138,7 +134,6 @@ class TestRunHappyPath:
         norm.run()
         assert norm.preload_called is True
         assert [r.source_id for r in norm.processed_rows] == ["r1", "r2", "r3"]
-        assert norm.cleanup_called is True
 
     def test_chaque_issue_a_son_compteur(self):
         """Un document écarté compte à part des erreurs."""

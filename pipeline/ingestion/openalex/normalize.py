@@ -480,6 +480,3 @@ class OpenalexNormalizer(SourceNormalizer):
         """Vrai pour un enregistrement source du même document qu'un enregistrement source INSPIRE-HEP (`domain.source_records.inspire_author_lists`)."""
         identifiers, _ = normalize_identifiers(record.identifiers)
         return not self._author_list_keys.isdisjoint(document_keys(identifiers))
-
-    def cleanup(self) -> None:
-        self._author_list_keys = frozenset()
