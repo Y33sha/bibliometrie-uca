@@ -82,8 +82,15 @@ Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py
   - Le modèle sans le nombre de contributions de la publication donne une AUC de 0,85.
 - [x] Verdicts versés à l'entraînement, avec les 76 verdicts des alertes par embeddings (`tour.py`). 97 paires jugées dans le jeu, dont 27 négatives ; les autres homonymes jugés figurent parmi les rejets. Une paire jugée pèse 20 fois plus qu'une autre.
 - [x] Indices supplémentaires : nombre de coauteurs à fiche RH dans la publication, adresse rattachée à un laboratoire RH de la personne (structures des périodes RH, leurs descendantes et leurs ascendantes de type laboratoire). Sur les paires jugées, notées hors pli, l'AUC passe de 0,913 à 0,957 ; sur tout le jeu, de 0,989 à 0,996.
-- [x] Calibration de Platt sur les notes hors pli des paires jugées. Sur 33 583 contributions hors entraînement, 162 ont une probabilité sous 0,5, 39 sous 0,2. Les paires jugées sur-représentent les alertes : la probabilité vaut pour un mélange semblable.
-- [ ] Nouveau tirage des 30 contributions les moins bien notées (`tour2.json`), jugé à l'aveugle. Probabilité calibrée de 0,02 à 0,17.
+- [x] Calibration de Platt sur les notes hors pli des paires jugées. Sur 33 583 contributions hors entraînement, 162 ont une probabilité sous 0,5, 39 sous 0,2.
+- [x] Tour 2 : les 30 contributions les moins bien notées (`tour2.json`), jugées à l'aveugle (`analyse_tour.py`, `verdicts_tour2/`), le 2026-11-25. 10 homonymes, 17 publications de la personne, 2 incertaines : précision de 10 sur 27 tranchées.
+  - Calibration : 11 % de publications de la personne prédites, 63 % observées. Les paires jugées sont trop peu nombreuses et trop riches en alertes pour calibrer.
+  - Rattachement par le nom : 9 publications de la personne sur 10 tranchées. Rattachement par un ORCID donné par HAL seul : 6 homonymes sur 8 tranchées. Rattachement par IdRef : 3 homonymes sur 9.
+  - Une personne à la production dispersée fournit 5 alertes, toutes de la personne. La similarité d'embeddings du modèle n'est pas normalisée par personne.
+  - Restreintes aux contributions signalables, titres génériques écartés, les alertes du tour comptent 9 homonymes sur 15.
+- [ ] Alertes restreintes aux contributions signalables selon la règle des clusters, titres et types génériques écartés.
+- [ ] Indice de similarité normalisée par personne : écart de la publication à la dispersion du profil, la publication notée exclue.
+- [ ] Tour 3 : les 30 contributions les moins bien notées après ces deux changements, sans calibration.
 
 ### Phase 3 — Arbres de gradient
 
