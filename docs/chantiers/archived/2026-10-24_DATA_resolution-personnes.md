@@ -8,7 +8,7 @@ La phase `author_grouping` réunit les contributions sources d'un même auteur d
 
 L'affiliation sert seulement à délimiter le périmètre. Une forme de nom partagée par deux personnes laisse la contribution source sans personne. Les affiliations fausses des sources, qui créent de fausses personnes du périmètre, relèvent du chantier [vérification des affiliations](../DATA_verification-affiliations.md).
 
-La résolution probabiliste relève du chantier [résolution probabiliste des personnes](../DATA_resolution-personnes-probabiliste.md).
+La résolution probabiliste relève du chantier [résolution probabiliste des personnes](2026-11-26_DATA_resolution-personnes-probabiliste.md).
 
 ## Décisions
 

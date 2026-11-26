@@ -12,8 +12,9 @@ from collections.abc import Mapping, Sequence
 from sqlalchemy import Connection, Row, text
 
 from pipeline.graph import Block, Phase, Task, in_transaction
-from pipeline.runtime.observability.log_format import quantity
+from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.dois import lookups
 from pipeline.transformation.publications.oa_inputs import OaFacts, oa_inputs
 
@@ -46,17 +47,19 @@ def _statuses(conn: Connection, rows: Sequence[Row[tuple[object, ...]]]) -> dict
     return {r.id: str(inputs[r.id].status()) for r in rows}
 
 
-def recompute_oa_status(conn: Connection, logger: logging.Logger) -> PhaseMetrics:  # noqa: ARG001
+def recompute_oa_status(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
     """Recalcule le statut open access de chaque publication et écrit les statuts qui changent. Le bilan donne, par statut, le nombre de publications et sa variation."""
     rows = conn.execute(_PUBLICATIONS).all()
     before: Counter[str] = Counter(str(r.oa_status) for r in rows)
     after: Counter[str] = Counter()
     changed: dict[int, str] = {}
-    for start in range(0, len(rows), BATCH_SIZE):
-        batch = rows[start : start + BATCH_SIZE]
-        computed = _statuses(conn, batch)
-        after.update(computed.values())
-        changed |= {r.id: computed[r.id] for r in batch if computed[r.id] != r.oa_status}
+    with track_progress(len(rows), f"{BRANCH}publications", logger, erase=True) as progress:
+        for start in range(0, len(rows), BATCH_SIZE):
+            batch = rows[start : start + BATCH_SIZE]
+            computed = _statuses(conn, batch)
+            after.update(computed.values())
+            changed |= {r.id: computed[r.id] for r in batch if computed[r.id] != r.oa_status}
+            progress.advance(len(batch))
     if changed:
         conn.execute(_WRITE_STATUSES, {"ids": list(changed), "statuses": list(changed.values())})
     metrics = PhaseMetrics(seen=len(rows), updated=len(changed))

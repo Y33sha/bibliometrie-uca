@@ -200,6 +200,10 @@ jobs:
       - name: Build production image
         run: docker build -t bibliometrie-uca:ci .
 
+      # Le Dockerfile énumère les paquets copiés : l'image doit importer l'API et le pipeline.
+      - name: Imports de l'image de production
+        run: docker run --rm bibliometrie-uca:ci python -c "import interfaces.api.app, pipeline.run"
+
       # Couche système de l'image. `ignore-unfixed` : échec seulement sur une faille corrigée en amont, que la mise à jour des paquets ferme à la construction suivante.
       - name: Vulnerability scan (image de production)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
