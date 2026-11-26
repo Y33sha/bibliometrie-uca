@@ -43,9 +43,10 @@ Mesure exploratoire du 2026-11-24 (`data/experiments/fausses-attributions/embedd
 - La méthode se choisit d'après des essais hors pipeline, évalués sur les verdicts humains, comme dans le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs.md).
 - Le modèle note des paires (contribution, personne candidate). Résolution : la personne candidate la mieux notée, si l'écart avec la suivante est net. Détection : une contribution rattachée et mal notée pour sa personne rejoint la file des attributions suspectes.
 - La création d'une personne pour un nom inconnu reste une règle.
-- Modèle discriminant : régression logistique régularisée, puis arbres de gradient s'ils la battent nettement. Probabilités calibrées. Un modèle bayésien naïf comme celui de Splink compte plusieurs fois des indices corrélés : laboratoire, structure HAL, revue, sous-champ, embedding.
+- Modèle discriminant : régression logistique régularisée, puis arbres de gradient s'ils la battent nettement. Un modèle bayésien naïf comme celui de Splink compte plusieurs fois des indices corrélés : laboratoire, structure HAL, revue, sous-champ, embedding.
 - Les identifiants sont hors des indices. Ils fournissent les étiquettes, puis un second signal.
 - Évaluation sur un découpage par personne : une personne figure dans l'entraînement ou dans le test, jamais dans les deux. Référence : la cascade de départage et la détection par clusters.
+- Embeddings des publications stockés en base dans un tableau de réels (`real[]`), 384 dimensions. Le type `vector` de l'extension pgvector reste possible pour une recherche des plus proches voisins dans tout le stock.
 
 ## Phasage
 

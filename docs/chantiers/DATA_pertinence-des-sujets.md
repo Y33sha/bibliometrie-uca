@@ -170,3 +170,4 @@ Les pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 - **Édition manuelle des rejets** : dans ce chantier ou dans [la gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md) ?
 - **Provenance des sujets ISTEX**, si les classifieurs donnent des sujets aux publications qui n'en ont pas : l'énumération `source_type` de `publication_subjects.source` ne la prévoit pas.
 - **Specter2** : variante du modèle (`allenai/specter2_base`, `proximity`, `classification`), exécution (locale sur CPU ou GPU, ou hébergée), persistance des vecteurs (pgvector ou fichier numpy). 74 600 publications à encoder.
+- **Embeddings du chantier [résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)** : titre et début du résumé, modèle multilingue `paraphrase-multilingual-MiniLM-L12-v2`, 384 dimensions, stockés en base. Réutilisables ici à la place d'un modèle propre ?
