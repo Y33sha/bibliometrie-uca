@@ -46,7 +46,7 @@ Mesure exploratoire du 2026-11-24 (`data/experiments/fausses-attributions/embedd
 - Modèle discriminant : régression logistique régularisée, puis arbres de gradient s'ils la battent nettement. Un modèle bayésien naïf comme celui de Splink compte plusieurs fois des indices corrélés : laboratoire, structure HAL, revue, sous-champ.
 - Les identifiants sont hors des indices. Ils fournissent les étiquettes, puis un second signal.
 - Évaluation sur un découpage par personne : une personne figure dans l'entraînement ou dans le test, jamais dans les deux. Référence : la cascade de départage et la détection par clusters.
-- Indice de contenu du modèle de production : cosinus des sous-champs OpenAlex. Les embeddings n'apportent pas de gain mesurable (phase 2).
+- Indice de contenu : cosinus des sous-champs OpenAlex. Les embeddings n'apportent pas de gain mesurable (phase 2).
 
 ## Phasage
 
@@ -55,7 +55,7 @@ Mesure exploratoire du 2026-11-24 (`data/experiments/fausses-attributions/embedd
 Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py`, `indices.py`), hors pipeline. Les personnes sont celles du jeu des embeddings. Les contributions aux seuls rôles de jury de thèse sont écartées, du jeu comme des profils. Jeu du 2026-11-25 : 29 433 paires avec indices, de 1 099 personnes, dont 1 263 négatives. Négatives avant le calcul des indices : rejets 857, homonymes par le nom 283, autres candidates d'une forme ambiguë 126, verdicts 14.
 
 - [x] Embeddings des publications, modèle `paraphrase-multilingual-MiniLM-L12-v2`.
-- [x] Positifs : épinglages, confirmations, verdicts « de la personne ». S'y ajoutent les contributions rattachées par un identifiant donné par au moins deux sources, ou par un ORCID de Crossref, DataCite, INSPIRE-HEP ou du `raw_orcid` d'OpenAlex. HAL et ScanR seuls sont exclus : l'ORCID de ScanR seul est faux une fois sur deux.
+- [x] Positifs : épinglages, confirmations, verdicts « de la personne ». S'y ajoutent les contributions rattachées par un ORCID de Crossref, DataCite, INSPIRE-HEP ou du `raw_orcid` d'OpenAlex. HAL et ScanR seuls sont exclus : l'ORCID de ScanR seul est faux une fois sur deux. Les sources se recopient : un identifiant présent dans deux sources ne compte pas comme positif. Sans ces positifs (`sans_multi_sources.py`), l'AUC des paires évaluées passe de 0,914 à 0,911.
 - [x] Négatifs : rejets, verdicts « homonyme », autres personnes candidates d'un nom ambigu sur les contributions positives, autres personnes de même nom de famille et de même initiale. Un prénom complet identique compte seulement entre personnes déclarées distinctes.
 - [x] Indices de chaque paire. La publication notée est exclue du profil de la personne.
   - Réseau : coauteurs partagés pondérés par leur rareté, laboratoire, structure HAL, revue.
@@ -128,14 +128,31 @@ Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py
 
 ### Phase 5 — Intégration
 
-- [ ] Dépendance scikit-learn, avec la tâche de notation des paires.
-- [ ] Tâche de notation des paires et motif « modèle » de la file des attributions suspectes, limité aux contributions signalables. Une ligne par contribution : motif des clusters, à défaut ressemblance aux publications rejetées, à défaut modèle.
-- [ ] Seuil sur la probabilité calibrée. Calibration de Platt sur les verdicts et les décisions de la file, recalculée à chaque run.
-- [ ] Identifiants comme second signal. Un désaccord entre le modèle et les identifiants signale une erreur d'identifiant ou une fausse attribution, présentée à l'administration.
+Le modèle, troisième voie de la file des attributions suspectes, vise la publication isolée d'un homonyme chez une personne sans rejet. Les clusters demandent au moins deux publications. La ressemblance aux publications rejetées demande des rejets.
 
-### Phase 6 — Documentation
+- [x] Homonyme aux publications nombreuses (`contamination.py`), le 2026-11-26. Chaque rejet est noté comme s'il était rattaché. Les autres publications de l'homonyme sont absentes du profil (A), ou présentes (B). Rejets signalés au seuil de 1 % des positives :
 
-- [ ] Mise à jour de la documentation du pipeline, de la détection des attributions suspectes, de l'administration et de la liste des phases de `CLAUDE.md`.
+  | Rejets de la personne | Rejets | Signalés en A | Signalés en B |
+  |---|---|---|---|
+  | 1 | 26 | 21 | 21 |
+  | 2 à 5 | 28 | 21 | 15 |
+  | 6 à 20 | 48 | 44 | 9 |
+  | plus de 20 | 755 | 708 | 10 |
+
+  Le modèle laisse aux clusters les homonymes aux publications nombreuses.
+- [x] Recouvrement avec les deux autres voies : 18 des 19 homonymes jugés encore rattachés sont absents de la file. 42 des 69 homonymes jugés sont seuls pour leur personne. 64 des 69 personnes ont une fiche RH.
+- [x] Verdicts des pages de jugement inscrits en base (`record_review_verdicts`) : 87 épinglages, 19 rejets. 43 verdicts « homonyme » portent sur des publications purgées.
+- [x] Essai du code de production (`banc_production.py`, `variantes_production.py`), le 2026-11-26. Population : personnes à fiche RH d'au moins quatre publications, et personnes ayant un rejet, soit 1 402 personnes. 16 579 paires étiquetées, dont 1 622 décidées par l'administration (épinglages et rejets). Banc : 72 paires jugées, 21 homonymes.
+
+  | Pondération à l'apprentissage | AUC | Homonymes parmi les 10 / 20 / 30 moins bien notées | Alertes sur le stock |
+  |---|---|---|---|
+  | Uniforme | 0,874 | 6 / 13 / 20 | 115 |
+  | Paires décidées × 20 | 0,853 | 6 / 12 / 18 | 164 |
+  | Verdicts × 20 | 0,909 | 7 / 13 / 20 | 22 |
+
+  - En base, un verdict est un épinglage ou un rejet parmi les autres décisions. Seuls les fichiers des pages de jugement distinguent les verdicts.
+  - Calibration de Platt sur les paires décidées : 33 à 38 % des paires du banc prédites sous 0,2 sont de la personne. La note ordonne les paires, sa probabilité est fausse.
+- [x] Intégration abandonnée. Le code essayé est conservé dans `data/experiments/resolution-probabiliste/integration_abandonnee/`.
 
 ## Questions ouvertes
 
