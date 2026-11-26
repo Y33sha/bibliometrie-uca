@@ -43,10 +43,10 @@ Mesure exploratoire du 2026-11-24 (`data/experiments/fausses-attributions/embedd
 - La méthode se choisit d'après des essais hors pipeline, évalués sur les verdicts humains, comme dans le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs.md).
 - Le modèle note des paires (contribution, personne candidate). Résolution : la personne candidate la mieux notée, si l'écart avec la suivante est net. Détection : une contribution rattachée et mal notée pour sa personne rejoint la file des attributions suspectes.
 - La création d'une personne pour un nom inconnu reste une règle.
-- Modèle discriminant : régression logistique régularisée, puis arbres de gradient s'ils la battent nettement. Un modèle bayésien naïf comme celui de Splink compte plusieurs fois des indices corrélés : laboratoire, structure HAL, revue, sous-champ, embedding.
+- Modèle discriminant : régression logistique régularisée, puis arbres de gradient s'ils la battent nettement. Un modèle bayésien naïf comme celui de Splink compte plusieurs fois des indices corrélés : laboratoire, structure HAL, revue, sous-champ.
 - Les identifiants sont hors des indices. Ils fournissent les étiquettes, puis un second signal.
 - Évaluation sur un découpage par personne : une personne figure dans l'entraînement ou dans le test, jamais dans les deux. Référence : la cascade de départage et la détection par clusters.
-- Embeddings des publications stockés en base dans un tableau de réels (`real[]`), 384 dimensions. Le type `vector` de l'extension pgvector reste possible pour une recherche des plus proches voisins dans tout le stock.
+- Indice de contenu du modèle de production : cosinus des sous-champs OpenAlex. Les embeddings n'apportent pas de gain mesurable (phase 2).
 
 ## Phasage
 
@@ -106,6 +106,17 @@ Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py
   - Coauteurs dans la publication, homonymes contre publications de la personne : à fiche RH, 4 contre 24 dès un coauteur, 0 contre 8 à partir de trois ; du périmètre, 0 contre 10 à partir de cinq ; rattachés au CHU, 1 contre 8 à partir de deux.
   - L'écart de similarité normalisée entre publications de la personne et homonymes se réduit avec la taille de la publication : 2,1 points sous 10 contributions, 0,6 au-delà de 100.
 - [x] Règle du groupe de coauteurs écartée : une contribution à au moins 3 coauteurs à fiche RH ou 5 coauteurs du périmètre, dans une publication de 100 contributions au plus, est retirée des alertes. Sur les paires évaluées, elle retire une fausse alerte des 30 premières. Sur tout le jeu, elle protège 235 paires négatives, dont 71 rejets : homonymes de l'établissement, entourés eux aussi de coauteurs du périmètre.
+- [x] Apport des embeddings (`apport_embeddings.py`), le 2026-11-26. Le score thématique compare l'embedding de la publication à ceux des libellés de thèmes : il compte parmi les indices d'embeddings. Paires évaluées : les 79 du banc d'essais. Jeu entier : paires étiquetées hors paires jugées.
+
+  | Indices | AUC, paires évaluées | Homonymes parmi les 10 / 20 / 30 paires évaluées les moins bien notées | Négatives parmi les 1 000 paires du jeu entier les moins bien notées |
+  |---|---|---|---|
+  | Tous | 0,929 | 9 / 16 / 25 | 952 |
+  | Sans embeddings, cosinus des sous-champs gardé | 0,914 | 9 / 16 / 22 | 946 |
+  | Sans indice de contenu | 0,915 | 9 / 15 / 23 | 842 |
+
+  - Le cosinus des sous-champs OpenAlex fournit le signal du contenu.
+  - Calibration de Platt en cinq plis groupés par personne, sur les paires évaluées. Au-dessus de 0,8 de probabilité d'être de la personne : 38 paires, 97 % de la personne. Sous 0,5 : 32 alertes, dont 25 homonymes.
+  - Les paires évaluées comptent 35 % d'homonymes, le stock beaucoup moins. Au tour 2, la calibration surestimait l'homonymie.
 
 ### Phase 3 — Arbres de gradient
 
@@ -117,16 +128,9 @@ Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py
 
 ### Phase 5 — Intégration
 
-Décisions du 2026-11-26 : embeddings dans une table à part (publication, modèle, empreinte du texte encodé, vecteur `real[]`), encodage plafonné en nombre de publications par run comme les interrogations d'API, dépendances fastembed et scikit-learn. Texte encodé : titre, puis résumé. Le modèle lit 128 tokens, soit environ 520 caractères en médiane. L'empreinte porte sur les 1 000 premiers caractères.
-
-- [x] Dépendance fastembed. c1761acdc
 - [ ] Dépendance scikit-learn, avec la tâche de notation des paires.
-- [x] Migration : table `publication_embeddings`, clé `embeddings_max_per_run` (3 000 par défaut). c1761acdc
-- [x] Phase `embeddings`, après `subjects` : publications sans embedding, ou dont l'empreinte du texte ou le modèle diffère, dans la limite du plafond. c1761acdc
-- [x] Commande `encode_publications` pour remplir le stock hors run. c1761acdc
-- [x] Modèle intégré à l'image Docker (241 Mo), dans une couche gardée en cache tant que le modèle ne change pas. e5b4f22d4
-- [ ] Remplissage du stock : 78 715 publications.
-- [ ] Tâche de notation des paires et motif « modèle » de la file des attributions suspectes, limité aux contributions signalables.
+- [ ] Tâche de notation des paires et motif « modèle » de la file des attributions suspectes, limité aux contributions signalables. Une ligne par contribution : motif des clusters, à défaut ressemblance aux publications rejetées, à défaut modèle.
+- [ ] Seuil sur la probabilité calibrée. Calibration de Platt sur les verdicts et les décisions de la file, recalculée à chaque run.
 - [ ] Identifiants comme second signal. Un désaccord entre le modèle et les identifiants signale une erreur d'identifiant ou une fausse attribution, présentée à l'administration.
 
 ### Phase 6 — Documentation

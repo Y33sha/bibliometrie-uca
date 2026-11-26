@@ -83,4 +83,4 @@ Prérequis : phase 3 du chantier [alignement des auteurs](archived/2026-10-24_DA
 ## Questions ouvertes
 
 - **Interdiction de fusion** : forme du verdict, et son effet sur deux enregistrements sources qui partagent un DOI. Cas : un DOI secondaire cité par un seul enregistrement source d'agrégateur réunit deux œuvres (165353, 27616).
-- **Doublons potentiels par similarité d'embeddings** du titre et du résumé, à côté de la similarité de titre. Les embeddings sont stockés en base par le chantier [résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md). La recherche des plus proches voisins dans tout le stock demande l'extension pgvector.
+- **Doublons potentiels par similarité d'embeddings** du titre et du résumé, à côté de la similarité de titre. La recherche des plus proches voisins dans tout le stock demande l'extension pgvector.
