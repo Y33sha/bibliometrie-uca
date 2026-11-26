@@ -152,6 +152,8 @@ Le modèle, troisième voie de la file des attributions suspectes, vise la publi
 
   - En base, un verdict est un épinglage ou un rejet parmi les autres décisions. Seuls les fichiers des pages de jugement distinguent les verdicts.
   - Calibration de Platt sur les paires décidées : 33 à 38 % des paires du banc prédites sous 0,2 sont de la personne. La note ordonne les paires, sa probabilité est fausse.
+- [x] Décisions difficiles repérées par la note avant décision (`variantes_difficiles.py`) : note hors pli de poids uniforme, décision contredite par la note ou note entre 0,1 et 0,9. 112 décisions contredites, dont 102 épinglages et 10 rejets ; 238 incertaines. Pondérées × 20, elles font tomber l'AUC à 0,83. La calibration sur ces seules décisions ne donne aucune alerte.
+  - Les verdicts réunissent 69 homonymes et 87 publications de la personne, tirés des mêmes alertes. Les décisions contredites sont presque toutes des épinglages : les homonymes des verdicts ont une note basse, comme les rejets faciles.
 - [x] Intégration abandonnée. Le code essayé est conservé dans `data/experiments/resolution-probabiliste/integration_abandonnee/`.
 
 ## Questions ouvertes
