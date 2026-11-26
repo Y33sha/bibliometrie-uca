@@ -14,6 +14,7 @@
 * [ ] revue dans une liste officielle, avec type autre que "revue": auditer
 * [ ] personnes: stocker les dates min et max des contributions dans le périmètre, pour filtrer les auteurs par période d'activité
 * [ ] référentiel des conférences?
+* [ ] colonne BOOL deprecated dans person_identifiers (masquer de l'UI)
 # UI
 ## Admin
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
