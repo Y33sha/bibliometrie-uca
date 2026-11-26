@@ -155,7 +155,3 @@ Le modèle, troisième voie de la file des attributions suspectes, vise la publi
 - [x] Décisions difficiles repérées par la note avant décision (`variantes_difficiles.py`) : note hors pli de poids uniforme, décision contredite par la note ou note entre 0,1 et 0,9. 112 décisions contredites, dont 102 épinglages et 10 rejets ; 238 incertaines. Pondérées × 20, elles font tomber l'AUC à 0,83. La calibration sur ces seules décisions ne donne aucune alerte.
   - Les verdicts réunissent 69 homonymes et 87 publications de la personne, tirés des mêmes alertes. Les décisions contredites sont presque toutes des épinglages : les homonymes des verdicts ont une note basse, comme les rejets faciles.
 - [x] Intégration abandonnée. Le code essayé est conservé dans `data/experiments/resolution-probabiliste/integration_abandonnee/`.
-
-## Questions ouvertes
-
-- Écart minimal entre la meilleure personne candidate et la suivante pour rattacher une contribution.

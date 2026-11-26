@@ -13,10 +13,10 @@
 - [Dashboard, point d'entrée de la vue Statistiques](UI_dashboard-point-d-entree.md)
 - [Financements](DATA_financements.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 
 ## Chantiers archivés
 
+- 2026-11-26 — [Résolution probabiliste des personnes](archived/2026-11-26_DATA_resolution-personnes-probabiliste.md)
 - 2026-11-25 — [Modèle open access des revues](archived/2026-11-25_DATA_modele-open-access-des-revues.md)
 - 2026-11-25 — [Refactorisation : normalisation](archived/2026-11-25_CODE_refacto-normalisation.md)
 - 2026-11-24 — [Vérification des affiliations des sources](archived/2026-11-24_DATA_verification-affiliations.md)
