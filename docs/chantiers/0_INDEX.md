@@ -6,7 +6,7 @@
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
-- [Retrait de la source ScanR](DATA_source-scanr.md)
+- [Source ScanR](DATA_source-scanr.md)
 
 ### Non commencé
 
