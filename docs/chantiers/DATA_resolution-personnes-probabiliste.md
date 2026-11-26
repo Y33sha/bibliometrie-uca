@@ -117,7 +117,13 @@ Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py
 
 ### Phase 5 — Intégration
 
-- [ ] Décisions préalables : stockage des embeddings en base, dépendance à scikit-learn, tâche du pipeline qui note les paires.
+Décisions du 2026-11-26 : embeddings dans une table à part (publication, modèle, empreinte du texte encodé, vecteur `real[]`), encodage plafonné en nombre de publications par run comme les interrogations d'API, dépendances fastembed et scikit-learn. Texte encodé : titre, puis résumé. Le modèle lit 128 tokens, soit environ 520 caractères en médiane. L'empreinte porte sur les 1 000 premiers caractères.
+
+- [ ] Dépendances fastembed et scikit-learn.
+- [ ] Migration : table des embeddings des publications, clé de configuration du plafond.
+- [ ] Tâche d'encodage : publications sans embedding, ou dont l'empreinte du texte ou le modèle diffère, dans la limite du plafond.
+- [ ] Commande de maintenance pour remplir le stock hors run.
+- [ ] Tâche de notation des paires et motif « modèle » de la file des attributions suspectes, limité aux contributions signalables.
 - [ ] Identifiants comme second signal. Un désaccord entre le modèle et les identifiants signale une erreur d'identifiant ou une fausse attribution, présentée à l'administration.
 - [ ] Résolution indépendante de l'ordre d'arrivée des enregistrements sources. Les rattachements non épinglés sont remis en jeu à chaque passage.
 
