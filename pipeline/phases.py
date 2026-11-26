@@ -23,7 +23,6 @@ from pipeline.transformation.persons import persons, suspect_attributions
 from pipeline.transformation.publications import open_access, publications
 from pipeline.transformation.publications.author_grouping import author_grouping
 from pipeline.transformation.publications.correction import metadata_correction
-from pipeline.transformation.publications.embeddings import embeddings
 from pipeline.transformation.publications.relations import relations
 from pipeline.transformation.publications.subjects import subjects
 from pipeline.transformation.publishing import publishing
@@ -46,7 +45,6 @@ PHASES: tuple[Phase, ...] = (
     publications.PHASE,
     relations.PHASE,
     subjects.PHASE,
-    embeddings.PHASE,
     author_grouping.PHASE,
     persons.PHASE,
     suspect_attributions.PHASE,

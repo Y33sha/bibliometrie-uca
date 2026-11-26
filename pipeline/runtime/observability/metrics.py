@@ -13,7 +13,6 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     "changed": "modifié",
     "conflicts": "conflit",
     "disappeared": "disparu",
-    "embeddings_pending": ("publication encore à encoder", "publications encore à encoder"),
     "fetched": "récupéré",
     "attached_by_issn": ("rattaché par ISSN", "rattachés par ISSN"),
     "attached_by_openalex": (

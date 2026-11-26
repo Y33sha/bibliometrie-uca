@@ -45,15 +45,6 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
     uv sync --frozen --no-dev --no-cache --no-install-project
 
-# Modèle d'embeddings de la phase `embeddings`, téléchargé à la construction : la racine du conteneur est en lecture seule. Seul le module qui nomme le modèle est copié, pour que la couche reste en cache tant que le modèle ne change pas.
-ENV EMBEDDINGS_MODEL_DIR=/app/models
-COPY infrastructure/embedding_model.py /tmp/embedding_model.py
-RUN /app/.venv/bin/python -c "import runpy; from fastembed import TextEmbedding; TextEmbedding(runpy.run_path('/tmp/embedding_model.py')['EMBEDDING_MODEL'], cache_dir='/app/models')" \
-    && rm /tmp/embedding_model.py \
-    && chmod -R a+rX /app/models
-# Le modèle est dans l'image : aucune requête vers Hugging Face à l'exécution.
-ENV HF_HUB_OFFLINE=1
-
 COPY application/     ./application/
 COPY domain/          ./domain/
 COPY infrastructure/  ./infrastructure/
@@ -68,7 +59,7 @@ ENV PATH="/app/.venv/bin:${PATH}"
 # Frontend buildé, servi par l'API (`SPAStaticFiles`).
 COPY --from=frontend-build /app/interfaces/frontend/build ./interfaces/frontend/build
 
-# Utilisateur non privilégié. `data/` et `logs/` sont créés dans l'image : un volume monté dessus appartient alors à l'utilisateur applicatif. Le reste de `/app` reste à root, lisible par tous : un `chown` récursif recopierait le modèle et l'environnement Python dans une couche de plus.
+# Utilisateur non privilégié. `data/` et `logs/` sont créés dans l'image : un volume monté dessus appartient alors à l'utilisateur applicatif. Le reste de `/app` reste à root, lisible par tous : un `chown` récursif recopierait l'environnement Python dans une couche de plus.
 RUN mkdir -p /app/data /app/logs \
     && useradd --uid 10001 --home-dir /app --shell /usr/sbin/nologin --no-create-home appuser \
     && chown appuser:appuser /app/data /app/logs

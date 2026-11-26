@@ -1933,28 +1933,6 @@ publication_subjects = Table(
 )
 
 
-publication_embeddings = Table(
-    "publication_embeddings",
-    metadata,
-    Column("publication_id", Integer, primary_key=True),
-    Column("model", Text, nullable=False, comment="Modèle d'embeddings du vecteur."),
-    Column(
-        "text_hash",
-        Text,
-        nullable=False,
-        comment="Empreinte du début du texte encodé : un texte modifié au-delà reste lu à l'identique par le modèle.",
-    ),
-    Column("vector", ARRAY(REAL), nullable=False, comment="Vecteur normalisé."),
-    Column("computed_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
-    CheckConstraint("cardinality(vector) > 0", name="publication_embeddings_vector_not_empty"),
-    comment=(
-        "Embedding de chaque publication : titre suivi du résumé, encodés par le modèle `model`. "
-        "La phase `embeddings` encode les publications sans vecteur, ou dont le modèle ou l'empreinte du texte diffère."
-    ),
-    schema="publications",
-)
-
-
 relation_type_enum = PgEnum(*RelationType, name="relation_type", create_type=False)
 
 
