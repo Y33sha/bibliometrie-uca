@@ -104,6 +104,7 @@ Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py
   - Les paires évaluées comptent 35 % d'homonymes. La précision des alertes dans le stock est plus basse.
   - Coauteurs dans la publication, homonymes contre publications de la personne : à fiche RH, 4 contre 24 dès un coauteur, 0 contre 8 à partir de trois ; du périmètre, 0 contre 10 à partir de cinq ; rattachés au CHU, 1 contre 8 à partir de deux.
   - L'écart de similarité normalisée entre publications de la personne et homonymes se réduit avec la taille de la publication : 2,1 points sous 10 contributions, 0,6 au-delà de 100.
+- [x] Règle du groupe de coauteurs écartée : une contribution à au moins 3 coauteurs à fiche RH ou 5 coauteurs du périmètre, dans une publication de 100 contributions au plus, est retirée des alertes. Sur les paires évaluées, elle retire une fausse alerte des 30 premières. Sur tout le jeu, elle protège 235 paires négatives, dont 71 rejets : homonymes de l'établissement, entourés eux aussi de coauteurs du périmètre.
 
 ### Phase 3 — Arbres de gradient
 
