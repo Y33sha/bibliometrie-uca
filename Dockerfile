@@ -44,6 +44,7 @@ COPY application/     ./application/
 COPY domain/          ./domain/
 COPY infrastructure/  ./infrastructure/
 COPY interfaces/      ./interfaces/
+COPY pipeline/        ./pipeline/
 
 # Versions de `uv.lock`, celles de l'intégration continue. uv est monté pour cette seule instruction, et `--no-cache` écarte les archives des paquets : l'image finale ne contient ni l'un ni les autres.
 RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
