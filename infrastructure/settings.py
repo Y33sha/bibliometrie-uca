@@ -94,6 +94,10 @@ class Settings(BaseSettings):
     biblio_raw_store_dir: str = ""
     """Répertoire de l'archive, quand le pipeline tourne avec `--raw-store`. Vide : `data/raw_store` à la racine du dépôt."""
 
+    # ----- Embeddings des publications -----
+    embeddings_model_dir: str = ""
+    """Répertoire des fichiers du modèle d'embeddings, téléchargés au premier usage. Vide : `data/models` à la racine du dépôt. L'image Docker l'embarque et le désigne."""
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _parse_cors_origins(cls, value: object) -> object:

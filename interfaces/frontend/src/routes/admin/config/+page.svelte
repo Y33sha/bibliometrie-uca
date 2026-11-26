@@ -137,13 +137,14 @@
     perimModal.structures = perimModal.structures.filter((s) => s.id !== sid);
   }
 
-  /** Plafonds d'interrogation des API, dont le champ vidé retire la borne. */
+  /** Plafonds par run, dont le champ vidé retire la borne. */
   const CAPS = [
     { key: "fetch_missing_max_per_source", label: "Imports par DOI : max par source" },
     { key: "fetch_stale_max_per_source", label: "Documents non revus : max par source" },
     { key: "unpaywall_max_per_run", label: "Unpaywall" },
     { key: "doi_resolution_max_per_run", label: "doi.org (URL des DOI)" },
     { key: "sudoc_max_per_run", label: "Sudoc : revues vérifiées" },
+    { key: "embeddings_max_per_run", label: "Embeddings : publications encodées" },
   ];
 
   /** Délais au-delà desquels le pipeline interroge de nouveau une source, en jours. */

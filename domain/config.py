@@ -26,6 +26,8 @@ class ConfigKey(StrEnum):
     """Nombre d'ISSN vérifiés dans le Sudoc par run."""
     DOI_RESOLUTION_MAX_PER_RUN = "doi_resolution_max_per_run"
     """Nombre de DOI dont l'URL de résolution est lue chez doi.org par run."""
+    EMBEDDINGS_MAX_PER_RUN = "embeddings_max_per_run"
+    """Nombre de publications encodées par la phase `embeddings` par run."""
     FETCH_STALE_AFTER_DAYS = "fetch_stale_after_days"
     """Âge au-delà duquel un document de `staging` est interrogé de nouveau à sa source, par source."""
     FETCH_MISSING_RETRY_AFTER_DAYS = "fetch_missing_retry_after_days"
@@ -172,6 +174,7 @@ SETTINGS: dict[ConfigKey, ConfigSetting] = {
     ConfigKey.FETCH_STALE_MAX_PER_SOURCE: ConfigSetting(_cap, 0, bounds=CAP_BOUNDS),
     ConfigKey.SUDOC_MAX_PER_RUN: ConfigSetting(_cap, 10_000, bounds=CAP_BOUNDS),
     ConfigKey.DOI_RESOLUTION_MAX_PER_RUN: ConfigSetting(_cap, 10_000, bounds=CAP_BOUNDS),
+    ConfigKey.EMBEDDINGS_MAX_PER_RUN: ConfigSetting(_cap, 3_000, bounds=CAP_BOUNDS),
     ConfigKey.FETCH_STALE_AFTER_DAYS: ConfigSetting(
         _delay_by_source, {s.value: 90 for s in Source}, bounds=DELAY_BOUNDS
     ),

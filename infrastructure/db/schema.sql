@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict u4MngzYd8nOyMSwS4aCAtTn0GTceBrPoAwOpymnhTMHBc4f2OcP438zLwzRNjHx
+\restrict geRc0mnpF3eWTrCyxYhwoewU1yfoTV2UnDXSYPQUvQVKHjIctTXms3MyjRqQc8e
 
 -- Dumped from database version 18.7 (Ubuntu 18.7-1.pgdg22.04+5)
 -- Dumped by pg_dump version 19.0 (Ubuntu 19.0-2.pgdg22.04+1)
@@ -751,7 +751,7 @@ CREATE TABLE ops.config (
     description text,
     created_at timestamp with time zone DEFAULT now(),
     CONSTRAINT config_brand_hue_is_angle CHECK (((key <> 'brand_hue'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (0)::numeric) AND ((value)::numeric <= (359)::numeric)) AND ((value)::numeric = trunc((value)::numeric))))),
-    CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['doi_resolution_max_per_run'::text, 'fetch_missing_max_per_source'::text, 'fetch_stale_max_per_source'::text, 'sudoc_max_per_run'::text, 'unpaywall_max_per_run'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
+    CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['doi_resolution_max_per_run'::text, 'embeddings_max_per_run'::text, 'fetch_missing_max_per_source'::text, 'fetch_stale_max_per_source'::text, 'sudoc_max_per_run'::text, 'unpaywall_max_per_run'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_delay_by_source_is_object CHECK (((key <> 'fetch_stale_after_days'::text) OR (jsonb_typeof(value) = 'object'::text))),
     CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'doi_resolution_recheck_after_days'::text, 'fetch_missing_retry_after_days'::text, 'issnl_table_refresh_after_days'::text, 'serial_openalex_recheck_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_institution_country_is_code CHECK (((key <> 'institution_country'::text) OR ((jsonb_typeof(value) = 'string'::text) AND ((value #>> '{}'::text[]) ~ '^[a-z]{2}$'::text) AND ((value #>> '{}'::text[]) <> 'xx'::text)))),
@@ -1857,6 +1857,48 @@ CREATE MATERIALIZED VIEW publications.publication_author_alignment AS
 --
 
 COMMENT ON MATERIALIZED VIEW publications.publication_author_alignment IS 'Recouvrement des listes d''auteurs des publications à plusieurs enregistrements sources. matched_source_contributions : contributions sources qui ont un correspondant dans un autre enregistrement source.';
+
+
+--
+-- Name: publication_embeddings; Type: TABLE; Schema: publications; Owner: -
+--
+
+CREATE TABLE publications.publication_embeddings (
+    publication_id integer NOT NULL,
+    model text NOT NULL,
+    text_hash text NOT NULL,
+    vector real[] NOT NULL,
+    computed_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT publication_embeddings_vector_not_empty CHECK ((cardinality(vector) > 0))
+);
+
+
+--
+-- Name: TABLE publication_embeddings; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON TABLE publications.publication_embeddings IS 'Embedding de chaque publication : titre suivi du résumé, encodés par le modèle `model`. La phase `embeddings` encode les publications sans vecteur, ou dont le modèle ou l''empreinte du texte diffère.';
+
+
+--
+-- Name: COLUMN publication_embeddings.model; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.publication_embeddings.model IS 'Modèle d''embeddings du vecteur.';
+
+
+--
+-- Name: COLUMN publication_embeddings.text_hash; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.publication_embeddings.text_hash IS 'Empreinte du début du texte encodé : un texte modifié au-delà reste lu à l''identique par le modèle.';
+
+
+--
+-- Name: COLUMN publication_embeddings.vector; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.publication_embeddings.vector IS 'Vecteur normalisé.';
 
 
 --
@@ -4177,6 +4219,14 @@ ALTER TABLE ONLY publications.manual_merges
 
 
 --
+-- Name: publication_embeddings publication_embeddings_pkey; Type: CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.publication_embeddings
+    ADD CONSTRAINT publication_embeddings_pkey PRIMARY KEY (publication_id);
+
+
+--
 -- Name: publication_relations publication_relations_pkey; Type: CONSTRAINT; Schema: publications; Owner: -
 --
 
@@ -5898,6 +5948,14 @@ ALTER TABLE ONLY publications.manual_merge_source_records
 
 
 --
+-- Name: publication_embeddings publication_embeddings_publication_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.publication_embeddings
+    ADD CONSTRAINT publication_embeddings_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES publications.publications(id) ON DELETE CASCADE;
+
+
+--
 -- Name: publication_relations publication_relations_from_publication_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
 --
 
@@ -6421,5 +6479,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict u4MngzYd8nOyMSwS4aCAtTn0GTceBrPoAwOpymnhTMHBc4f2OcP438zLwzRNjHx
+\unrestrict geRc0mnpF3eWTrCyxYhwoewU1yfoTV2UnDXSYPQUvQVKHjIctTXms3MyjRqQc8e
 
