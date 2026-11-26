@@ -7,10 +7,8 @@ from typing import Protocol, cast
 import numpy as np
 
 from infrastructure import PROJECT_ROOT
+from infrastructure.embedding_model import EMBEDDING_MODEL
 from infrastructure.settings import settings
-
-EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-"""Modèle multilingue à 384 dimensions. Il lit les 128 premiers tokens du texte, soit environ 500 caractères."""
 
 
 class TextEncoder(Protocol):
