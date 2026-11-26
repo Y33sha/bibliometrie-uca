@@ -109,11 +109,11 @@ Scripts et données dans `data/experiments/resolution-probabiliste/` (`paires.py
 
 ### Phase 3 — Arbres de gradient
 
-- [ ] Arbres de gradient (`HistGradientBoosting`), comparés à la régression logistique.
+- [x] Arbres de gradient (`HistGradientBoosting`), comparés à la régression logistique dans le banc d'essais : AUC de 0,94 contre 0,93, sans gain net. La régression logistique est retenue.
 
-### Phase 4 — Apprentissage actif
+### Phase 4 — Apprentissage continu
 
-- [ ] Tours de jugement dans la page des alertes : paires les plus suspectes et paires les plus incertaines. Les verdicts rejoignent les étiquettes, puis le modèle est réentraîné et remesuré.
+- [x] Les rejets et les confirmations de la file des attributions suspectes deviennent des étiquettes, et le modèle se réentraîne à chaque run. Les tours de jugement dédiés sont abandonnés.
 
 ### Phase 5 — Intégration
 
@@ -128,7 +128,10 @@ Décisions du 2026-11-26 : embeddings dans une table à part (publication, modè
 - [ ] Remplissage du stock : 78 715 publications.
 - [ ] Tâche de notation des paires et motif « modèle » de la file des attributions suspectes, limité aux contributions signalables.
 - [ ] Identifiants comme second signal. Un désaccord entre le modèle et les identifiants signale une erreur d'identifiant ou une fausse attribution, présentée à l'administration.
-- [ ] Résolution indépendante de l'ordre d'arrivée des enregistrements sources. Les rattachements non épinglés sont remis en jeu à chaque passage.
+
+### Phase 6 — Documentation
+
+- [ ] Mise à jour de la documentation du pipeline, de la détection des attributions suspectes, de l'administration et de la liste des phases de `CLAUDE.md`.
 
 ## Questions ouvertes
 
