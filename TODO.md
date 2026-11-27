@@ -1,6 +1,6 @@
 # Pipeline
 ## Extraction
-* [ ] Dimensions?; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
+* [ ] Sudoc? Cairn, Persée pour augmenter couverture SHS?
 * [ ] payloads bruts: ne plus faire transiter par la base?
 * [ ] openalex: chercher par ROR plutôt que par i***?
 ## Suite du traitement
