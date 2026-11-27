@@ -40,17 +40,18 @@
 	let lab: Structure | null = $state(null);
 	let thesesCount = $state(0);
 	let membersCount = $state(0);
-	let hrPersonsCount = $state(0);
+	let hasPartners = $state(false);
+	let hasAddresses = $state(false);
 	let error = $state(false);
 
-	// L'onglet « Adresses » est réservé à la session admin.
+	// Les onglets Thèses, Collaborations et Adresses s'affichent seulement quand leur liste est non vide. L'onglet « Adresses » est réservé à la session admin.
 	const tabs: TabDef[] = $derived([
 		{ id: 'dashboard', label: 'Dashboard' },
 		{ id: 'publications', label: 'Publications' },
 		...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
 		{ id: 'persons', label: 'Personnes' },
-		{ id: 'collaborations', label: 'Collaborations' },
-		...(isAdmin() ? [{ id: 'addresses', label: 'Adresses' }] : []),
+		...(hasPartners ? [{ id: 'collaborations', label: 'Collaborations' }] : []),
+		...(isAdmin() && hasAddresses ? [{ id: 'addresses', label: 'Adresses' }] : []),
 	]);
 	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
@@ -73,7 +74,8 @@
 			lab = profileData.structure;
 			thesesCount = profileData.theses_count;
 			membersCount = profileData.members_count;
-			hrPersonsCount = profileData.hr_persons_count;
+			hasPartners = profileData.has_partners;
+			hasAddresses = profileData.has_addresses;
 			return true;
 		} catch {
 			error = true;
@@ -200,12 +202,7 @@
 	<!-- Tab: Adresses -->
 	{#if activeTab === 'addresses'}
 		<div class="tab-content">
-			<!-- L'onglet lit les publications des membres pendant leur présence : sans période de présence, il est vide. -->
-			{#if hrPersonsCount > 0}
-				<ScopedAddresses endpoint={`/api/structures/${labId}`} scope={{ lab_id: String(labId) }} preferredStructureId={lab.id} apiKey="lab" />
-			{:else}
-				<p class="no-results">Aucune personne du référentiel RH n'est rattachée à la structure.</p>
-			{/if}
+			<ScopedAddresses endpoint={`/api/structures/${labId}`} scope={{ lab_id: String(labId) }} preferredStructureId={lab.id} apiKey="lab" />
 		</div>
 	{/if}
 

@@ -41,14 +41,15 @@
 	let profile = $state<Person | null>(null);
 	let identifiers = $state<Identifier[]>([]);
 	let thesesCount = $state(0);
+	let hasAddresses = $state(false);
 	let error = $state(false);
 
-	// L'onglet « Adresses » est réservé à la session admin.
+	// Les onglets Thèses et Adresses s'affichent seulement quand leur liste est non vide. L'onglet « Adresses » est réservé à la session admin.
 	const tabs: TabDef[] = $derived([
 		{ id: 'dashboard', label: 'Dashboard' },
 		{ id: 'publications', label: 'Publications' },
 		...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
-		...(isAdmin() ? [{ id: 'addresses', label: 'Adresses' }] : []),
+		...(isAdmin() && hasAddresses ? [{ id: 'addresses', label: 'Adresses' }] : []),
 	]);
 	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
@@ -96,6 +97,7 @@
 			profile = profileData.person;
 			identifiers = profileData.identifiers;
 			thesesCount = profileData.theses_count;
+			hasAddresses = profileData.has_addresses;
 		} catch {
 			error = true;
 			return;

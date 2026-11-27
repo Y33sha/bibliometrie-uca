@@ -50,6 +50,13 @@ def test_les_partenaires_excluent_la_structure_et_ses_ancetres(sa_sync_conn):
     assert [(o.value, o.count) for o in _facets(sa_sync_conn, structure).types] == [("facility", 1)]
 
 
+def test_le_profil_signale_les_partenaires(sa_sync_conn):
+    structure, _ = _copublication(sa_sync_conn)
+    detail = StructuresQueries(sa_sync_conn).get_structure_detail(structure)
+    assert detail is not None
+    assert detail.has_partners is True
+
+
 def test_filtre_par_pays_et_par_annee(sa_sync_conn):
     structure, _ = _copublication(sa_sync_conn)
     assert _partners(sa_sync_conn, structure, countries=["fr"]).total == 0

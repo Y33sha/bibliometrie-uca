@@ -10,7 +10,7 @@ Le bouton « Qualité de la détection » liste les rattachements créés ou rej
 
 ## Onglets Adresses d'une personne et d'une structure
 
-En session d'administration, la fiche d'une personne et celle d'une structure ont un onglet Adresses. Il montre les seules [adresses brutes](../../glossaire.md#adresse-brute). La phase [`affiliations`](../../pipeline/04-affiliations.md) en écarte les libellés HAL et les noms seuls.
+En session d'administration, la fiche d'une personne ou d'une structure à [adresses brutes](../../glossaire.md#adresse-brute) a un onglet Adresses. Il montre seulement ces adresses. La phase [`affiliations`](../../pipeline/04-affiliations.md) en écarte les libellés HAL et les noms seuls.
 
 L'onglet mesure le rattachement des publications dans les bases lues par les classements internationaux : WoS et OpenAlex. Il retient seulement les adresses de ces deux sources, sur les articles, les reviews, les communications, les ouvrages et les chapitres. Pour une personne, il lit ses publications. Pour une structure, il lit les publications de ses membres parues pendant leur période de présence ; une publication datée à l'année ou au mois compte si toute l'année ou tout le mois tombe dans la période. Seules les personnes de la base RH sont membres.
 

@@ -13,6 +13,7 @@ from infrastructure.read_models.addresses.models import (
     ScopedAddressSummary,
 )
 from infrastructure.read_models.addresses.scoped import (
+    has_scoped_addresses,
     person_scope,
     scoped_address_summary,
     scoped_addresses,
@@ -94,6 +95,7 @@ class PersonDetailQueries:
             ),
             identifiers=identifiers,
             theses_count=theses_count_row.n,
+            has_addresses=has_scoped_addresses(self._conn, person_scope(person_id)),
         )
 
     def person_theses(self, person_id: int) -> PersonThesesResponse:

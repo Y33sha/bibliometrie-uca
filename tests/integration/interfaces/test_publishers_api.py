@@ -29,6 +29,7 @@ from tests.integration.helpers.seeds import (
     seed_subject_usage,
     uniq,
 )
+from tests.integration.helpers.serials import insert_monograph
 from tests.integration.helpers.sources import insert_source_record
 
 # Publication sans titre normalisé.
@@ -228,6 +229,15 @@ class TestGetPublisher:
         assert "publication_count" in body
         assert body["serial_count"] == 0
         assert body["publication_count"] == 0
+        assert body["has_monographs"] is False
+
+    def test_signals_monographs(self, client):
+        pid = seed_publisher(uniq("MonographPub"))
+        with owner_connection() as conn:
+            insert_monograph(conn, "Livre", publisher_id=pid)
+        r = client.get(f"/api/publishers/{pid}")
+        assert r.status_code == 200
+        assert r.json()["has_monographs"] is True
 
     def test_doi_prefixes_aggregated(self, client):
         """La fiche d'un éditeur renvoie ses préfixes DOI."""

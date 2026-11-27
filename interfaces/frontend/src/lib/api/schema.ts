@@ -4880,6 +4880,11 @@ export interface components {
             identifiers: components["schemas"]["PersonIdentifierOut"][];
             /** Theses Count */
             theses_count: number;
+            /**
+             * Has Addresses
+             * @description Les publications de la personne ont au moins une adresse brute (`person_addresses`).
+             */
+            has_addresses: boolean;
         };
         /**
          * PersonSearchResult
@@ -5466,6 +5471,11 @@ export interface components {
             publication_count: number;
             /** Doi Prefixes */
             doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
+            /**
+             * Has Monographs
+             * @description L'éditeur a au moins une monographie.
+             */
+            has_monographs: boolean;
         };
         /**
          * PublisherListItem
@@ -6317,10 +6327,15 @@ export interface components {
              */
             members_count: number;
             /**
-             * Hr Persons Count
-             * @description Personnes à période de présence, actuelle ou passée, dans la structure.
+             * Has Partners
+             * @description La structure a au moins une organisation partenaire (`get_structure_partners`).
              */
-            hr_persons_count: number;
+            has_partners: boolean;
+            /**
+             * Has Addresses
+             * @description Les publications des membres pendant leur présence ont au moins une adresse brute (`get_structure_addresses`).
+             */
+            has_addresses: boolean;
         };
         /** StructureInfo */
         StructureInfo: {

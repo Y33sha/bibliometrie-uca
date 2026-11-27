@@ -183,6 +183,8 @@ class PersonProfileResponse(Model):
     person: PersonProfileCore
     identifiers: list[PersonIdentifierOut]
     theses_count: int
+    has_addresses: bool
+    """Les publications de la personne ont au moins une adresse brute (`person_addresses`)."""
 
 
 class PersonThesis(Model):

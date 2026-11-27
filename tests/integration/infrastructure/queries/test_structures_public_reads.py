@@ -180,9 +180,11 @@ class TestGetLaboratory:
         assert isinstance(res.parents, list)
         assert isinstance(res.children, list)
         assert isinstance(res.theses_count, int)
+        assert res.has_partners is False
+        assert res.has_addresses is False
 
     def test_members_count_counts_retained_current_members(self, sa_sync_conn):
-        """Seule la personne retenue et présente compte parmi les membres ; les trois personnes à période de présence, passée ou actuelle, comptent dans le référentiel RH."""
+        """Seule la personne retenue et présente compte parmi les membres."""
         lab = insert_structure(sa_sync_conn, "LAB-MEMBERS")
         present = insert_person(sa_sync_conn, "Presenty")
         insert_hr_period(sa_sync_conn, present, unit_label="LAB", structure_id=lab)
@@ -200,7 +202,6 @@ class TestGetLaboratory:
 
         assert res is not None
         assert res.members_count == 1
-        assert res.hr_persons_count == 3
 
 
 class TestGetLaboratoryAddresses:
@@ -266,6 +267,19 @@ class TestGetLaboratoryAddresses:
             (uca_address, 2),
             (lab_address, 1),
         ]
+
+    def test_profile_signals_addresses_of_members_only(self, sa_sync_conn):
+        """Le laboratoire a des adresses ; l'UCA, sans membre, n'en a pas, bien que ses adresses figurent dans les publications."""
+        lab, uca, _, _, _ = self._setup(sa_sync_conn)
+        queries = StructuresQueries(sa_sync_conn)
+
+        lab_detail = queries.get_structure_detail(lab)
+        uca_detail = queries.get_structure_detail(uca)
+
+        assert lab_detail is not None
+        assert uca_detail is not None
+        assert lab_detail.has_addresses is True
+        assert uca_detail.has_addresses is False
 
     def test_address_publications_restricted_to_members(self, sa_sync_conn):
         lab, _, lab_address, _, publications = self._setup(sa_sync_conn)

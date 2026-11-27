@@ -9,6 +9,8 @@ from domain.publishers.names import publisher_name_key
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PublisherType
 from infrastructure.read_models._common import FacetOption, YesNoCount
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
+from infrastructure.read_models.monographs.models import MonographFilters
+from infrastructure.read_models.monographs.queries import has_monographs
 from infrastructure.read_models.publishers.models import (
     DoiPrefixInfo,
     Publisher,
@@ -94,11 +96,7 @@ def _list_sql(where: str, sort: PublisherSort) -> str:
 
 
 def _row_to_list_item(row: Row[tuple[object, ...]]) -> PublisherListItem:
-    return PublisherListItem(**_row_to_publisher(row).model_dump())
-
-
-def _row_to_publisher(row: Row[tuple[object, ...]]) -> Publisher:
-    return Publisher(
+    return PublisherListItem(
         id=row.id,
         name=row.name,
         openalex_id=row.openalex_id,
@@ -234,7 +232,10 @@ class PublisherQueries:
         ).one_or_none()
         if row is None:
             return None
-        return _row_to_publisher(row)
+        return Publisher(
+            **_row_to_list_item(row).model_dump(),
+            has_monographs=has_monographs(self._conn, MonographFilters(publisher_id=publisher_id)),
+        )
 
     def get_publisher_name_forms(self, publisher_id: int) -> list[PublisherNameForm]:
         """Renvoie les formes de nom de l'éditeur, les plus fréquentes parmi ses enregistrements sources d'abord.
