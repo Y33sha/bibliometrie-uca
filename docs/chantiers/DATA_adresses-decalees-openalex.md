@@ -40,12 +40,14 @@ Enregistrements sources de 4 à 200 auteurs :
 - Dans d'autres, le décalage commence à un auteur collectif placé plus loin, non reconnu comme collectif (`is_collective_name`) : « MacaqueNet » en position 2 de W4407421416.
 - Sens d'après les adresses WoS des mêmes auteurs (`sens.py`) : auteur inséré pour 23 des 47 enregistrements sources décalés, auteur manquant pour 9, sens mixte pour 5. Les 10 autres sont sans enregistrement WoS ou sans auteur comparable.
 - 22 des 23 enregistrements sources à auteur inséré contiennent un auteur collectif reconnu. 8 des 9 à auteur manquant n'en contiennent aucun, et 4 de ces 9 ont des affiliations numérotées.
+- Signaux du sens tirés des seules données d'OpenAlex (`sens_interne.py`), sur les 32 enregistrements sources de sens établi : la présence d'un auteur collectif donne le sens de 30 ; une affiliation propre au premier ou au dernier auteur de la suite décalée, celui de 19.
 - 46 contributions sources sont du périmètre par la seule adresse d'une voisine, dans 38 enregistrements sources décalés. Le sens retenu : auteur inséré avec un auteur collectif, auteur manquant sinon.
 - Les enregistrements sources à toutes les adresses pour chacun contiennent 165 contributions sources du périmètre, légitimes ou non.
 
 ## Décisions
 
 - Les adresses décalées se corrigent : chaque contribution source garde sa seule adresse.
+- La détection et le sens du décalage s'appuient sur les seules données d'OpenAlex. WoS, source sans moissonnage, sert seulement à évaluer les mesures.
 - Le défaut est signalé à OpenAlex, avec la méthode de correction.
 
 ## Phasage
@@ -53,6 +55,7 @@ Enregistrements sources de 4 à 200 auteurs :
 ### Phase 1 — Détection
 
 - [x] Sens du décalage d'après WoS.
+- [x] Signaux du sens tirés des seules données d'OpenAlex.
 - [ ] Règle du domaine : détection et sens du décalage sur les adresses brutes d'un enregistrement source, par position.
 - [ ] Revue des enregistrements sources de sens mixte ou sans enregistrement WoS, et des enregistrements sources de score 0,5 à 0,8.
 
