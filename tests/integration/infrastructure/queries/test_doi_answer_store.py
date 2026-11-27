@@ -2,6 +2,7 @@
 
 from itertools import count
 
+import pytest
 from sqlalchemy import text
 
 from domain.source_records.identifiers import (
@@ -117,12 +118,17 @@ class TestKnownDois:
 
         assert "10.1/tardif" in _to_query(sa_sync_conn, DOI_ORG)
 
-    def test_la_forme_sans_version_est_interrogee(self, sa_sync_conn):
-        _candidate(sa_sync_conn, "10.6084/m9.figshare.123.v2")
+    @pytest.mark.parametrize(
+        ("versioned", "unversioned"),
+        [
+            ("10.6084/m9.figshare.123.v2", "10.6084/m9.figshare.123"),
+            ("10.31234/osf.io/hkdyb_v3", "10.31234/osf.io/hkdyb"),
+        ],
+    )
+    def test_la_forme_sans_version_est_interrogee(self, sa_sync_conn, versioned, unversioned):
+        _candidate(sa_sync_conn, versioned)
 
-        assert {"10.6084/m9.figshare.123.v2", "10.6084/m9.figshare.123"} <= _to_query(
-            sa_sync_conn, DOI_ORG
-        )
+        assert {versioned, unversioned} <= _to_query(sa_sync_conn, DOI_ORG)
 
 
 class TestDoisToQuery:

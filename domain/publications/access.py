@@ -1,16 +1,17 @@
 """Liens d'accès d'une publication : ses copies ouvertes, une par plateforme.
 
-Seules les copies ouvertes comptent (`open_copies`). La copie de l'éditeur, désignée par le DOI de la publication, passe en tête, puis les autres copies en version éditeur, hors preprint. Suivent les copies des plateformes à icône (`KnownPlatform.icon`), puis les autres. Dans chaque groupe, les copies d'un preprint passent après les autres (`Copy.of_preprint`). Une copie se classe ensuite par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL.
+Seules les copies ouvertes comptent (`open_copies`). La copie de l'éditeur, désignée par le DOI de la publication, passe en tête, puis les autres copies en version éditeur, hors preprint. Suivent les copies des plateformes à icône (`KnownPlatform.icon`), puis les autres. Dans chaque groupe, les copies d'un preprint passent après les autres (`Copy.of_preprint`). Une copie se classe ensuite par sa version (éditeur, acceptée, soumise, inconnue), puis après la copie de la forme sans version de son DOI ou d'une version de numéro supérieur, puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL.
 
 La meilleure copie donne l'adresse d'accès. Une copie désignée par un DOI figure parmi les liens quand une archive ou un serveur de preprints l'héberge (Zenodo), ou quand une autre plateforme l'héberge sous un autre DOI que celui de la publication. Le DOI de la publication chez son éditeur s'affiche à part.
 """
 
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
 from domain.documents.doc_types import DocType
-from domain.documents.identifiers import HALId
+from domain.documents.identifiers import HALId, doi_version
 from domain.documents.licenses import License
 from domain.platforms.platform import ARCHIVE_TYPES, PlatformType
 from domain.platforms.registry import (
@@ -166,13 +167,31 @@ def _listed(copy: Copy, doi: str | None) -> bool:
     return copy.platform is not None and target != (doi or "")
 
 
-def _rank(copy: Copy, doi: str | None) -> tuple[bool, bool, bool, bool, int, int]:
+def _superseded_dois(copies: Iterable[Copy]) -> frozenset[str]:
+    """Renvoie les DOI à suffixe de version (`doi_version`) des copies dont une autre copie désigne la forme sans version ou une version de numéro supérieur."""
+    dois = {target for copy in copies if (target := _doi_target(copy))}
+    latest: dict[str, float] = {}
+    for target in dois:
+        version = doi_version(target)
+        family, number = (version.unversioned, version.number) if version else (target, math.inf)
+        latest[family] = max(latest.get(family, 0), number)
+    return frozenset(
+        target
+        for target in dois
+        if (version := doi_version(target)) and latest[version.unversioned] > version.number
+    )
+
+
+def _rank(
+    copy: Copy, doi: str | None, superseded: frozenset[str]
+) -> tuple[bool, bool, bool, bool, int, bool, int]:
     return (
         not _from_publisher(copy, doi),
         copy.version != "publishedVersion" or copy.of_preprint,
         _icon(copy) is None,
         copy.of_preprint,
         _VERSION_RANK.get(copy.version or "", _UNKNOWN_VERSION_RANK),
+        _doi_target(copy) in superseded,
         copy.arrival,
     )
 
@@ -208,7 +227,9 @@ def open_copies(copies: Iterable[Copy]) -> list[Copy]:
 
 def access(copies: Iterable[Copy], *, doi: str | None) -> Access:
     """Calcule l'adresse d'accès et les liens d'accès d'une publication de DOI `doi`."""
-    ranked = sorted(open_copies(copies), key=lambda copy: _rank(copy, doi))
+    opened = open_copies(copies)
+    superseded = _superseded_dois(opened)
+    ranked = sorted(opened, key=lambda copy: _rank(copy, doi, superseded))
     best: dict[str, Copy] = {}
     for copy in ranked:
         if _listed(copy, doi):

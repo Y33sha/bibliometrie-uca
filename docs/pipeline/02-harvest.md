@@ -38,7 +38,7 @@ Dans HAL, en mode full, les thèses de theses.fr sans document HAL. Dans theses.
 Dans OPS, les familles des brevets du périmètre sans famille OPS, par numéro de publication, puis de demande, puis de priorité.
 
 **`fetch_missing.doi.<source>` : DOI manquants par source.**
-Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les DOI cherchés sont ceux des publications de la fenêtre d'années du run : l'un des enregistrements sources de la publication a son année dans la fenêtre. Un DOI à suffixe de version (`.v2`, `/v2`) ajoute sa forme sans version, cherchée dans toutes les sources. Crossref, non interrogeable par affiliation, est seulement interrogé ici et par personne.
+Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les DOI cherchés sont ceux des publications de la fenêtre d'années du run : l'un des enregistrements sources de la publication a son année dans la fenêtre. Un DOI à suffixe de version (`.v2`, `/v2`, `_v2`) ajoute sa forme sans version, cherchée dans toutes les sources. Crossref, non interrogeable par affiliation, est seulement interrogé ici et par personne.
 
 Crossref et DataCite reçoivent seulement les DOI à préfixe enregistré chez eux, d'après l'agence résolue par la phase [dois](05-publishing.md#référentiel-des-doi-dois). Un DOI à préfixe sans agence attend le run suivant.
 

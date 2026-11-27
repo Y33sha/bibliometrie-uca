@@ -134,6 +134,23 @@ def test_les_copies_d_un_preprint_passent_apres_les_autres():
     assert [link.label for link in result.links] == ["Zenodo", "arXiv", "HAL"]
 
 
+def test_une_version_d_un_doi_passe_apres_sa_forme_sans_version_et_ses_versions_suivantes():
+    v1, v3, concept = (
+        _copy(f"https://doi.org/10.31234/osf.io/hkdyb{suffix}", version="submittedVersion")
+        for suffix in ("_v1", "_v3", "")
+    )
+    assert _access([v1, v3]).url == v3.url
+    assert _access([v1, v3, concept]).url == concept.url
+
+
+def test_une_forme_sans_version_fermee_laisse_passer_la_version_ouverte():
+    v1 = _copy("https://doi.org/10.31234/osf.io/hkdyb_v1", version="submittedVersion")
+    concept = _copy(
+        "https://doi.org/10.31234/osf.io/hkdyb", version="submittedVersion", is_oa=False
+    )
+    assert _access([v1, concept]).url == v1.url
+
+
 def test_un_preprint_seul_donne_l_adresse_d_acces():
     copy = _copy("https://arxiv.org/abs/1", version="submittedVersion", platform="arXiv")
     assert _access([copy]).url == "https://arxiv.org/abs/1"
