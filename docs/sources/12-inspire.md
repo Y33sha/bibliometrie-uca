@@ -78,7 +78,7 @@ L'année est celle de la première publication (`publication_info.year`), hors e
 
 L'ORCID d'un auteur sert au [rattachement des personnes](../pipeline/09-persons.md#rattacher-une-contribution-à-une-personne) (`ORCID_MATCH_SOURCES`).
 
-Un enregistrement source OpenAlex du même document qu'une fiche est sans contributions sources ([listes d'auteurs d'INSPIRE-HEP](../pipeline/03-normalize.md#listes-dauteurs-dinspire-hep)).
+Un enregistrement source OpenAlex du même document qu'une fiche est sans contributions sources ([listes d'auteurs d'INSPIRE-HEP](../pipeline/03-normalize.md#listes-dauteurs-dinspire-hep-withhold_openalex_authors)).
 
 ### Identifiants
 
