@@ -43,6 +43,8 @@
 	let thesesCount = $state(0);
 	let hasAddresses = $state(false);
 	let error = $state(false);
+	// Version des publications de la fiche, dans la clé d'API du dashboard et de la liste : une écriture du volet (détachement, fusion) l'incrémente, et les deux se rechargent.
+	let publicationsVersion = $state(0);
 
 	// Les onglets Thèses et Adresses s'affichent seulement quand leur liste est non vide. L'onglet « Adresses » est réservé à la session admin.
 	const tabs: TabDef[] = $derived([
@@ -104,6 +106,12 @@
 		}
 	}
 
+	// Après une écriture du volet : en-tête, dashboard et liste des publications rechargés.
+	function onDrawerChange() {
+		if (personId) void loadProfile(personId);
+		publicationsVersion++;
+	}
+
 	onMount(async () => {
 		if (personId) await loadProfile(personId);
 	});
@@ -155,7 +163,7 @@
 			{#if profile}
 				<PublicationsDashboard
 					context={{ kind: 'person', id: profile.id }}
-					apiKey="person-detail-dashboard"
+					apiKey={`person-detail-dashboard-${publicationsVersion}`}
 					thesesFigure={false}
 					citationFigure={false}
 					figures={thesesCount > 0
@@ -182,7 +190,7 @@
 	{#if activeTab === 'publications'}
 		<div class="tab-content">
 			<PublicationsListView
-				apiKey={`person-${personId}-publications`}
+				apiKey={`person-${personId}-publications-${publicationsVersion}`}
 				context={{ kind: 'person', id: Number(personId) }}
 				basePath={`/persons/${personId}`}
 				showAdminExclude={isAdmin()}
@@ -239,7 +247,7 @@
 	<PersonCurationDrawer
 		personId={drawer.id}
 		onclose={() => drawer.open(null)}
-		onchange={() => personId && loadProfile(personId)}
+		onchange={onDrawerChange}
 		onopenPerson={drawer.open}
 	/>
 {/if}
