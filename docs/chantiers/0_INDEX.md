@@ -4,6 +4,7 @@
 
 ### En cours
 
+- [Adresses décalées chez OpenAlex](DATA_adresses-decalees-openalex.md)
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 - [Source ScanR](DATA_source-scanr.md)
