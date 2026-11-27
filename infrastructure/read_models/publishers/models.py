@@ -61,6 +61,9 @@ class PublisherListItem(Model):
 class Publisher(PublisherListItem):
     """Profil d'un éditeur (page publique `/publishers/[id]`)."""
 
+    has_monographs: bool
+    """L'éditeur a au moins une monographie."""
+
 
 class PublisherListResponse(PaginatedResponse):
     publishers: list[PublisherListItem]

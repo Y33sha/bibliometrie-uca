@@ -99,6 +99,25 @@ class TestMemberReads:
 
         assert [address.id for address in response.addresses] == [member_address]
 
+    def test_profile_signals_addresses(self, sa_sync_conn):
+        """Le profil signale des adresses pour la personne qui en a, aucune pour une personne sans publication."""
+        person = insert_person(sa_sync_conn, "Adressee")
+        publication = insert_publication(sa_sync_conn)
+        insert_contribution(sa_sync_conn, publication, person_id=person, roles=["author"])
+        member = insert_aligned_source_contribution(sa_sync_conn, publication, person)
+        insert_source_contribution_address(
+            sa_sync_conn, member, address_id=insert_address(sa_sync_conn, "Adresse brute")
+        )
+        queries = PersonsQueries(sa_sync_conn)
+
+        with_address = queries.person_profile(person)
+        without_address = queries.person_profile(insert_person(sa_sync_conn, "Sansadresse"))
+
+        assert with_address is not None
+        assert without_address is not None
+        assert with_address.has_addresses is True
+        assert without_address.has_addresses is False
+
     def test_addresses_are_raw_addresses_only(self, sa_sync_conn):
         """Un libellé HAL, un nom seul ou une adresse sans origine sont absents des adresses et du compte des publications avec adresse."""
         person = insert_person(sa_sync_conn, "Adressee")

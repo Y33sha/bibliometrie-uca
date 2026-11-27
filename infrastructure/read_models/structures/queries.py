@@ -12,6 +12,7 @@ from infrastructure.read_models.addresses.models import (
     ScopedAddressSummary,
 )
 from infrastructure.read_models.addresses.scoped import (
+    has_scoped_addresses,
     lab_members_scope,
     scoped_address_summary,
     scoped_addresses,
@@ -415,9 +416,9 @@ class StructuresQueries:
         members_count = self._conn.execute(
             text(f"SELECT COUNT(*) FROM persons p WHERE {members_where}"), members_binds
         ).scalar_one()
-        hr_persons_count = self._conn.execute(
-            text("SELECT COUNT(DISTINCT person_id) FROM hr_periods WHERE structure_id = :id"),
-            {"id": structure_id},
+        has_partners = self._conn.execute(
+            text(f"{_PARTNER_LINKS} SELECT EXISTS (SELECT 1 FROM links)"),  # noqa: S608
+            _partner_binds(structure_id, StructurePartnerFilters()),
         ).scalar_one()
 
         return StructureDetailResponse(
@@ -437,7 +438,8 @@ class StructuresQueries:
             forms=[_name_form_from_row(r) for r in form_rows],
             theses_count=theses_row.n,
             members_count=members_count,
-            hr_persons_count=hr_persons_count,
+            has_partners=has_partners,
+            has_addresses=has_scoped_addresses(self._conn, lab_members_scope(structure_id)),
         )
 
     def get_structure_addresses(

@@ -69,7 +69,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from domain.sources.lookups import LOOKUP_ID_TYPES
-from domain.sources.registry import LOOKUP_SOURCES, Source
+from domain.sources.registry import Source
 from domain.sources.staging import StagingEntryMode
 from domain.structures.hal_structures import HalStructureStatus
 from domain.structures.perimeter_evidence import PerimeterEvidence
@@ -721,7 +721,7 @@ identifier_origin_enum = PgEnum(
 )
 
 source_type_enum = PgEnum(*Source, name="source_type", create_type=False)
-lookup_source_enum = PgEnum(*LOOKUP_SOURCES, name="lookup_source", create_type=False)
+lookup_source_enum = PgEnum(*Source, name="lookup_source", create_type=False)
 
 oa_type_enum = PgEnum(*OaStatus, name="oa_type", create_type=False)
 
@@ -1824,10 +1824,9 @@ failed_lookups = Table(
     ),
     _identifier_case("failed_lookups"),
     comment=(
-        "Identifiants cherchés en vain par la phase fetch_missing, dans une source ou auprès de "
-        "doi.org (source doi_org : DOI que doi.org ne connaît pas). L'échec est définitif pour un "
-        "identifiant absent de son registre (hal-id dans HAL, NNT dans theses.fr, DOI auprès de "
-        "doi.org). Les autres recherches reprennent quand not_found_at date de plus que le délai "
+        "Identifiants cherchés en vain par la phase fetch_missing dans une source. L'échec est "
+        "définitif pour un identifiant absent de son registre (hal-id dans HAL, NNT dans "
+        "theses.fr). Les autres recherches reprennent quand not_found_at date de plus que le délai "
         "fetch_missing_retry_after_days."
     ),
     schema="sources",

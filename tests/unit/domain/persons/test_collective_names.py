@@ -35,6 +35,20 @@ from domain.persons.collective_names import is_collective_name
         "The PLOS ONE Editors",
         "FACE BD Grp",
         "LSST Dark Energy Sci Collaborat",
+        "IODP Expedition Scientists",
+        "Participants of the Athens MagellanPlus workshop",
+        "The Récits project",
+        "the NS‐PARK cohort",
+        "INRAE",
+        "AMAP, CIRAD, CNRS, INRA, IRD, UM, Montpellier, France",
+        "INSERM",
+        "OECD",
+        "The Scientific Advisory Board of the ANSM",
+        "EFSA Panel on Animal Health and Animal Welfare (AHAW)",
+        "MacaqueNet",
+        "WellBeNet",
+        "Opticon RadioNet Pilot",
+        "the FREGAT and BIG-RENAPE Networks",
     ],
 )
 def test_reconnait_un_collectif(name):
@@ -50,10 +64,15 @@ def test_reconnait_un_collectif(name):
         "R. Barate et al.",
         "François Fund",
         "Sebastian Bank",
+        "Alix Portal",
+        "Kewin Panel",
+        "Jasmin Board",
+        "Jean Bonnet",
+        "BONNET, Muriel",
         "",
         None,
     ],
 )
 def test_garde_les_personnes(name):
-    """« Comite » est aussi un nom de famille. Une personne suivie de ses co-auteurs reste une personne."""
+    """« Comite », « Panel » et « Board » sont aussi des noms de famille. Une personne suivie de ses co-auteurs reste une personne."""
     assert not is_collective_name(name)

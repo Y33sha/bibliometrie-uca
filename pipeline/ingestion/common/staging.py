@@ -15,7 +15,7 @@ from enum import StrEnum
 from sqlalchemy import Connection, bindparam, text
 
 from domain.documents.identifiers import DOI
-from domain.sources.registry import DOI_ORG, PROFILES, Source
+from domain.sources.registry import Source
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
@@ -211,8 +211,6 @@ class StagingStore:
             entry_mode=entry_mode,
         )
         forget_failed_doi_lookups(self._conn, source, identity.dois)
-        if PROFILES[Source(source)].registration_agency is not None:
-            forget_failed_doi_lookups(self._conn, DOI_ORG, identity.dois)
         forget_failed_native_id_lookup(self._conn, source, identity.source_id)
         return UpsertOutcome.of(inserted=inserted, changed=changed)
 

@@ -1,0 +1,415 @@
+<title>Déroulement du pipeline</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Mise en page : circuit principal en colonne centrale (deux colonnes pour les blocs parallèles), affluents et sorties dans deux rails latéraux, liens tracés en SVG par-dessus la grille. Sur téléphone, une seule colonne dans l'ordre du déroulement. */
+:root {
+  --bg: #fbfbfa;
+  --card: #ffffff;
+  --surface: #f2f4f5;
+  --text: #1d2433;
+  --muted: #5d6673;
+  --border: #e0e4e8;
+  --accent: oklch(0.446 0.064 196);
+  --accent-line: oklch(0.6 0.085 196);
+  --accent-soft: oklch(0.952 0.016 196);
+  --on-accent: #ffffff;
+  --edge: #a0a8b2;
+  --attention: #b84000;
+  --attention-soft: #fff1e2;
+  --font: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151a;
+    --card: #181d24;
+    --surface: #151a21;
+    --text: #e4e7eb;
+    --muted: #9aa3ae;
+    --border: #2b333e;
+    --accent: oklch(0.8 0.07 196);
+    --accent-line: oklch(0.68 0.08 196);
+    --accent-soft: oklch(0.3 0.035 196);
+    --on-accent: #11151a;
+    --edge: #5f6974;
+    --attention: #ffa266;
+    --attention-soft: #3b2617;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151a;
+  --card: #181d24;
+  --surface: #151a21;
+  --text: #e4e7eb;
+  --muted: #9aa3ae;
+  --border: #2b333e;
+  --accent: oklch(0.8 0.07 196);
+  --accent-line: oklch(0.68 0.08 196);
+  --accent-soft: oklch(0.3 0.035 196);
+  --on-accent: #11151a;
+  --edge: #5f6974;
+  --attention: #ffa266;
+  --attention-soft: #3b2617;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.page {
+  max-width: 1340px;
+  margin: 0 auto;
+  padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+header.intro { display: grid; gap: 10px; margin-bottom: 28px; max-width: 78ch; }
+.back { font-size: 0.85rem; color: var(--accent); text-decoration: none; }
+.back:hover { text-decoration: underline; }
+h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.015em; margin: 0; text-wrap: balance; }
+.doc { color: inherit; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; }
+.doc:hover { text-decoration-color: currentColor; }
+
+#flow { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+#edges { display: none; position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 0; }
+.node, .rail { position: relative; z-index: 1; min-width: 0; }
+
+.node {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  padding: 16px 18px 14px;
+  align-self: start;
+}
+.node.technical { background: var(--surface); border-style: dashed; box-shadow: none; }
+.node-head { display: flex; gap: 12px; align-items: flex-start; }
+.node-head > div { flex: 1; min-width: 0; }
+.num {
+  flex: none;
+  display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--accent); color: var(--on-accent);
+  font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.tag { flex: none; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 9px; margin-top: 3px; }
+h2 { font-size: 1.28rem; font-weight: 700; margin: 0; line-height: 1.25; text-wrap: balance; }
+.technical h2 { color: var(--muted); }
+.role { margin: 2px 0 0; color: var(--muted); font-size: 0.93rem; }
+
+.steps { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 0; }
+.step { padding: 12px 0 12px; border-top: 1px solid var(--border); }
+.step:last-child { padding-bottom: 2px; }
+.step.solo { border-top: 0; padding: 12px 0 2px; }
+.step-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+h3 { font-size: 1rem; font-weight: 600; margin: 0; }
+.step-text { margin: 2px 0 8px; color: var(--muted); font-size: 0.9rem; }
+.count { flex: none; font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.groups { display: grid; gap: 6px; }
+.grp { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.glabel { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); margin-right: 2px; }
+.task {
+  font-family: var(--mono); font-size: 0.76rem; line-height: 1.3;
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 5px;
+  padding: 2px 7px; cursor: pointer; text-align: left;
+  max-width: 100%; overflow-wrap: anywhere;
+}
+.node .task { background: var(--surface); }
+.technical .task, .aff .task { background: var(--card); }
+.task:hover { border-color: var(--accent-line); }
+a.task { display: inline-block; text-decoration: none; }
+.detail .code { margin-left: 6px; font-size: 0.8rem; color: var(--accent); }
+.task[aria-expanded="true"] { background: var(--accent-soft); border-color: var(--accent-line); }
+.task:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 1px; }
+.detail { margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: var(--accent-soft); font-size: 0.88rem; }
+.detail b { font-family: var(--mono); font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 2px; overflow-wrap: anywhere; }
+.detail code { font-family: var(--mono); font-size: 0.82em; overflow-wrap: anywhere; }
+
+.rail { display: flex; flex-direction: column; gap: 14px; align-self: start; padding-left: 14px; border-left: 2px solid var(--border); }
+.aff {
+  background: var(--surface);
+  border: 1px dashed var(--edge);
+  border-radius: 8px;
+  padding: 10px 12px 11px;
+  font-size: 0.9rem;
+}
+.aff-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.kind { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.aff h3 { font-size: 0.96rem; margin-top: 1px; }
+.aff p { margin: 2px 0 8px; color: var(--muted); font-size: 0.84rem; }
+.aff .feeds { margin: 8px 0 0; font-size: 0.8rem; color: var(--muted); }
+.asteps { display: grid; gap: 10px; margin-top: 4px; }
+.astep { display: grid; gap: 3px; }
+.astep + .astep { border-top: 1px solid var(--border); padding-top: 8px; }
+h4 { font-size: 0.88rem; font-weight: 600; margin: 0; }
+.aff .astep-text { margin: 0 0 4px; font-size: 0.8rem; }
+.substeps { display: grid; gap: 8px; margin-top: 2px; padding-left: 10px; border-left: 2px solid var(--border); }
+.substeps .astep + .astep { border-top: 0; padding-top: 0; }
+
+.e-main { fill: none; stroke: var(--accent-line); stroke-width: 2.25; }
+.e-aff { fill: none; stroke: var(--edge); stroke-width: 1.4; transition: stroke 120ms; }
+.e-aff.hot { stroke: var(--accent-line); stroke-width: 2; }
+.mk-main { fill: var(--accent-line); }
+.mk-aff { fill: var(--edge); }
+.mk-hot { fill: var(--accent-line); }
+
+@media (min-width: 1080px) {
+  #flow { grid-template-columns: 272px minmax(0, 1fr) minmax(0, 1fr) 272px; column-gap: 60px; row-gap: 46px; }
+  #edges { display: block; }
+  .rail { padding-left: 0; border-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .e-aff { transition: none; } }
+</style>
+
+<div class="page">
+  <header class="intro">
+    <!--RETOUR-->
+    <h1>Déroulement du pipeline</h1>
+  </header>
+  <main id="flow">
+    <svg id="edges" aria-hidden="true">
+      <defs>
+        <marker id="m-main" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-main" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="m-aff" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="mk-aff" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="m-hot" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="mk-hot" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+      <g id="edge-layer"></g>
+    </svg>
+  </main>
+</div>
+
+<script>
+const DATA = /*DATA*/null;
+
+const flow = document.getElementById("flow");
+const layer = document.getElementById("edge-layer");
+const desktop = window.matchMedia("(min-width: 1080px)");
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+}
+function rich(s) {
+  return esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+function shortName(task) {
+  const i = task.indexOf(".");
+  return i < 0 ? task : task.slice(i + 1);
+}
+function taskCount(block) {
+  const own = (block.groups || []).reduce((n, g) => n + g.tasks.length, 0);
+  return own + (block.steps || []).reduce((n, s) => n + taskCount(s), 0);
+}
+function isLeaf(block) {
+  return !(block.steps && block.steps.length);
+}
+function countLabel(block) {
+  const n = taskCount(block);
+  if (n < 2) return "";
+  return `<span class="count">${n} tâches</span>`;
+}
+function tasksHtml(block) {
+  return groupsHtml(block.groups, block.id, taskCount(block) > 1);
+}
+
+function groupsHtml(groups, blockId, clickable) {
+  const chip = (t) =>
+    clickable
+      ? `<button type="button" class="task" data-task="${esc(t)}" data-block="${blockId}" aria-expanded="false" aria-controls="d-${blockId}" title="${esc(t)}">${esc(shortName(t))}</button>`
+      : `<a class="task" href="${esc(DATA.code[t])}" title="${esc(t)} : code">${esc(shortName(t))}</a>`;
+  const rows = groups.map((g) => {
+    const label = g.label ? `<span class="glabel">${esc(g.label)}</span>` : "";
+    return `<div class="grp">${label}${g.tasks.map(chip).join("")}</div>`;
+  });
+  const detail = clickable ? `<div class="detail" id="d-${blockId}" hidden></div>` : "";
+  return `<div class="groups">${rows.join("")}</div>${detail}`;
+}
+
+function linked(id, text) {
+  const href = DATA.docs[id];
+  return href ? `<a class="doc" href="${esc(href)}">${esc(text)}</a>` : esc(text);
+}
+
+function nodeHtml(n) {
+  const solo = n.steps.length === 1 && !n.steps[0].title;
+  const badge = n.num ? `<span class="num">${esc(n.num)}</span>` : `<span class="tag">technique</span>`;
+  const headCount = solo ? countLabel(n.steps[0]) : "";
+  let body;
+  if (solo) {
+    const s = n.steps[0];
+    body = `<div class="step solo" id="${s.id}">${tasksHtml(s)}</div>`;
+  } else {
+    body = `<ol class="steps">${n.steps
+      .map((s) => `<li class="step" id="${s.id}"><div class="step-head"><h3>${linked(s.id, s.title)}</h3>${countLabel(s)}</div>${s.text ? `<p class="step-text">${esc(s.text)}</p>` : ""}${tasksHtml(s)}</li>`)
+      .join("")}</ol>`;
+  }
+  return `<section class="node${n.technical ? " technical" : ""}" id="${n.id}" aria-labelledby="h-${n.id}">
+    <div class="node-head">${badge}<div><h2 id="h-${n.id}">${linked(n.id, n.title)}</h2><p class="role">${esc(n.role)}</p></div>${headCount}</div>
+    ${body}
+  </section>`;
+}
+
+function affStepHtml(s) {
+  const text = s.text ? `<p class="astep-text">${esc(s.text)}</p>` : "";
+  const inner = isLeaf(s) ? tasksHtml(s) : `<div class="substeps">${s.steps.map(affStepHtml).join("")}</div>`;
+  return `<div class="astep" id="${s.id}"><div class="step-head"><h4>${linked(s.id, s.title)}</h4>${countLabel(s)}</div>${text}${inner}</div>`;
+}
+
+function affHtml(a) {
+  const kind = a.kind === "in" ? "affluent" : "sortie";
+  const feeds = a.feeds.length ? `<p class="feeds">→ ${a.feeds.map(esc).join(", ")}</p>` : "";
+  const body = isLeaf(a) ? tasksHtml(a) : `<div class="asteps">${a.steps.map(affStepHtml).join("")}</div>`;
+  return `<aside class="aff" id="${a.id}" aria-labelledby="h-${a.id}">
+    <div class="aff-top"><span class="kind">${kind}</span>${countLabel(a)}</div>
+    <h3 id="h-${a.id}">${linked(a.id, a.title)}</h3>
+    <p>${esc(a.text)}</p>
+    ${body}
+    ${feeds}
+  </aside>`;
+}
+
+function render() {
+  const nodes = Object.fromEntries(DATA.nodes.map((n) => [n.id, n]));
+  const affs = Object.fromEntries(DATA.affluents.map((a) => [a.id, a]));
+  const html = DATA.layout.order.map((id) => {
+    if (nodes[id]) return nodeHtml(nodes[id]);
+    const cards = DATA.layout.rails[id].map((a) => affHtml(affs[a])).join("");
+    return `<div class="rail" id="${id}">${cards}</div>`;
+  });
+  flow.insertAdjacentHTML("beforeend", html.join(""));
+
+  const areas = DATA.layout.areas.map((a) => `"${a}"`).join(" ");
+  const placed = DATA.layout.order.map((id) => `#${id}{grid-area:${id}}`).join("");
+  const style = document.createElement("style");
+  style.textContent = `@media (min-width:1080px){#flow{grid-template-areas:${areas}}${placed}}`;
+  document.head.appendChild(style);
+}
+
+function toggleDetail(button) {
+  const block = button.dataset.block;
+  const panel = document.getElementById(`d-${block}`);
+  const open = button.getAttribute("aria-expanded") === "true";
+  document.querySelectorAll(`.task[data-block="${block}"]`).forEach((b) => b.setAttribute("aria-expanded", "false"));
+  if (open) {
+    panel.hidden = true;
+  } else {
+    const task = button.dataset.task;
+    const text = DATA.descriptions[task] || "Pas de description.";
+    panel.innerHTML = `<b>${esc(task)}</b>${rich(text)}<a class="code" href="${esc(DATA.code[task])}">code</a>`;
+    panel.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+  }
+  scheduleEdges();
+}
+
+function box(id) {
+  const fr = flow.getBoundingClientRect();
+  const el = document.getElementById(id);
+  const r = el.getBoundingClientRect();
+  const b = { l: r.left - fr.left, r: r.right - fr.left, t: r.top - fr.top, b: r.bottom - fr.top };
+  b.cx = (b.l + b.r) / 2;
+  b.w = b.r - b.l;
+  if (el.classList.contains("step")) {
+    const node = el.closest(".node").getBoundingClientRect();
+    b.l = node.left - fr.left;
+    b.r = node.right - fr.left;
+    b.cx = (b.l + b.r) / 2;
+    b.y = b.t + 13;
+  } else if (el.classList.contains("node")) {
+    b.y = b.t + 26;
+  } else {
+    b.y = b.t + 20;
+  }
+  return b;
+}
+
+function lanePath(sx, sy, laneX, ty, tx) {
+  const r = 8;
+  const dirX1 = laneX > sx ? 1 : -1;
+  const dirX2 = tx > laneX ? 1 : -1;
+  return `M${sx},${sy} L${laneX - dirX1 * r},${sy} Q${laneX},${sy} ${laneX},${sy + r} L${laneX},${ty - r} Q${laneX},${ty} ${laneX + dirX2 * r},${ty} L${tx},${ty}`;
+}
+
+function edgePath(e, center, gap) {
+  const s = box(e.from);
+  const t = box(e.to);
+  const dy = e.dy || 0;
+  if (e.route === "v") {
+    const x = s.w < t.w ? s.cx : t.cx;
+    return `M${x},${s.b} L${x},${t.t - 1}`;
+  }
+  if (e.route === "rail") {
+    return t.t > s.b ? `M${s.cx},${s.b} L${s.cx},${t.t - 1}` : `M${s.cx},${s.t} L${s.cx},${t.b + 1}`;
+  }
+  if (e.route === "lane") {
+    const left = s.cx < center.l;
+    const laneX = (left ? center.l - gap / 2 : center.r + gap / 2) + (e.lane || 0);
+    const sx = left ? s.r : s.l;
+    const tx = left ? t.l : t.r;
+    return lanePath(sx, s.b - 14, laneX, t.y + dy, tx);
+  }
+  const forward = s.cx < t.cx;
+  const sx = forward ? s.r : s.l;
+  const tx = forward ? t.l : t.r;
+  const sy = s.y;
+  const ty = t.y + dy;
+  const mid = (tx - sx) / 2;
+  return `M${sx},${sy} C${sx + mid},${sy} ${tx - mid},${ty} ${tx},${ty}`;
+}
+
+function drawEdges() {
+  layer.innerHTML = "";
+  if (!desktop.matches) return;
+  const center = box("n1");
+  const gap = parseFloat(getComputedStyle(flow).columnGap) || 64;
+  const ns = "http://www.w3.org/2000/svg";
+  for (const e of DATA.edges) {
+    const p = document.createElementNS(ns, "path");
+    p.setAttribute("d", edgePath(e, center, gap));
+    p.setAttribute("class", e.kind === "main" ? "e-main" : "e-aff");
+    p.setAttribute("marker-end", e.kind === "main" ? "url(#m-main)" : "url(#m-aff)");
+    p.dataset.from = e.from;
+    p.dataset.to = e.to;
+    layer.appendChild(p);
+  }
+}
+
+let pending = 0;
+function scheduleEdges() {
+  cancelAnimationFrame(pending);
+  pending = requestAnimationFrame(drawEdges);
+}
+
+function highlight(id, on) {
+  layer.querySelectorAll("path.e-aff").forEach((p) => {
+    if (p.dataset.from === id || p.dataset.to === id) {
+      p.classList.toggle("hot", on);
+      p.setAttribute("marker-end", on ? "url(#m-hot)" : "url(#m-aff)");
+    }
+  });
+}
+
+render();
+flow.addEventListener("click", (ev) => {
+  const b = ev.target.closest(".task");
+  if (b) toggleDetail(b);
+});
+flow.querySelectorAll(".aff, .step").forEach((el) => {
+  el.addEventListener("mouseenter", () => highlight(el.id, true));
+  el.addEventListener("mouseleave", () => highlight(el.id, false));
+});
+new ResizeObserver(scheduleEdges).observe(flow);
+desktop.addEventListener("change", scheduleEdges);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(scheduleEdges);
+scheduleEdges();
+</script>

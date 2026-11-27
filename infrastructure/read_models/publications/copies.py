@@ -7,7 +7,7 @@ from sqlalchemy import Connection, text
 
 from domain.documents.licenses import License
 from domain.platforms.platform import PlatformType
-from domain.publications.access import Copy, registered_url_copy
+from domain.publications.access import Copy, doi_of_url, registered_url_copy
 from infrastructure.sql_fragments import under_active_embargo
 
 
@@ -29,8 +29,10 @@ def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict
         """),
         {"ids": list(publication_ids)},
     ).all()
+    agencies = _doi_agencies(conn, [r.url for r in rows])
     copies: dict[int, list[Copy]] = defaultdict(list)
     for r in rows:
+        doi = doi_of_url(r.url)
         copies[r.publication_id].append(
             Copy.of_location(
                 r.url,
@@ -44,6 +46,7 @@ def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict
                 platform_openalex_id=r.platform_openalex_id,
                 record_source=r.source,
                 record_doc_type=r.doc_type,
+                doi_agency=agencies.get(doi.split("/", 1)[0]) if doi else None,
             )
         )
     registered = conn.execute(
@@ -58,3 +61,17 @@ def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict
         if copy := registered_url_copy(r.registered_url):
             copies[r.id].append(copy)
     return dict(copies)
+
+
+def _doi_agencies(conn: Connection, urls: Sequence[str]) -> dict[str, str]:
+    """Renvoie l'agence d'enregistrement (`doi_prefixes.ra`) de chaque préfixe des DOI désignés par les adresses de doi.org de `urls`."""
+    prefixes = sorted({doi.split("/", 1)[0] for url in urls if (doi := doi_of_url(url))})
+    if not prefixes:
+        return {}
+    rows = conn.execute(
+        text(
+            "SELECT prefix, ra FROM doi_prefixes WHERE prefix = ANY(:prefixes) AND ra IS NOT NULL"
+        ),
+        {"prefixes": prefixes},
+    )
+    return {r.prefix: r.ra for r in rows}

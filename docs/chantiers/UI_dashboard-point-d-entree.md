@@ -6,7 +6,7 @@
 
 **Ses filtres sont écrits en dur.** Seule la période figure à l'écran.
 - Types : la famille « Publications ». Le graphique des types de documents fait exception : il compte toutes les familles, thèses en cours comprises, alors que la liste des publications les exclut (`excluded_doc_type=ongoing_thesis`).
-- Années : de l'année en cours moins 5 à l'année en cours, parmi les années présentes (`defaultYears`).
+- Années : de la première à la dernière année présente entre l'année en cours moins 5 et l'année en cours, années vides comprises (`defaultYears`).
 
 **L'onglet Publications** de chaque fiche (`PublicationsListView`) possède le panneau des filtres, leur synchronisation avec l'URL et trois vues : Notices, Tableau, Statistiques. La vue Statistiques trace un indicateur, empilé, le long d'un axe de comparaison (l'année par défaut), sous les filtres actifs.
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6xm5wJ9Q2S594yKZsgYLUrSR5U9T6kjW8s92CmqcwyP7ydAnfvja0D3hnprvOOZ
+\restrict 6PvYSKYgrnDcYpR01agAf8grb2g0i5KurhukWuHJLmsQrH76whzkyWxscXIoVdS
 
 -- Dumped from database version 18.7 (Ubuntu 18.7-1.pgdg22.04+5)
 -- Dumped by pg_dump version 19.0 (Ubuntu 19.0-2.pgdg22.04+1)
@@ -302,8 +302,7 @@ CREATE TYPE public.lookup_source AS ENUM (
     'theses',
     'crossref',
     'datacite',
-    'inspire',
-    'doi_org'
+    'inspire'
 );
 
 
@@ -3386,7 +3385,7 @@ END))
 -- Name: TABLE failed_lookups; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON TABLE sources.failed_lookups IS 'Identifiants cherchés en vain par la phase fetch_missing, dans une source ou auprès de doi.org (source doi_org : DOI que doi.org ne connaît pas). L''échec est définitif pour un identifiant absent de son registre (hal-id dans HAL, NNT dans theses.fr, DOI auprès de doi.org). Les autres recherches reprennent quand not_found_at date de plus que le délai fetch_missing_retry_after_days.';
+COMMENT ON TABLE sources.failed_lookups IS 'Identifiants cherchés en vain par la phase fetch_missing dans une source. L''échec est définitif pour un identifiant absent de son registre (hal-id dans HAL, NNT dans theses.fr). Les autres recherches reprennent quand not_found_at date de plus que le délai fetch_missing_retry_after_days.';
 
 
 --
@@ -6421,5 +6420,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6xm5wJ9Q2S594yKZsgYLUrSR5U9T6kjW8s92CmqcwyP7ydAnfvja0D3hnprvOOZ
+\unrestrict 6PvYSKYgrnDcYpR01agAf8grb2g0i5KurhukWuHJLmsQrH76whzkyWxscXIoVdS
 

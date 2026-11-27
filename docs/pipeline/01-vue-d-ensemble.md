@@ -4,6 +4,8 @@
 
 Le pipeline moissonne les sources, normalise leurs données, puis déduit les publications, les contributions et les personnes du référentiel. Le [guide d'exploitation](../exploitation/03-pipeline.md) décrit son lancement et ses options.
 
+Le [déroulement du pipeline](deroulement.html) range les tâches selon le circuit des données, des sources aux personnes. `uv run python -m interfaces.cli.dev.deroulement` régénère cette page depuis `interfaces/cli/dev/deroulement/`.
+
 | Notion | Code | Définition |
 |---|---|---|
 | moissonnage | phases `harvest`, `harvest_by_person` et `fetch_*` du bloc `Block.HARVESTING` | Interrogation des sources vers `staging`, sur le périmètre puis par recherches ciblées |
@@ -30,7 +32,7 @@ Les phases s'exécutent dans cet ordre, qui suit les dépendances entre tâches.
 
 **Référentiels**
 
-- [`structure_referentials`](04-affiliations.md#référentiels-ror-et-hal-structure_referentials) tient à jour les référentiels ROR et HAL.
+- [`structures`](04-affiliations.md#référentiels-ror-et-hal-structures) tient à jour les référentiels ROR et HAL.
 - [`dois`](05-publishing.md#référentiel-des-doi-dois) tient le référentiel des DOI connus : agence de chaque préfixe, existence et URL de résolution chez doi.org.
 - [`publishing`](05-publishing.md) complète les référentiels de l'édition.
 

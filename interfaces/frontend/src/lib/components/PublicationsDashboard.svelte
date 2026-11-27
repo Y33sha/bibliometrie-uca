@@ -14,7 +14,7 @@
 	import BarChart from '#lib/components/charts/BarChart.svelte';
 	import StackedBarChart from '#lib/components/charts/StackedBarChart.svelte';
 	import YearScatterChart from '#lib/components/charts/YearScatterChart.svelte';
-	import { defaultYears } from '#lib/defaultYears.js';
+	import { defaultYears } from '#lib/years.js';
 	import { publicationsDocTypes } from '#lib/docTypes.svelte.js';
 	import { orderedPivotValues, pivotValueColor, pivotValueDescription, pivotValueLabel } from '#lib/pivotValues.js';
 	import { contextParams, type PublicationListContext } from '#lib/publicationListContext.js';

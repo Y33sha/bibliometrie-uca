@@ -5,7 +5,7 @@
 3. Sinon, copie ouverte chez l'éditeur sans licence ouverte : `bronze`.
 4. Sinon : `embargoed` sous embargo ; `closed` avec une copie déclarée fermée, un verdict, ou pour une publication fermée par nature (`is_restricted`) ; `unknown` sans aucune information.
 
-Le verdict d'Unpaywall relève les accès chez l'éditeur, jamais ne les abaisse. Un verdict `green` relève seulement l'information : Unpaywall classe en archive des plateformes d'éditeurs (OpenEdition, Cairn), compte comme ouvertes les notices HAL sans fichier et ignore l'embargo d'un dépôt. Un brevet a le statut `unknown` (`has_oa_status`).
+Le verdict d'Unpaywall relève les accès chez l'éditeur, jamais ne les abaisse. Un verdict `green` relève seulement l'information : Unpaywall classe en archive des plateformes d'éditeurs (OpenEdition, Cairn), compte comme ouverts les dépôts HAL sans fichier et ignore l'embargo d'un dépôt. Un brevet a le statut `unknown` (`has_oa_status`).
 """
 
 from collections.abc import Iterable, Mapping

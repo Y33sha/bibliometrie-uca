@@ -67,9 +67,11 @@ _LOOKUP = "lookup"
 _KNOWN_DOIS = f"""
     SELECT doi FROM known_dois
     UNION
+    SELECT id_value FROM source_record_identifiers WHERE id_type = 'doi' AND removed_by IS NOT NULL
+    UNION
     SELECT {unversioned_doi_sql("doi")} FROM known_dois WHERE {unversioned_doi_sql("doi")} IS NOT NULL
 """
-"""DOI connus (vue `known_dois` : DOI actifs des enregistrements sources, cibles des relations), et forme sans version de chaque DOI à suffixe de version. `fetch_missing` cherche aussi ces formes."""
+"""DOI connus (vue `known_dois` : DOI actifs des enregistrements sources, cibles des relations), DOI retirés des enregistrements sources, et forme sans version de chaque DOI connu à suffixe de version. Un DOI retiré parce qu'inconnu de doi.org (`UNRESOLVED_DOI_TO_NULL`) est ainsi interrogé de nouveau : enregistré entre-temps, il revient sur ses enregistrements sources au passage suivant de `remove_identifiers`. `fetch_missing` cherche aussi les formes sans version."""
 
 _PUBLICATION_DOIS = "SELECT DISTINCT doi FROM publications WHERE doi IS NOT NULL"
 """DOI des publications."""

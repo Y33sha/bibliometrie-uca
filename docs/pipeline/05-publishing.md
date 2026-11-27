@@ -4,10 +4,10 @@
 
 ## Référentiel des DOI (`dois`)
 
-La phase `dois` suit les référentiels ROR et HAL. Elle tient les faits obtenus sur chaque DOI connu, lus par le moissonnage, l'édition, la correction et la consolidation des publications. Les DOI connus sont les DOI actifs des enregistrements sources et les cibles des relations (vue `known_dois`), plus la forme sans version de chaque DOI à suffixe de version.
+La phase `dois` suit les référentiels ROR et HAL. Elle tient les faits obtenus sur chaque DOI connu, lus par le moissonnage, l'édition, la correction et la consolidation des publications. Les DOI connus sont les DOI des enregistrements sources, retirés compris, et les cibles des relations, plus la forme sans version de chaque DOI à suffixe de version.
 
 - **`resolve_prefixes`** — demande à doi.org l'agence d'enregistrement de chaque préfixe nouveau, et l'enregistre dans `doi_prefixes` : Crossref, DataCite ou inconnue. La recherche des documents manquants ([fetch_missing](02-harvest.md#documents-absents-dune-source-fetch_missing)) adresse ensuite chaque DOI à l'API de son agence.
-- **`resolve_dois`** — demande à l'API des handles de doi.org l'existence et l'URL de résolution de chaque DOI connu (`dois.registered`, `dois.registered_url`). Un DOI inconnu de doi.org sort de la recherche des documents manquants, et la correction le retire des enregistrements sources.
+- **`resolve_dois`** — demande à l'API des handles de doi.org l'existence et l'URL de résolution de chaque DOI connu (`dois.registered`, `dois.registered_url`). Un DOI inconnu de doi.org sort de la recherche des documents manquants, et la correction le retire des enregistrements sources, jusqu'à ce que doi.org le connaisse.
 Les publications d'un DOI dont la réponse change entrent dans la file de consolidation. doi.org reçoit seulement les DOI sans réponse, ou à réponse plus ancienne que `doi_resolution_recheck_after_days` (180 jours), dans la limite de `doi_resolution_max_per_run` (10 000) par exécution. Ces réglages se modifient dans `admin/config`. Quand le service est indisponible, le DOI est repris au run suivant.
 
 ## Référentiels de l'édition (`publishing`)

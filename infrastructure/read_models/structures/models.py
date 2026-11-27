@@ -116,8 +116,10 @@ class StructureDetailResponse(Model):
     theses_count: int
     members_count: int
     """Personnes retenues à période de présence actuelle dans la structure."""
-    hr_persons_count: int
-    """Personnes à période de présence, actuelle ou passée, dans la structure."""
+    has_partners: bool
+    """La structure a au moins une organisation partenaire (`get_structure_partners`)."""
+    has_addresses: bool
+    """Les publications des membres pendant leur présence ont au moins une adresse brute (`get_structure_addresses`)."""
 
 
 class StructurePartner(Model):

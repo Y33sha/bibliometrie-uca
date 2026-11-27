@@ -133,6 +133,7 @@ class TestDoiVersion:
             ("10.6084/m9.figshare.123.v2", DoiVersion("10.6084/m9.figshare.123", 2)),
             ("10.21203/rs.3.rs-123/v1", DoiVersion("10.21203/rs.3.rs-123", 1)),
             ("10.48580/dv5t.v89", DoiVersion("10.48580/dv5t", 89)),
+            ("10.31234/osf.io/hkdyb_v3", DoiVersion("10.31234/osf.io/hkdyb", 3)),
         ],
     )
     def test_version_suffix(self, doi, expected):

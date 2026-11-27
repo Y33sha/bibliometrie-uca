@@ -66,7 +66,7 @@ Moissonnage et normalisation
 
 Référentiels
 
-- `structure_referentials` — Référentiels ROR et HAL
+- `structures` — Référentiels ROR et HAL
 - `dois` — Référentiel des DOI : agence des préfixes, existence et URL chez doi.org
 - `publishing` — Référentiels de l'édition : préfixes DOI, éditeurs, publications en série, monographies, espaces de noms DOI des revues
 

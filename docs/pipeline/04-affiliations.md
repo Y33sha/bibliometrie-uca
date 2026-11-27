@@ -2,7 +2,7 @@
 
 *À jour le 2026-11-20.*
 
-## Référentiels ROR et HAL (`structure_referentials`)
+## Référentiels ROR et HAL (`structures`)
 
 - **`refresh_ror`** — importe la dernière version du dump ROR, publié sur Zenodo, si elle n'est pas déjà importée.
 

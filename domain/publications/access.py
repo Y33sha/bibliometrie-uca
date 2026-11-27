@@ -1,16 +1,17 @@
 """Liens d'accès d'une publication : ses copies ouvertes, une par plateforme.
 
-Seules les copies ouvertes comptent (`open_copies`). La copie de l'éditeur, désignée par le DOI de la publication, passe en tête, puis les autres copies en version éditeur, hors preprint. Suivent les copies des plateformes à icône (`KnownPlatform.icon`), puis les autres. Dans chaque groupe, les copies d'un preprint passent après les autres (`Copy.of_preprint`). Une copie se classe ensuite par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL.
+Seules les copies ouvertes comptent (`open_copies`). La copie de l'éditeur, désignée par le DOI de la publication, passe en tête, puis les autres copies en version éditeur, hors preprint. Suivent les copies des plateformes à icône (`KnownPlatform.icon`), puis les autres. Dans chaque groupe, les copies d'un preprint passent après les autres (`Copy.of_preprint`). Une copie se classe ensuite par sa version (éditeur, acceptée, soumise, inconnue), puis après la copie de la forme sans version de son DOI ou d'une version de numéro supérieur, puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL.
 
 La meilleure copie donne l'adresse d'accès. Une copie désignée par un DOI figure parmi les liens quand une archive ou un serveur de preprints l'héberge (Zenodo), ou quand une autre plateforme l'héberge sous un autre DOI que celui de la publication. Le DOI de la publication chez son éditeur s'affiche à part.
 """
 
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
 from domain.documents.doc_types import DocType
-from domain.documents.identifiers import HALId
+from domain.documents.identifiers import HALId, doi_version
 from domain.documents.licenses import License
 from domain.platforms.platform import ARCHIVE_TYPES, PlatformType
 from domain.platforms.registry import (
@@ -21,9 +22,11 @@ from domain.platforms.registry import (
     platform_type_of_copy,
 )
 from domain.publications.oa_status import OA_OPEN_STATUSES, OaStatus
-from domain.sources.registry import Source
+from domain.sources.registry import PROFILES, Source
 
 _DOI_HOSTS = frozenset({"doi.org", "dx.doi.org"})
+_DATACITE = PROFILES[Source.DATACITE].registration_agency
+"""Agence d'enregistrement DataCite, telle que l'écrit `doi_prefixes.ra`."""
 _WEB_SCHEMES = frozenset({"http", "https"})
 _VERSION_RANK = {"publishedVersion": 0, "acceptedVersion": 1, "submittedVersion": 2}
 _UNKNOWN_VERSION_RANK = len(_VERSION_RANK)
@@ -65,25 +68,39 @@ class Copy:
         platform_openalex_id: str | None = None,
         record_source: str | None = None,
         record_doc_type: str | None = None,
+        doi_agency: str | None = None,
     ) -> Copy:
         """Renvoie la copie d'une localisation d'un enregistrement source.
 
         La plateforme de la liste donne son nom et son type, à défaut ceux donnés par la source. Une copie sous embargo est fermée. La copie HAL d'un enregistrement HAL est décrite par sa plateforme. Une copie garde le type preprint de son enregistrement source.
+
+        OpenAlex déclare ouverte la page de presque tout DOI DataCite. Pour une telle copie, hors archive et sans licence, l'ouverture est inconnue.
 
         Args:
             declared_oa: ouverture déclarée par la source.
             platform_openalex_id: identifiant OpenAlex de la plateforme donnée par la source.
             record_source: source de l'enregistrement source.
             record_doc_type: type de document de l'enregistrement source.
+            doi_agency: agence d'enregistrement du DOI désigné par l'URL (`doi_of_url`), telle que l'écrit `doi_prefixes.ra`.
         """
         known = known_platform_of_copy(url, platform_openalex_id)
+        platform_type = platform_type_of_copy(url, platform_openalex_id) or source_platform_type
+        is_oa = declared_oa and not embargoed
+        if (
+            is_oa
+            and record_source == Source.OPENALEX
+            and doi_agency == _DATACITE
+            and license is None
+            and platform_type not in ARCHIVE_TYPES
+        ):
+            is_oa = None
         return cls(
             url=url,
             version=version,
-            is_oa=declared_oa and not embargoed,
+            is_oa=is_oa,
             platform=known.name if known else source_platform,
             known_platform=known,
-            platform_type=platform_type_of_copy(url, platform_openalex_id) or source_platform_type,
+            platform_type=platform_type,
             license=license,
             described_by_platform=record_source == Source.HAL and known is HAL,
             arrival=arrival,
@@ -124,11 +141,17 @@ def _icon(copy: Copy) -> str | None:
     return copy.known_platform.icon if copy.known_platform else None
 
 
-def _doi_target(copy: Copy) -> str | None:
-    """Renvoie le DOI désigné par une copie à l'adresse de doi.org, en minuscules, ou `None` pour une autre adresse."""
-    if _host(copy) not in _DOI_HOSTS:
+def doi_of_url(url: str) -> str | None:
+    """Renvoie le DOI désigné par une adresse de doi.org, en minuscules, ou `None` pour une autre adresse."""
+    parts = urlsplit(url)
+    if parts.hostname not in _DOI_HOSTS:
         return None
-    return unquote(urlsplit(copy.url).path).lstrip("/").lower()
+    return unquote(parts.path).lstrip("/").lower()
+
+
+def _doi_target(copy: Copy) -> str | None:
+    """Renvoie le DOI désigné par une copie à l'adresse de doi.org (`doi_of_url`)."""
+    return doi_of_url(copy.url)
 
 
 def _from_publisher(copy: Copy, doi: str | None) -> bool:
@@ -144,13 +167,31 @@ def _listed(copy: Copy, doi: str | None) -> bool:
     return copy.platform is not None and target != (doi or "")
 
 
-def _rank(copy: Copy, doi: str | None) -> tuple[bool, bool, bool, bool, int, int]:
+def _superseded_dois(copies: Iterable[Copy]) -> frozenset[str]:
+    """Renvoie les DOI à suffixe de version (`doi_version`) des copies dont une autre copie désigne la forme sans version ou une version de numéro supérieur."""
+    dois = {target for copy in copies if (target := _doi_target(copy))}
+    latest: dict[str, float] = {}
+    for target in dois:
+        version = doi_version(target)
+        family, number = (version.unversioned, version.number) if version else (target, math.inf)
+        latest[family] = max(latest.get(family, 0), number)
+    return frozenset(
+        target
+        for target in dois
+        if (version := doi_version(target)) and latest[version.unversioned] > version.number
+    )
+
+
+def _rank(
+    copy: Copy, doi: str | None, superseded: frozenset[str]
+) -> tuple[bool, bool, bool, bool, int, bool, int]:
     return (
         not _from_publisher(copy, doi),
         copy.version != "publishedVersion" or copy.of_preprint,
         _icon(copy) is None,
         copy.of_preprint,
         _VERSION_RANK.get(copy.version or "", _UNKNOWN_VERSION_RANK),
+        _doi_target(copy) in superseded,
         copy.arrival,
     )
 
@@ -186,7 +227,9 @@ def open_copies(copies: Iterable[Copy]) -> list[Copy]:
 
 def access(copies: Iterable[Copy], *, doi: str | None) -> Access:
     """Calcule l'adresse d'accès et les liens d'accès d'une publication de DOI `doi`."""
-    ranked = sorted(open_copies(copies), key=lambda copy: _rank(copy, doi))
+    opened = open_copies(copies)
+    superseded = _superseded_dois(opened)
+    ranked = sorted(opened, key=lambda copy: _rank(copy, doi, superseded))
     best: dict[str, Copy] = {}
     for copy in ranked:
         if _listed(copy, doi):

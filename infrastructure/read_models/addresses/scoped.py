@@ -19,7 +19,7 @@ from infrastructure.sql_fragments import is_ranking_record, is_raw_address
 
 @dataclass(frozen=True, slots=True)
 class AddressScope:
-    """Périmètre des contributions : requête SQL qui renvoie leurs identifiants (colonne `id`), et ses paramètres."""
+    """Périmètre des contributions : requête SQL qui renvoie leurs identifiants (colonne `id`), éventuellement en double, et ses paramètres."""
 
     contributions: str
     binds: dict[str, JsonValue] = field(default_factory=dict)
@@ -37,7 +37,7 @@ def lab_members_scope(structure_id: int) -> AddressScope:
     """Renvoie le périmètre des contributions des personnes à période de présence dans la structure, sur les publications parues pendant la période. Une date à l'année ou au mois vaut jusqu'au dernier jour de l'année ou du mois : une publication de l'année du départ, datée à l'année, est exclue."""
     return AddressScope(
         # `LATERAL` et `OFFSET 0` : une recherche indexée des contributions par membre, plutôt qu'un parcours de toutes les contributions.
-        """SELECT DISTINCT member.id
+        """SELECT member.id
         FROM hr_periods hp
         CROSS JOIN LATERAL (
             SELECT g.id
@@ -56,24 +56,42 @@ def lab_members_scope(structure_id: int) -> AddressScope:
     )
 
 
+_ADDRESS_ROWS = f"""
+    JOIN contributions g ON g.id = sg.id
+    JOIN publications p ON p.id = g.publication_id
+    JOIN aligned_source_contributions m ON m.contribution_id = g.id
+    JOIN source_contributions sc ON sc.id = m.source_contribution_id
+    JOIN source_records sr ON sr.id = sc.source_record_id
+    JOIN source_contribution_addresses sca
+      ON sca.source_contribution_id = m.source_contribution_id
+    JOIN addresses a ON a.id = sca.address_id
+    WHERE {is_raw_address("a")} AND {is_ranking_record("sr", "p")}
+"""
+"""Adresses brutes des contributions sources des contributions `sg` du périmètre, issues des sources lues par les classements, sur les publications de la famille « publications »."""
+
+
 def _cte(scope: AddressScope) -> str:
-    """Renvoie la CTE `scoped_address_publications` : triplets (publication, adresse brute, année) des contributions sources des contributions du périmètre, issues des sources lues par les classements, sur les publications de la famille « publications ». Le périmètre est calculé d'abord (`MATERIALIZED`) : le planificateur sous-estime sa taille."""
+    """Renvoie la CTE `scoped_address_publications` : triplets (publication, adresse brute, année) des adresses du périmètre (`_ADDRESS_ROWS`). Le périmètre, dédoublonné, est calculé d'abord (`MATERIALIZED`) : le planificateur sous-estime sa taille."""
     return f"""
-        WITH scope_contributions AS MATERIALIZED ({scope.contributions}),
+        WITH scope_contributions AS MATERIALIZED (
+            SELECT DISTINCT id FROM ({scope.contributions}) scope
+        ),
         scoped_address_publications AS (
             SELECT DISTINCT g.publication_id, sca.address_id, p.publication_year
             FROM scope_contributions sg
-            JOIN contributions g ON g.id = sg.id
-            JOIN publications p ON p.id = g.publication_id
-            JOIN aligned_source_contributions m ON m.contribution_id = g.id
-            JOIN source_contributions sc ON sc.id = m.source_contribution_id
-            JOIN source_records sr ON sr.id = sc.source_record_id
-            JOIN source_contribution_addresses sca
-              ON sca.source_contribution_id = m.source_contribution_id
-            JOIN addresses a ON a.id = sca.address_id
-            WHERE {is_raw_address("a")} AND {is_ranking_record("sr", "p")}
+            {_ADDRESS_ROWS}
         )
     """
+
+
+def has_scoped_addresses(conn: Connection, scope: AddressScope) -> bool:
+    """Renvoie vrai quand le périmètre a au moins une adresse brute (`_ADDRESS_ROWS`). La requête s'arrête à la première adresse trouvée."""
+    return bool(
+        conn.execute(
+            text(f"SELECT EXISTS (SELECT 1 FROM ({scope.contributions}) sg {_ADDRESS_ROWS})"),
+            scope.binds,
+        ).scalar_one()
+    )
 
 
 def scoped_addresses(

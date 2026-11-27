@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import pytest
 
+from domain.documents.licenses import License
 from domain.platforms.platform import ARCHIVE_TYPES, PlatformType
 from domain.platforms.registry import ESPACENET, HAL, KNOWN_PLATFORMS, espacenet_url
 from domain.publications.access import (
@@ -12,6 +13,7 @@ from domain.publications.access import (
     Copy,
     access,
     access_url,
+    doi_of_url,
     registered_url_copy,
 )
 
@@ -130,6 +132,23 @@ def test_les_copies_d_un_preprint_passent_apres_les_autres():
     )
     assert result.url == "https://zenodo.org/records/1"
     assert [link.label for link in result.links] == ["Zenodo", "arXiv", "HAL"]
+
+
+def test_une_version_d_un_doi_passe_apres_sa_forme_sans_version_et_ses_versions_suivantes():
+    v1, v3, concept = (
+        _copy(f"https://doi.org/10.31234/osf.io/hkdyb{suffix}", version="submittedVersion")
+        for suffix in ("_v1", "_v3", "")
+    )
+    assert _access([v1, v3]).url == v3.url
+    assert _access([v1, v3, concept]).url == concept.url
+
+
+def test_une_forme_sans_version_fermee_laisse_passer_la_version_ouverte():
+    v1 = _copy("https://doi.org/10.31234/osf.io/hkdyb_v1", version="submittedVersion")
+    concept = _copy(
+        "https://doi.org/10.31234/osf.io/hkdyb", version="submittedVersion", is_oa=False
+    )
+    assert _access([v1, concept]).url == v1.url
 
 
 def test_un_preprint_seul_donne_l_adresse_d_acces():
@@ -292,6 +311,41 @@ def test_une_copie_garde_le_type_preprint_de_son_enregistrement_source():
         record_doc_type="preprint",
     )
     assert copy.of_preprint
+
+
+@pytest.mark.parametrize(
+    ("record_source", "agency", "copy_license", "platform_type", "declared_oa", "is_oa"),
+    [
+        ("openalex", "DataCite", None, None, True, None),
+        ("openalex", "DataCite", None, PlatformType.PUBLISHER_PLATFORM, True, None),
+        ("openalex", "DataCite", License.CC_BY, None, True, True),
+        ("openalex", "DataCite", None, PlatformType.REPOSITORY, True, True),
+        ("openalex", "DataCite", None, None, False, False),
+        ("openalex", "Crossref", None, None, True, True),
+        ("datacite", "DataCite", None, None, True, True),
+    ],
+)
+def test_l_ouverture_declaree_par_openalex_pour_la_page_d_un_doi_datacite_est_inconnue(
+    record_source, agency, copy_license, platform_type, declared_oa, is_oa
+):
+    """Hors archive et sans licence. Une copie déclarée fermée le reste."""
+    copy = Copy.of_location(
+        "https://doi.org/10.48611/isbn.978-2-406-18704-2",
+        version=None,
+        declared_oa=declared_oa,
+        arrival=1,
+        license=copy_license,
+        source_platform_type=platform_type,
+        record_source=record_source,
+        doi_agency=agency,
+    )
+    assert copy.is_oa is is_oa
+
+
+def test_l_adresse_d_un_doi_donne_son_doi():
+    assert doi_of_url("https://doi.org/10.48611/ISBN.978-2") == "10.48611/isbn.978-2"
+    assert doi_of_url("https://dx.doi.org/10.1%2Fx") == "10.1/x"
+    assert doi_of_url("https://osf.io/hkdyb") is None
 
 
 def test_l_adresse_enregistree_d_un_pdf_donne_une_copie_ouverte_de_l_editeur():

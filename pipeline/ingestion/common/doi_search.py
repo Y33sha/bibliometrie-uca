@@ -42,7 +42,7 @@ def get_missing_dois(
 
     Un DOI est absent de la cible s'il manque à son `staging` et à tous les DOI de ses enregistrements sources, DOI retirés par la correction compris : une source renvoie un même document pour chacun de ses DOI.
 
-    Un DOI sort de la sélection pendant `retry_after_days` jours après une recherche vaine dans la cible (`failed_lookups`), et définitivement s'il est inconnu de doi.org (`dois.registered`).
+    Un DOI sort de la sélection pendant `retry_after_days` jours après une recherche vaine dans la cible (`failed_lookups`), et tant qu'il est inconnu de doi.org (`dois.registered`).
 
     Pour une cible agence d'enregistrement, seuls comptent les DOI à préfixe résolu vers cette agence. Un préfixe encore sans agence attend la phase `dois`, plus loin dans le run : son DOI est cherché au run suivant, auprès d'une seule des deux agences.
 

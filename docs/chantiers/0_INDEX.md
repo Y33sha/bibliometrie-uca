@@ -4,6 +4,7 @@
 
 ### En cours
 
+- [Adresses décalées chez OpenAlex](DATA_adresses-decalees-openalex.md)
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 - [Source ScanR](DATA_source-scanr.md)
@@ -13,6 +14,7 @@
 - [Dashboard, point d'entrée de la vue Statistiques](UI_dashboard-point-d-entree.md)
 - [Financements](DATA_financements.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
+- [Identifiants d'une autre œuvre](DATA_identifiants-d-une-autre-oeuvre.md)
 
 ## Chantiers archivés
 

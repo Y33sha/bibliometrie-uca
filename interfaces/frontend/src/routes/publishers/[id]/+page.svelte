@@ -29,15 +29,17 @@
 	// Volet d'édition de l'éditeur, en session admin : ouvert tant que `?publisher=<id>` figure dans l'URL.
 	const drawer = useDrawerParam('publisher', isAdmin);
 
-	const tabs: TabDef[] = [
+	let publisher = $state<PublisherDetail | null>(null);
+
+	// Les onglets des publications en série et des monographies s'affichent seulement quand leur liste est non vide.
+	const tabs: TabDef[] = $derived([
 		{ id: 'dashboard', label: 'Dashboard' },
-		{ id: 'serials', label: 'Publications en série' },
-		{ id: 'monographs', label: 'Monographies' },
+		...(publisher && publisher.serial_count > 0 ? [{ id: 'serials', label: 'Publications en série' }] : []),
+		...(publisher?.has_monographs ? [{ id: 'monographs', label: 'Monographies' }] : []),
 		{ id: 'publications', label: 'Publications' },
-	];
+	]);
 	const activeTab = $derived(activeTabId(tabs, page.url.searchParams));
 
-	let publisher = $state<PublisherDetail | null>(null);
 	let error = $state(false);
 
 	// Label FR du publisher_type, affiché dans l'en-tête de la page.

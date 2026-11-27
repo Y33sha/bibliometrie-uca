@@ -88,6 +88,17 @@ def _item(row: Row[tuple[object, ...]]) -> MonographListItem:
     return MonographListItem.model_validate(row._mapping)
 
 
+def has_monographs(conn: Connection, filters: MonographFilters) -> bool:
+    """Renvoie vrai quand la liste des monographies aux filtres `filters` est non vide."""
+    where, binds = _where(filters)
+    return bool(
+        conn.execute(
+            text(f"SELECT EXISTS (SELECT 1 FROM monographs m WHERE {where})"),  # noqa: S608
+            binds,
+        ).scalar_one()
+    )
+
+
 class MonographQueries:
     """Lectures PostgreSQL sur les monographies."""
 
