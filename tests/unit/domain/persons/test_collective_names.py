@@ -48,6 +48,7 @@ from domain.persons.collective_names import is_collective_name
         "MacaqueNet",
         "WellBeNet",
         "Opticon RadioNet Pilot",
+        "the FREGAT and BIG-RENAPE Networks",
     ],
 )
 def test_reconnait_un_collectif(name):

@@ -52,6 +52,7 @@ _COLLECTIVE_WORDS: frozenset[str] = frozenset(
         "ministere",
         "ministry",
         "network",
+        "networks",
         "oecd",
         "office",
         "organisation",
