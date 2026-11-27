@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body { margin: 0; }</style>
+</head>
+<body>
+<title>Déroulement du pipeline</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Mise en page : circuit principal en colonne centrale (deux colonnes pour les blocs parallèles), affluents et sorties dans deux rails latéraux, liens tracés en SVG par-dessus la grille. Sur téléphone, une seule colonne dans l'ordre du déroulement. */
+:root {
+  --bg: #fbfbfa;
+  --card: #ffffff;
+  --surface: #f2f4f5;
+  --text: #1d2433;
+  --muted: #5d6673;
+  --border: #e0e4e8;
+  --accent: oklch(0.446 0.064 196);
+  --accent-line: oklch(0.6 0.085 196);
+  --accent-soft: oklch(0.952 0.016 196);
+  --on-accent: #ffffff;
+  --edge: #a0a8b2;
+  --attention: #b84000;
+  --attention-soft: #fff1e2;
+  --font: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151a;
+    --card: #181d24;
+    --surface: #151a21;
+    --text: #e4e7eb;
+    --muted: #9aa3ae;
+    --border: #2b333e;
+    --accent: oklch(0.8 0.07 196);
+    --accent-line: oklch(0.68 0.08 196);
+    --accent-soft: oklch(0.3 0.035 196);
+    --on-accent: #11151a;
+    --edge: #5f6974;
+    --attention: #ffa266;
+    --attention-soft: #3b2617;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151a;
+  --card: #181d24;
+  --surface: #151a21;
+  --text: #e4e7eb;
+  --muted: #9aa3ae;
+  --border: #2b333e;
+  --accent: oklch(0.8 0.07 196);
+  --accent-line: oklch(0.68 0.08 196);
+  --accent-soft: oklch(0.3 0.035 196);
+  --on-accent: #11151a;
+  --edge: #5f6974;
+  --attention: #ffa266;
+  --attention-soft: #3b2617;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.page {
+  max-width: 1340px;
+  margin: 0 auto;
+  padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+header.intro { display: grid; gap: 10px; margin-bottom: 28px; max-width: 78ch; }
+.back { font-size: 0.85rem; color: var(--accent); text-decoration: none; }
+.back:hover { text-decoration: underline; }
+h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.015em; margin: 0; text-wrap: balance; }
+.lead { margin: 0; color: var(--muted); }
+.meta { margin: 0; font-size: 0.85rem; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 4px 0 0; padding: 0; list-style: none; font-size: 0.85rem; color: var(--muted); }
+.legend li { display: flex; align-items: center; gap: 8px; }
+.sw { display: inline-block; width: 22px; height: 14px; border-radius: 4px; }
+.sw-node { background: var(--card); border: 1px solid var(--border); box-shadow: 0 1px 2px rgb(0 0 0 / 0.06); }
+.sw-aff { background: var(--surface); border: 1px dashed var(--edge); }
+.sw-line { width: 26px; height: 0; border-top: 2px solid var(--accent-line); border-radius: 0; }
+
+#flow { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+#edges { display: none; position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 0; }
+.node, .rail { position: relative; z-index: 1; min-width: 0; }
+
+.node {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  padding: 16px 18px 14px;
+  align-self: start;
+}
+.node.technical { background: var(--surface); border-style: dashed; box-shadow: none; }
+.node-head { display: flex; gap: 12px; align-items: flex-start; }
+.node-head > div { flex: 1; min-width: 0; }
+.num {
+  flex: none;
+  display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--accent); color: var(--on-accent);
+  font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.tag { flex: none; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 9px; margin-top: 3px; }
+h2 { font-size: 1.28rem; font-weight: 700; margin: 0; line-height: 1.25; text-wrap: balance; }
+.technical h2 { color: var(--muted); }
+.role { margin: 2px 0 0; color: var(--muted); font-size: 0.93rem; }
+
+.steps { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 0; }
+.step { padding: 12px 0 12px; border-top: 1px solid var(--border); }
+.step:last-child { padding-bottom: 2px; }
+.step.solo { border-top: 0; padding: 12px 0 2px; }
+.step-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+h3 { font-size: 1rem; font-weight: 600; margin: 0; }
+.step-text { margin: 2px 0 8px; color: var(--muted); font-size: 0.9rem; }
+.count { flex: none; font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.groups { display: grid; gap: 6px; }
+.grp { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.glabel { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); margin-right: 2px; }
+.task {
+  font-family: var(--mono); font-size: 0.76rem; line-height: 1.3;
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 5px;
+  padding: 2px 7px; cursor: pointer; text-align: left;
+  max-width: 100%; overflow-wrap: anywhere;
+}
+.node .task { background: var(--surface); }
+.technical .task, .aff .task { background: var(--card); }
+.task:hover { border-color: var(--accent-line); }
+.task.static { cursor: default; }
+.task.static:hover { border-color: var(--border); }
+.task[aria-expanded="true"] { background: var(--accent-soft); border-color: var(--accent-line); }
+.task:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 1px; }
+.detail { margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: var(--accent-soft); font-size: 0.88rem; }
+.detail b { font-family: var(--mono); font-size: 0.8rem; font-weight: 600; display: block; margin-bottom: 2px; overflow-wrap: anywhere; }
+.detail code { font-family: var(--mono); font-size: 0.82em; overflow-wrap: anywhere; }
+
+.rail { display: flex; flex-direction: column; gap: 14px; align-self: start; padding-left: 14px; border-left: 2px solid var(--border); }
+.aff {
+  background: var(--surface);
+  border: 1px dashed var(--edge);
+  border-radius: 8px;
+  padding: 10px 12px 11px;
+  font-size: 0.9rem;
+}
+.aff-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.kind { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.aff h3 { font-size: 0.96rem; margin-top: 1px; }
+.aff p { margin: 2px 0 8px; color: var(--muted); font-size: 0.84rem; }
+.aff .feeds { margin: 8px 0 0; font-size: 0.8rem; color: var(--muted); }
+.asteps { display: grid; gap: 10px; margin-top: 4px; }
+.astep { display: grid; gap: 3px; }
+.astep + .astep { border-top: 1px solid var(--border); padding-top: 8px; }
+h4 { font-size: 0.88rem; font-weight: 600; margin: 0; }
+.aff .astep-text { margin: 0 0 4px; font-size: 0.8rem; }
+.substeps { display: grid; gap: 8px; margin-top: 2px; padding-left: 10px; border-left: 2px solid var(--border); }
+.substeps .astep + .astep { border-top: 0; padding-top: 0; }
+
+.e-main { fill: none; stroke: var(--accent-line); stroke-width: 2.25; }
+.e-aff { fill: none; stroke: var(--edge); stroke-width: 1.4; transition: stroke 120ms; }
+.e-aff.hot { stroke: var(--accent-line); stroke-width: 2; }
+.mk-main { fill: var(--accent-line); }
+.mk-aff { fill: var(--edge); }
+.mk-hot { fill: var(--accent-line); }
+
+@media (min-width: 1080px) {
+  #flow { grid-template-columns: 272px minmax(0, 1fr) minmax(0, 1fr) 272px; column-gap: 60px; row-gap: 46px; }
+  #edges { display: block; }
+  .rail { padding-left: 0; border-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .e-aff { transition: none; } }
+</style>
+
+<div class="page">
+  <header class="intro">
+    <a class="back" href="01-vue-d-ensemble/">Vue d'ensemble du pipeline</a>
+    <h1>Déroulement du pipeline</h1>
+    <ul class="legend">
+      <li><span class="sw sw-node"></span>bloc du circuit principal</li>
+      <li><span class="sw sw-aff"></span>affluent ou sortie</li>
+      <li><span class="sw sw-line"></span>circuit principal</li>
+      <li>clic sur une tâche : sa description</li>
+    </ul>
+  </header>
+  <main id="flow">
+    <svg id="edges" aria-hidden="true">
+      <defs>
+        <marker id="m-main" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-main" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="m-aff" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="mk-aff" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="m-hot" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="mk-hot" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+      <g id="edge-layer"></g>
+    </svg>
+  </main>
+</div>
+
+<script>
+const DATA = {"nodes": [{"id": "n1", "num": "1", "title": "Moissonnage", "role": "Interroge les sources et garde les documents tels quels.", "steps": [{"id": "s1-1", "title": "Recherche par affiliation", "text": "Documents qui mentionnent une structure du périmètre.", "groups": [{"label": "harvest", "tasks": ["harvest.hal", "harvest.openalex", "harvest.wos", "harvest.scanr", "harvest.ops", "harvest.theses", "harvest.datacite", "harvest.inspire"]}], "steps": []}, {"id": "s1-2", "title": "Recherche par personne", "text": "Documents des personnes RH, par ORCID, idHAL et IdRef.", "groups": [{"label": "harvest_by_person", "tasks": ["harvest_by_person.hal", "harvest_by_person.openalex", "harvest_by_person.scanr", "harvest_by_person.crossref", "harvest_by_person.datacite"]}], "steps": []}, {"id": "s1-3", "title": "Recherche croisée", "text": "Documents trouvés dans une autre source : hal-id, NNT, brevet, DOI.", "groups": [{"label": "fetch_missing", "tasks": ["fetch_missing.hal_by_id", "fetch_missing.hal_by_nnt", "fetch_missing.doi.hal", "fetch_missing.scanr_by_hal_id", "fetch_missing.doi.scanr", "fetch_missing.theses_by_nnt", "fetch_missing.ops_by_number", "fetch_missing.doi.openalex", "fetch_missing.doi.wos", "fetch_missing.doi.crossref", "fetch_missing.doi.datacite"]}], "steps": []}, {"id": "s1-4", "title": "Mise à jour", "text": "Documents non revus, disparus, ou aux auteurs tronqués.", "groups": [{"label": "fetch_stale", "tasks": ["fetch_stale.hal", "fetch_stale.openalex", "fetch_stale.wos", "fetch_stale.scanr", "fetch_stale.ops", "fetch_stale.theses", "fetch_stale.crossref", "fetch_stale.datacite", "fetch_stale.inspire"]}, {"label": "fetch_truncated", "tasks": ["fetch_truncated.refetch_openalex"]}], "steps": []}]}, {"id": "n2", "num": "2", "title": "Normalisation", "role": "Passage du JSON au SQL : enregistrements sources, contributions sources, adresses.", "steps": [{"id": "s2-1", "title": null, "text": null, "groups": [{"label": "par source", "tasks": ["normalize.theses", "normalize.ops", "normalize.crossref", "normalize.datacite", "normalize.hal", "normalize.inspire", "normalize.openalex", "normalize.scanr", "normalize.wos"]}, {"label": "nettoyage", "tasks": ["normalize.withhold_openalex_authors", "normalize.prune_disappeared", "normalize.cleanup_orphan_contributor_information", "normalize.cleanup_orphan_addresses", "normalize.arbitrate_identifiers"]}], "steps": []}]}, {"id": "n3", "num": "3", "title": "Affiliations", "role": "Relie les contributions sources aux structures et repère celles du périmètre.", "steps": [{"id": "s3-1", "title": "Reconnaissance des structures", "text": "Noms de structures dans les adresses et les partenaires de thèse.", "groups": [{"label": null, "tasks": ["affiliations.classify_addresses", "affiliations.detect_concatenated_addresses", "affiliations.resolve_addresses", "affiliations.resolve_thesis_partners"]}], "steps": []}, {"id": "s3-2", "title": "Décision du périmètre", "text": "Par une structure du périmètre, ou l'identifiant d'une personne RH.", "groups": [{"label": null, "tasks": ["affiliations.decide_source_contribution_perimeter"]}], "steps": []}]}, {"id": "n4", "num": "4", "title": "Métadonnées", "role": "Corrige les métadonnées pour la réconciliation et la consolidation.", "steps": [{"id": "s4-1", "title": "Correction des enregistrements", "text": "Type de document, identifiants des dépôts HAL introuvables.", "groups": [{"label": null, "tasks": ["metadata_correction.correct_source_records"]}], "steps": []}, {"id": "s4-2", "title": "Nettoyage des DOI", "text": "Cibles des DOI secondaires, retrait des DOI partagés ou inconnus.", "groups": [{"label": null, "tasks": ["metadata_correction.doi_targets", "metadata_correction.remove_identifiers"]}], "steps": []}, {"id": "s4-3", "title": "Admission à la réconciliation", "text": "Enregistrements sources écartés de la réconciliation.", "groups": [{"label": null, "tasks": ["metadata_correction.decide_matchability"]}], "steps": []}]}, {"id": "n5", "num": "5", "title": "Publications", "role": "Réconcilie les enregistrements sources et constitue le référentiel des publications.", "steps": [{"id": "s5-1", "title": "Réconciliation", "text": "Même document : DOI, NNT, hal-id, ou type, titre et année.", "groups": [{"label": null, "tasks": ["publications.reconcile"]}], "steps": []}, {"id": "s5-2", "title": "Consolidation", "text": "Métadonnées de chaque publication, tirées de ses enregistrements sources.", "groups": [{"label": null, "tasks": ["publications.consolidate_publications"]}], "steps": []}]}, {"id": "n6", "num": "6", "title": "Personnes", "role": "Attribue les contributions aux personnes et constitue le référentiel des personnes.", "steps": [{"id": "s6-1", "title": "Alignement des auteurs", "text": "Les contributions sources d'un même auteur forment une contribution.", "groups": [{"label": null, "tasks": ["author_grouping.align_source_contributions", "author_grouping.recompute_contribution_attributes"]}], "steps": []}, {"id": "s6-2", "title": "Attribution", "text": "Par identifiant ou par forme de nom.", "groups": [{"label": null, "tasks": ["persons.resolve_contributions", "persons.populate_person_name_forms", "persons.purge_persons"]}], "steps": []}, {"id": "s6-3", "title": "Attributions suspectes", "text": "Publications probablement signées par un homonyme.", "groups": [{"label": null, "tasks": ["suspect_attributions.detect_suspect_attributions"]}], "steps": []}]}, {"id": "nF", "num": null, "title": "Finalisation", "role": "Purges, données dérivées, compteurs.", "technical": true, "steps": [{"id": "sF-1", "title": "Purges", "text": "Publications sans enregistrement source ou sans personne, référentiels éditoriaux vides.", "groups": [{"label": null, "tasks": ["finalize.purge_publications", "finalize.delete_empty_monographs", "finalize.delete_empty_serials", "finalize.delete_empty_publishers"]}], "steps": []}, {"id": "sF-2", "title": "Données dérivées", "text": "Périmètre des publications, liens aux structures, éditeur des revues.", "groups": [{"label": null, "tasks": ["finalize.publications_in_perimeter", "finalize.refresh_structure_views", "finalize.serial_publishers"]}], "steps": []}, {"id": "sF-3", "title": "Compteurs", "text": "Publications des adresses, revues et éditeurs, usage des sujets.", "groups": [{"label": null, "tasks": ["finalize.publication_counts", "finalize.count_subject_usage"]}], "steps": []}]}], "affluents": [{"id": "a-per", "kind": "in", "title": "Structures du périmètre", "text": "Structures de chaque périmètre.", "groups": [{"label": null, "tasks": ["perimeter_structures"]}], "feeds": ["Recherche par affiliation", "Décision du périmètre"]}, {"id": "a-str", "kind": "in", "title": "Référentiels de structures", "text": "ROR et structures HAL à jour.", "groups": [{"label": "structures", "tasks": ["structures.refresh_ror", "structures.refresh_hal_structures"]}], "feeds": ["Décision du périmètre", "Pays"]}, {"id": "a-doi", "kind": "in", "title": "Résolution des DOI", "text": "Agence des préfixes, existence et URL des DOI chez doi.org.", "groups": [{"label": "dois", "tasks": ["dois.resolve_prefixes", "dois.resolve_dois"]}], "feeds": ["Éditeurs", "Nettoyage des DOI"]}, {"id": "a-edi", "kind": "in", "title": "Référentiels éditoriaux", "text": "Éditeurs, revues et monographies des enregistrements sources.", "steps": [{"id": "e-pub", "title": "Éditeurs", "text": "Titulaire de chaque préfixe DOI, puis éditeur de chaque enregistrement source.", "groups": [{"label": null, "tasks": ["publishing.resolve_crossref_publishers", "publishing.resolve_datacite_publishers", "publishing.attach_publishers", "publishing.merge_duplicate_publishers"]}], "steps": []}, {"id": "e-ser", "title": "Revues", "text": null, "groups": [], "steps": [{"id": "e-ser-1", "title": "Rattachement", "text": "Par ISSN-L, identifiant OpenAlex ou titre.", "groups": [{"label": null, "tasks": ["publishing.sync_issns", "publishing.check_issns_in_sudoc", "publishing.import_issnl_table", "publishing.attach_serials"]}], "steps": []}, {"id": "e-ser-2", "title": "Qualification", "text": "Type, DOAJ, modèle open access.", "groups": [{"label": null, "tasks": ["publishing.check_serials_in_openalex", "publishing.type_proceedings_serials", "publishing.type_journal_serials", "publishing.enrich_serials_from_doaj", "publishing.model_serials"]}], "steps": []}, {"id": "e-ser-3", "title": "Revue par le DOI", "text": "Revue manquante retrouvée par l'espace de noms DOI.", "groups": [{"label": null, "tasks": ["publishing.learn_serial_doi_namespaces", "publishing.serial_by_doi"]}], "steps": []}]}, {"id": "e-mon", "title": "Monographies", "text": "Monographie et collection de chaque volume, volumes d'actes.", "groups": [{"label": null, "tasks": ["publishing.attach_monographs", "publishing.link_monographs_to_collections", "publishing.type_proceedings_volumes"]}], "steps": []}], "feeds": ["Correction des enregistrements"]}, {"id": "a-pay", "kind": "in", "title": "Pays", "text": "Pays des adresses, reportés sur les enregistrements sources.", "groups": [{"label": "countries", "tasks": ["countries.detect_by_country_name", "countries.detect_by_place_name", "countries.resolve_countries", "countries.refresh_source_record_countries"]}], "feeds": ["Consolidation"]}, {"id": "a-rel", "kind": "out", "title": "Relations", "text": "Versions, errata, rétractations.", "groups": [{"label": "relations", "tasks": ["relations.rebuild_publication_relations", "relations.link_notices", "relations.flag_retracted_publications"]}], "feeds": []}, {"id": "a-oa", "kind": "out", "title": "Open access", "text": "Verdict d'Unpaywall, statut open access.", "groups": [{"label": "open_access", "tasks": ["open_access.verify_unpaywall", "open_access.recompute_oa_status"]}], "feeds": []}, {"id": "a-sub", "kind": "out", "title": "Sujets", "text": "Sujets des sources, reportés sur les publications.", "groups": [{"label": "subjects", "tasks": ["subjects.derive_publication_subjects"]}], "feeds": ["Attributions suspectes"]}], "layout": {"areas": ["r-a1 n1 n1 .", ". n2 n2 .", "r-a3 n3 n4 r-b3", "r-a5 n5 n5 r-b5", ". n6 n6 .", ". nF nF ."], "rails": {"r-a1": ["a-per"], "r-a3": ["a-str"], "r-b3": ["a-doi", "a-edi"], "r-a5": ["a-pay"], "r-b5": ["a-rel", "a-oa", "a-sub"]}, "order": ["r-a1", "n1", "n2", "r-a3", "n3", "r-b3", "n4", "r-a5", "n5", "r-b5", "n6", "nF"]}, "edges": [{"from": "n1", "to": "n2", "kind": "main", "route": "v"}, {"from": "n2", "to": "n3", "kind": "main", "route": "v"}, {"from": "n2", "to": "n4", "kind": "main", "route": "v"}, {"from": "n3", "to": "n5", "kind": "main", "route": "v"}, {"from": "n4", "to": "n5", "kind": "main", "route": "v"}, {"from": "n5", "to": "n6", "kind": "main", "route": "v"}, {"from": "n6", "to": "nF", "kind": "main", "route": "v"}, {"from": "a-per", "to": "s1-1", "kind": "aff", "route": "h"}, {"from": "a-per", "to": "s3-2", "kind": "aff", "route": "lane", "lane": -10}, {"from": "a-str", "to": "s3-2", "kind": "aff", "route": "h", "dy": 18}, {"from": "a-str", "to": "a-pay", "kind": "aff", "route": "rail"}, {"from": "a-doi", "to": "a-edi", "kind": "aff", "route": "rail"}, {"from": "a-doi", "to": "s4-2", "kind": "aff", "route": "h"}, {"from": "a-edi", "to": "s4-1", "kind": "aff", "route": "h"}, {"from": "a-pay", "to": "s5-2", "kind": "aff", "route": "h"}, {"from": "s5-2", "to": "a-rel", "kind": "aff", "route": "h"}, {"from": "s5-2", "to": "a-oa", "kind": "aff", "route": "h"}, {"from": "s5-2", "to": "a-sub", "kind": "aff", "route": "h"}, {"from": "a-sub", "to": "s6-3", "kind": "aff", "route": "lane", "lane": 0}], "descriptions": {"harvest.hal": "Documents HAL qui mentionnent une structure du périmètre.", "harvest.openalex": "Documents OpenAlex qui mentionnent une structure du périmètre.", "harvest.wos": "Documents WoS qui mentionnent une structure du périmètre.", "harvest.scanr": "Documents ScanR qui mentionnent une structure du périmètre.", "harvest.ops": "Documents OPS qui mentionnent une structure du périmètre.", "harvest.theses": "Documents theses.fr qui mentionnent une structure du périmètre.", "harvest.datacite": "Documents DataCite qui mentionnent une structure du périmètre.", "harvest.inspire": "Documents INSPIRE-HEP qui mentionnent une structure du périmètre.", "harvest_by_person.hal": "Documents HAL des personnes RH, par leurs identifiants.", "harvest_by_person.openalex": "Documents OpenAlex des personnes RH, par leurs identifiants.", "harvest_by_person.scanr": "Documents ScanR des personnes RH, par leurs identifiants.", "harvest_by_person.crossref": "Documents Crossref des personnes RH, par leurs identifiants.", "harvest_by_person.datacite": "Documents DataCite des personnes RH, par leurs identifiants.", "fetch_missing.hal_by_id": "Documents absents de HAL, cherchés par le hal-id vu dans OpenAlex ou ScanR.", "fetch_missing.hal_by_nnt": "Thèses de theses.fr absentes de HAL, cherchées dans HAL par NNT.", "fetch_missing.doi.hal": "Documents absents de HAL, cherchés par le DOI vu dans une autre source.", "fetch_missing.scanr_by_hal_id": "Documents absents de ScanR, cherchés par le hal-id vu dans HAL ou OpenAlex.", "fetch_missing.doi.scanr": "Documents absents de ScanR, cherchés par le DOI vu dans une autre source.", "fetch_missing.theses_by_nnt": "Thèses absentes de theses.fr, cherchées par le NNT vu dans une autre source.", "fetch_missing.ops_by_number": "Familles de brevets absentes d'OPS, cherchées par numéro.", "fetch_missing.doi.openalex": "Documents absents de OpenAlex, cherchés par le DOI vu dans une autre source.", "fetch_missing.doi.wos": "Documents absents de WoS, cherchés par le DOI vu dans une autre source.", "fetch_missing.doi.crossref": "Documents absents de Crossref, cherchés par le DOI vu dans une autre source.", "fetch_missing.doi.datacite": "Documents absents de DataCite, cherchés par le DOI vu dans une autre source.", "fetch_stale.hal": "Documents HAL non revus depuis un délai, cherchés de nouveau.", "fetch_stale.openalex": "Documents OpenAlex non revus depuis un délai, cherchés de nouveau.", "fetch_stale.wos": "Documents WoS non revus depuis un délai, cherchés de nouveau.", "fetch_stale.scanr": "Documents ScanR non revus depuis un délai, cherchés de nouveau.", "fetch_stale.ops": "Documents OPS non revus depuis un délai, cherchés de nouveau.", "fetch_stale.theses": "Documents theses.fr non revus depuis un délai, cherchés de nouveau.", "fetch_stale.crossref": "Documents Crossref non revus depuis un délai, cherchés de nouveau.", "fetch_stale.datacite": "Documents DataCite non revus depuis un délai, cherchés de nouveau.", "fetch_stale.inspire": "Documents INSPIRE-HEP non revus depuis un délai, cherchés de nouveau.", "fetch_truncated.refetch_openalex": "Listes d'auteurs OpenAlex tronquées, complétées.", "normalize.theses": "Documents bruts theses.fr : enregistrements sources, contributions sources, adresses.", "normalize.ops": "Documents bruts OPS : enregistrements sources, contributions sources, adresses.", "normalize.crossref": "Documents bruts Crossref : enregistrements sources, contributions sources, adresses.", "normalize.datacite": "Documents bruts DataCite : enregistrements sources, contributions sources, adresses.", "normalize.hal": "Documents bruts HAL : enregistrements sources, contributions sources, adresses.", "normalize.inspire": "Documents bruts INSPIRE-HEP : enregistrements sources, contributions sources, adresses.", "normalize.openalex": "Documents bruts OpenAlex : enregistrements sources, contributions sources, adresses.", "normalize.scanr": "Documents bruts ScanR : enregistrements sources, contributions sources, adresses.", "normalize.wos": "Documents bruts WoS : enregistrements sources, contributions sources, adresses.", "normalize.withhold_openalex_authors": "Retire les auteurs d'un enregistrement OpenAlex présent aussi dans INSPIRE-HEP.", "normalize.prune_disappeared": "Supprime les enregistrements sources disparus de leur source.", "normalize.cleanup_orphan_contributor_information": "Supprime les informations du contributeur sans contribution source.", "normalize.cleanup_orphan_addresses": "Supprime les adresses sans contribution source ni décision manuelle.", "normalize.arbitrate_identifiers": "Neutralise un identifiant de personne écrit sous un autre nom que son nom majoritaire.", "affiliations.classify_addresses": "Classe le texte des adresses : adresse brute, libellé HAL ou nom seul.", "affiliations.detect_concatenated_addresses": "Repère les adresses qui réunissent plusieurs affiliations.", "affiliations.resolve_addresses": "Cherche les noms de structures dans le texte des adresses.", "affiliations.resolve_thesis_partners": "Cherche les noms de structures dans les laboratoires partenaires des thèses.", "affiliations.decide_source_contribution_perimeter": "Décide l'entrée de chaque contribution source dans le périmètre.", "metadata_correction.correct_source_records": "Corrige le type de document et les identifiants de chaque enregistrement source.", "metadata_correction.doi_targets": "Relie le DOI d'une forme secondaire, comme une version Zenodo, au DOI de l'œuvre.", "metadata_correction.remove_identifiers": "Retire les DOI partagés par des œuvres distinctes, et les DOI inconnus de doi.org.", "metadata_correction.decide_matchability": "Écarte de la réconciliation certains enregistrements sources : paratexte, doublon retiré…", "publications.reconcile": "Rattache chaque enregistrement source à sa publication : création, fusion ou scission.", "publications.consolidate_publications": "Calcule les métadonnées de chaque publication depuis ses enregistrements sources.", "author_grouping.align_source_contributions": "Aligne les auteurs d'une publication d'une source à l'autre.", "author_grouping.recompute_contribution_attributes": "Rôles, indices de périmètre et positions de chaque contribution.", "persons.resolve_contributions": "Rattache chaque contribution à une personne, et crée les personnes inconnues.", "persons.populate_person_name_forms": "Régénère les formes de nom des personnes.", "persons.purge_persons": "Supprime les personnes sans contribution du périmètre.", "suspect_attributions.detect_suspect_attributions": "Signale les publications d'une personne probablement signées par un homonyme.", "finalize.purge_publications": "Supprime les publications sans enregistrement source, ou sans personne ni indice lié au document.", "finalize.delete_empty_monographs": "Supprime les monographies vides.", "finalize.delete_empty_serials": "Supprime les revues vides.", "finalize.delete_empty_publishers": "Supprime les éditeurs vides.", "finalize.publications_in_perimeter": "Décide le périmètre des publications.", "finalize.refresh_structure_views": "Relie les contributions et les publications à leurs structures.", "finalize.serial_publishers": "Donne à chaque revue l'éditeur de ses publications récentes.", "finalize.publication_counts": "Recompte les publications des adresses, revues et éditeurs.", "finalize.count_subject_usage": "Recompte l'usage et les co-occurrences des sujets.", "perimeter_structures": "Liste des structures de chaque périmètre.", "structures.refresh_ror": "Importe la dernière version du dump ROR.", "structures.refresh_hal_structures": "Charge les structures HAL citées et absentes du référentiel, avec leurs parents.", "dois.resolve_prefixes": "Agence de chaque préfixe DOI : Crossref, DataCite ou inconnue.", "dois.resolve_dois": "Existence et URL de chaque DOI chez doi.org.", "publishing.resolve_crossref_publishers": "Éditeur titulaire de chaque préfixe Crossref.", "publishing.resolve_datacite_publishers": "Organisation et entrepôt de chaque préfixe DataCite.", "publishing.attach_publishers": "Rattache chaque enregistrement source à l'éditeur qu'il nomme.", "publishing.merge_duplicate_publishers": "Fusionne les noms d'un même éditeur.", "publishing.sync_issns": "Recense les ISSN valides des enregistrements sources.", "publishing.check_issns_in_sudoc": "Notice Sudoc de chaque ISSN : titre, statut, titres liés.", "publishing.import_issnl_table": "Importe la table des ISSN-L de l'ISSN International Centre.", "publishing.attach_serials": "Rattache chaque enregistrement source à sa revue : ISSN-L, sinon identifiant OpenAlex, sinon titre.", "publishing.check_serials_in_openalex": "Fiche OpenAlex de chaque revue : identifiant, type, open access, listes.", "publishing.type_proceedings_serials": "Type en recueil d'actes les revues faites surtout d'articles de congrès.", "publishing.type_journal_serials": "Type en revue les séries de type inconnu faites surtout d'articles.", "publishing.enrich_serials_from_doaj": "Fiche DOAJ de chaque revue, rattachée par ISSN.", "publishing.model_serials": "Modèle open access de chaque revue : diamant, open access intégral, abonnement.", "publishing.learn_serial_doi_namespaces": "Espace de noms DOI de chaque revue, par exemple 10.1016/j.physletb.", "publishing.serial_by_doi": "Donne sa revue à un enregistrement source sans revue, d'après son DOI.", "publishing.attach_monographs": "Rattache chaque volume à sa monographie.", "publishing.link_monographs_to_collections": "Rattache chaque monographie à sa collection.", "publishing.type_proceedings_volumes": "Distingue les volumes d'actes des livres.", "countries.detect_by_country_name": "Pays proposés par les noms de pays des adresses.", "countries.detect_by_place_name": "Pays proposés par les noms d'institutions et de villes des adresses.", "countries.resolve_countries": "Retient les pays de chaque adresse parmi les pays proposés.", "countries.refresh_source_record_countries": "Reporte les pays des adresses sur les contributions et les enregistrements sources.", "relations.rebuild_publication_relations": "Relations entre publications : versions, preprints, clés partagées.", "relations.link_notices": "Relations des publications avec leurs errata et avis.", "relations.flag_retracted_publications": "Marque les publications rétractées.", "open_access.verify_unpaywall": "Statut open access du DOI de chaque publication chez Unpaywall.", "open_access.recompute_oa_status": "Statut open access de chaque publication.", "subjects.derive_publication_subjects": "Lie chaque publication aux sujets de ses enregistrements sources et à leurs ancêtres."}};
+
+const flow = document.getElementById("flow");
+const layer = document.getElementById("edge-layer");
+const desktop = window.matchMedia("(min-width: 1080px)");
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+}
+function rich(s) {
+  return esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+function shortName(task) {
+  const i = task.indexOf(".");
+  return i < 0 ? task : task.slice(i + 1);
+}
+function taskCount(block) {
+  const own = (block.groups || []).reduce((n, g) => n + g.tasks.length, 0);
+  return own + (block.steps || []).reduce((n, s) => n + taskCount(s), 0);
+}
+function isLeaf(block) {
+  return !(block.steps && block.steps.length);
+}
+function countLabel(block) {
+  const n = taskCount(block);
+  if (n < 2) return "";
+  return `<span class="count">${n} tâches</span>`;
+}
+function tasksHtml(block) {
+  return groupsHtml(block.groups, block.id, taskCount(block) > 1);
+}
+
+function groupsHtml(groups, blockId, clickable) {
+  const chip = (t) =>
+    clickable
+      ? `<button type="button" class="task" data-task="${esc(t)}" data-block="${blockId}" aria-expanded="false" aria-controls="d-${blockId}" title="${esc(t)}">${esc(shortName(t))}</button>`
+      : `<span class="task static" title="${esc(t)}">${esc(shortName(t))}</span>`;
+  const rows = groups.map((g) => {
+    const label = g.label ? `<span class="glabel">${esc(g.label)}</span>` : "";
+    return `<div class="grp">${label}${g.tasks.map(chip).join("")}</div>`;
+  });
+  const detail = clickable ? `<div class="detail" id="d-${blockId}" hidden></div>` : "";
+  return `<div class="groups">${rows.join("")}</div>${detail}`;
+}
+
+function nodeHtml(n) {
+  const solo = n.steps.length === 1 && !n.steps[0].title;
+  const badge = n.num ? `<span class="num">${esc(n.num)}</span>` : `<span class="tag">technique</span>`;
+  const headCount = solo ? countLabel(n.steps[0]) : "";
+  let body;
+  if (solo) {
+    const s = n.steps[0];
+    body = `<div class="step solo" id="${s.id}">${tasksHtml(s)}</div>`;
+  } else {
+    body = `<ol class="steps">${n.steps
+      .map((s) => `<li class="step" id="${s.id}"><div class="step-head"><h3>${esc(s.title)}</h3>${countLabel(s)}</div>${s.text ? `<p class="step-text">${esc(s.text)}</p>` : ""}${tasksHtml(s)}</li>`)
+      .join("")}</ol>`;
+  }
+  return `<section class="node${n.technical ? " technical" : ""}" id="${n.id}" aria-labelledby="h-${n.id}">
+    <div class="node-head">${badge}<div><h2 id="h-${n.id}">${esc(n.title)}</h2><p class="role">${esc(n.role)}</p></div>${headCount}</div>
+    ${body}
+  </section>`;
+}
+
+function affStepHtml(s) {
+  const text = s.text ? `<p class="astep-text">${esc(s.text)}</p>` : "";
+  const inner = isLeaf(s) ? tasksHtml(s) : `<div class="substeps">${s.steps.map(affStepHtml).join("")}</div>`;
+  return `<div class="astep" id="${s.id}"><div class="step-head"><h4>${esc(s.title)}</h4>${countLabel(s)}</div>${text}${inner}</div>`;
+}
+
+function affHtml(a) {
+  const kind = a.kind === "in" ? "affluent" : "sortie";
+  const feeds = a.feeds.length ? `<p class="feeds">→ ${a.feeds.map(esc).join(", ")}</p>` : "";
+  const body = isLeaf(a) ? tasksHtml(a) : `<div class="asteps">${a.steps.map(affStepHtml).join("")}</div>`;
+  return `<aside class="aff" id="${a.id}" aria-labelledby="h-${a.id}">
+    <div class="aff-top"><span class="kind">${kind}</span>${countLabel(a)}</div>
+    <h3 id="h-${a.id}">${esc(a.title)}</h3>
+    <p>${esc(a.text)}</p>
+    ${body}
+    ${feeds}
+  </aside>`;
+}
+
+function render() {
+  const nodes = Object.fromEntries(DATA.nodes.map((n) => [n.id, n]));
+  const affs = Object.fromEntries(DATA.affluents.map((a) => [a.id, a]));
+  const html = DATA.layout.order.map((id) => {
+    if (nodes[id]) return nodeHtml(nodes[id]);
+    const cards = DATA.layout.rails[id].map((a) => affHtml(affs[a])).join("");
+    return `<div class="rail" id="${id}">${cards}</div>`;
+  });
+  flow.insertAdjacentHTML("beforeend", html.join(""));
+
+  const areas = DATA.layout.areas.map((a) => `"${a}"`).join(" ");
+  const placed = DATA.layout.order.map((id) => `#${id}{grid-area:${id}}`).join("");
+  const style = document.createElement("style");
+  style.textContent = `@media (min-width:1080px){#flow{grid-template-areas:${areas}}${placed}}`;
+  document.head.appendChild(style);
+}
+
+function toggleDetail(button) {
+  const block = button.dataset.block;
+  const panel = document.getElementById(`d-${block}`);
+  const open = button.getAttribute("aria-expanded") === "true";
+  document.querySelectorAll(`.task[data-block="${block}"]`).forEach((b) => b.setAttribute("aria-expanded", "false"));
+  if (open) {
+    panel.hidden = true;
+  } else {
+    const task = button.dataset.task;
+    const text = DATA.descriptions[task] || "Pas de description.";
+    panel.innerHTML = `<b>${esc(task)}</b>${rich(text)}`;
+    panel.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+  }
+  scheduleEdges();
+}
+
+function box(id) {
+  const fr = flow.getBoundingClientRect();
+  const el = document.getElementById(id);
+  const r = el.getBoundingClientRect();
+  const b = { l: r.left - fr.left, r: r.right - fr.left, t: r.top - fr.top, b: r.bottom - fr.top };
+  b.cx = (b.l + b.r) / 2;
+  b.w = b.r - b.l;
+  if (el.classList.contains("step")) {
+    const node = el.closest(".node").getBoundingClientRect();
+    b.l = node.left - fr.left;
+    b.r = node.right - fr.left;
+    b.cx = (b.l + b.r) / 2;
+    b.y = b.t + 13;
+  } else if (el.classList.contains("node")) {
+    b.y = b.t + 26;
+  } else {
+    b.y = b.t + 20;
+  }
+  return b;
+}
+
+function lanePath(sx, sy, laneX, ty, tx) {
+  const r = 8;
+  const dirX1 = laneX > sx ? 1 : -1;
+  const dirX2 = tx > laneX ? 1 : -1;
+  return `M${sx},${sy} L${laneX - dirX1 * r},${sy} Q${laneX},${sy} ${laneX},${sy + r} L${laneX},${ty - r} Q${laneX},${ty} ${laneX + dirX2 * r},${ty} L${tx},${ty}`;
+}
+
+function edgePath(e, center, gap) {
+  const s = box(e.from);
+  const t = box(e.to);
+  const dy = e.dy || 0;
+  if (e.route === "v") {
+    const x = s.w < t.w ? s.cx : t.cx;
+    return `M${x},${s.b} L${x},${t.t - 1}`;
+  }
+  if (e.route === "rail") {
+    return t.t > s.b ? `M${s.cx},${s.b} L${s.cx},${t.t - 1}` : `M${s.cx},${s.t} L${s.cx},${t.b + 1}`;
+  }
+  if (e.route === "lane") {
+    const left = s.cx < center.l;
+    const laneX = (left ? center.l - gap / 2 : center.r + gap / 2) + (e.lane || 0);
+    const sx = left ? s.r : s.l;
+    const tx = left ? t.l : t.r;
+    return lanePath(sx, s.b - 14, laneX, t.y + dy, tx);
+  }
+  const forward = s.cx < t.cx;
+  const sx = forward ? s.r : s.l;
+  const tx = forward ? t.l : t.r;
+  const sy = s.y;
+  const ty = t.y + dy;
+  const mid = (tx - sx) / 2;
+  return `M${sx},${sy} C${sx + mid},${sy} ${tx - mid},${ty} ${tx},${ty}`;
+}
+
+function drawEdges() {
+  layer.innerHTML = "";
+  if (!desktop.matches) return;
+  const center = box("n1");
+  const gap = parseFloat(getComputedStyle(flow).columnGap) || 64;
+  const ns = "http://www.w3.org/2000/svg";
+  for (const e of DATA.edges) {
+    const p = document.createElementNS(ns, "path");
+    p.setAttribute("d", edgePath(e, center, gap));
+    p.setAttribute("class", e.kind === "main" ? "e-main" : "e-aff");
+    p.setAttribute("marker-end", e.kind === "main" ? "url(#m-main)" : "url(#m-aff)");
+    p.dataset.from = e.from;
+    p.dataset.to = e.to;
+    layer.appendChild(p);
+  }
+}
+
+let pending = 0;
+function scheduleEdges() {
+  cancelAnimationFrame(pending);
+  pending = requestAnimationFrame(drawEdges);
+}
+
+function highlight(id, on) {
+  layer.querySelectorAll("path.e-aff").forEach((p) => {
+    if (p.dataset.from === id || p.dataset.to === id) {
+      p.classList.toggle("hot", on);
+      p.setAttribute("marker-end", on ? "url(#m-hot)" : "url(#m-aff)");
+    }
+  });
+}
+
+render();
+flow.addEventListener("click", (ev) => {
+  const b = ev.target.closest(".task");
+  if (b) toggleDetail(b);
+});
+flow.querySelectorAll(".aff, .step").forEach((el) => {
+  el.addEventListener("mouseenter", () => highlight(el.id, true));
+  el.addEventListener("mouseleave", () => highlight(el.id, false));
+});
+new ResizeObserver(scheduleEdges).observe(flow);
+desktop.addEventListener("change", scheduleEdges);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(scheduleEdges);
+scheduleEdges();
+</script>
+
+</body>
+</html>
