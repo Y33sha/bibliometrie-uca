@@ -13,6 +13,7 @@
 - [Dashboard, point d'entrée de la vue Statistiques](UI_dashboard-point-d-entree.md)
 - [Financements](DATA_financements.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
+- [Identifiants d'une autre œuvre](DATA_identifiants-d-une-autre-oeuvre.md)
 
 ## Chantiers archivés
 
