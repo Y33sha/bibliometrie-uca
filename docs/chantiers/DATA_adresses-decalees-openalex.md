@@ -45,6 +45,9 @@ Enregistrements sources de 4 à 200 auteurs :
 - Auteurs collectifs mal reconnus (`noms_collectifs.py`, `collectifs_effet.sql`). Parmi les enregistrements sources décalés, seul W4407421416 contenait un collectif ignoré de `is_collective_name` (« MacaqueNet »). Mots ajoutés : « scientists », « expedition », « participants », « project », « cohort », sigles d'organismes (INRAE, CIRAD, CNRS, INSERM, OECD), locutions « advisory board » et « panel on », mot à capitale interne terminé par « Net » (MacaqueNet, WellBeNet). Ils rendent collectives 137 contributions sources, 95 d'OpenAlex et 42 de ScanR, dont 16 rattachées à une personne. « portal », « panel » et « board » seuls sont aussi des noms de famille.
 - 46 contributions sources sont du périmètre par la seule adresse d'une voisine, dans 38 enregistrements sources décalés. Le sens retenu : auteur inséré avec un auteur collectif, auteur manquant sinon.
 - Les enregistrements sources à toutes les adresses pour chacun contiennent 165 contributions sources du périmètre, légitimes ou non.
+- Revue à l'œil (`revue.py`, une lettre par affiliation). Les 10 enregistrements sources décalés sans enregistrement WoS comparable sont décalés. 6 des 47 sont des faux positifs : des équipes de 5 à 10 auteurs aux affiliations partagées (A, A, BA, BA…), dont les 5 de sens mixte.
+- Une même affiliation figure chez deux auteurs voisins sous deux écritures, avec ou sans virgules (W4407421416). Les affiliations se comparent normalisées (`normalize_text`), comme les adresses en base.
+- Critère des chaînons (`chainons.py`, `chainons_base.py`) : un auteur intérieur partage une adresse avec le précédent et une autre, différente, avec le suivant. Avec 40 % de chaînons parmi les auteurs intérieurs, sur 3 chaînons au moins, 78 enregistrements sources OpenAlex sont retenus, contre 1 pour WoS. Ils comprennent les 41 décalés de la revue et 36 autres. 6 de ces 36, tirés au hasard, sont décalés, avec plusieurs affiliations par auteur et souvent un auteur collectif plus loin dans la liste. Les 6 faux positifs restent sous 40 % de chaînons, sauf un à 50 %.
 
 ## Décisions
 
@@ -60,7 +63,8 @@ Enregistrements sources de 4 à 200 auteurs :
 - [x] Signaux du sens tirés des seules données d'OpenAlex.
 - [x] Reconnaissance des auteurs collectifs : mots, locutions et noms de réseau ajoutés à `is_collective_name`.
 - [ ] Règle du domaine : détection et sens du décalage sur les adresses brutes d'un enregistrement source, par position.
-- [ ] Revue des enregistrements sources de sens mixte ou sans enregistrement WoS, et des enregistrements sources de score 0,5 à 0,8.
+- [x] Revue des enregistrements sources de sens mixte ou sans enregistrement WoS.
+- [x] Critère des chaînons sur la base, revue d'un échantillon des enregistrements sources retenus.
 
 ### Phase 2 — Correction à la normalisation d'OpenAlex
 
