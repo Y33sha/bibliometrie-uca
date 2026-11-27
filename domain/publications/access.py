@@ -21,9 +21,11 @@ from domain.platforms.registry import (
     platform_type_of_copy,
 )
 from domain.publications.oa_status import OA_OPEN_STATUSES, OaStatus
-from domain.sources.registry import Source
+from domain.sources.registry import PROFILES, Source
 
 _DOI_HOSTS = frozenset({"doi.org", "dx.doi.org"})
+_DATACITE = PROFILES[Source.DATACITE].registration_agency
+"""Agence d'enregistrement DataCite, telle que l'écrit `doi_prefixes.ra`."""
 _WEB_SCHEMES = frozenset({"http", "https"})
 _VERSION_RANK = {"publishedVersion": 0, "acceptedVersion": 1, "submittedVersion": 2}
 _UNKNOWN_VERSION_RANK = len(_VERSION_RANK)
@@ -65,25 +67,39 @@ class Copy:
         platform_openalex_id: str | None = None,
         record_source: str | None = None,
         record_doc_type: str | None = None,
+        doi_agency: str | None = None,
     ) -> Copy:
         """Renvoie la copie d'une localisation d'un enregistrement source.
 
         La plateforme de la liste donne son nom et son type, à défaut ceux donnés par la source. Une copie sous embargo est fermée. La copie HAL d'un enregistrement HAL est décrite par sa plateforme. Une copie garde le type preprint de son enregistrement source.
+
+        OpenAlex déclare ouverte la page de presque tout DOI DataCite. Pour une telle copie, hors archive et sans licence, l'ouverture est inconnue.
 
         Args:
             declared_oa: ouverture déclarée par la source.
             platform_openalex_id: identifiant OpenAlex de la plateforme donnée par la source.
             record_source: source de l'enregistrement source.
             record_doc_type: type de document de l'enregistrement source.
+            doi_agency: agence d'enregistrement du DOI désigné par l'URL (`doi_of_url`), telle que l'écrit `doi_prefixes.ra`.
         """
         known = known_platform_of_copy(url, platform_openalex_id)
+        platform_type = platform_type_of_copy(url, platform_openalex_id) or source_platform_type
+        is_oa = declared_oa and not embargoed
+        if (
+            is_oa
+            and record_source == Source.OPENALEX
+            and doi_agency == _DATACITE
+            and license is None
+            and platform_type not in ARCHIVE_TYPES
+        ):
+            is_oa = None
         return cls(
             url=url,
             version=version,
-            is_oa=declared_oa and not embargoed,
+            is_oa=is_oa,
             platform=known.name if known else source_platform,
             known_platform=known,
-            platform_type=platform_type_of_copy(url, platform_openalex_id) or source_platform_type,
+            platform_type=platform_type,
             license=license,
             described_by_platform=record_source == Source.HAL and known is HAL,
             arrival=arrival,
@@ -124,11 +140,17 @@ def _icon(copy: Copy) -> str | None:
     return copy.known_platform.icon if copy.known_platform else None
 
 
-def _doi_target(copy: Copy) -> str | None:
-    """Renvoie le DOI désigné par une copie à l'adresse de doi.org, en minuscules, ou `None` pour une autre adresse."""
-    if _host(copy) not in _DOI_HOSTS:
+def doi_of_url(url: str) -> str | None:
+    """Renvoie le DOI désigné par une adresse de doi.org, en minuscules, ou `None` pour une autre adresse."""
+    parts = urlsplit(url)
+    if parts.hostname not in _DOI_HOSTS:
         return None
-    return unquote(urlsplit(copy.url).path).lstrip("/").lower()
+    return unquote(parts.path).lstrip("/").lower()
+
+
+def _doi_target(copy: Copy) -> str | None:
+    """Renvoie le DOI désigné par une copie à l'adresse de doi.org (`doi_of_url`)."""
+    return doi_of_url(copy.url)
 
 
 def _from_publisher(copy: Copy, doi: str | None) -> bool:

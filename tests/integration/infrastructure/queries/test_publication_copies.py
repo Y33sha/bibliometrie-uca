@@ -10,6 +10,7 @@ from infrastructure.read_models.publications.copies import publication_copies
 from pipeline.ingestion.common.embargoes import Embargo, EmbargoStore
 from pipeline.ingestion.common.locations import LocationFacts, LocationStore
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.serials import insert_doi_prefix
 from tests.integration.helpers.sources import insert_source_record
 
 
@@ -45,6 +46,23 @@ def test_le_fichier_depose_est_ferme_jusqu_a_la_fin_de_l_embargo(sa_sync_conn, e
         "https://hal.science/hal-01607327": file_open,
         "https://arxiv.org/abs/2401.00001": True,
     }
+
+
+@pytest.mark.parametrize(("ra", "is_oa"), [("DataCite", None), ("Crossref", True)])
+def test_l_agence_du_doi_decide_de_l_ouverture_declaree_par_openalex(sa_sync_conn, ra, is_oa):
+    """OpenAlex déclare ouverte la page de presque tout DOI DataCite : sans licence, l'ouverture est inconnue."""
+    insert_doi_prefix(sa_sync_conn, "10.98765", ra=ra)
+    publication = insert_publication(sa_sync_conn)
+    source_record = insert_source_record(
+        sa_sync_conn, publication, source="openalex", source_id="W1"
+    )
+    LocationStore(sa_sync_conn).replace_locations(
+        source_record, [LocationFacts("https://doi.org/10.98765/livre", is_oa=True)]
+    )
+
+    copies = publication_copies(sa_sync_conn, [publication])[publication]
+
+    assert [c.is_oa for c in copies] == [is_oa]
 
 
 @pytest.mark.parametrize(
