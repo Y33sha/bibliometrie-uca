@@ -1,6 +1,6 @@
 """Blocs du déroulement du pipeline, leurs étapes, leurs affluents et sorties, et les tâches du code rangées dans chacun.
 
-Un bloc du circuit principal se découpe en étapes. Un affluent alimente une étape ; une sortie dérive d'une étape. Un affluent se découpe aussi en étapes, et une étape en sous-étapes. Chaque groupe de tâches a un libellé facultatif, nom de phase ou d'étape du code.
+Un bloc du circuit principal se découpe en étapes. Un affluent alimente une étape ; une sortie dérive d'une étape. Un affluent se découpe aussi en étapes, et une étape en sous-étapes. Chaque groupe de tâches a un libellé facultatif, nom de phase ou d'étape du code. Le texte d'un bloc, d'une étape ou d'un affluent dit ce que fait le pipeline. Son lien `doc` désigne un chapitre de `docs/pipeline`, avec une ancre facultative.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ class Step(TypedDict):
     text: str | None
     groups: list[Group]
     steps: list[Step]
+    doc: str | None
 
 
 class Node(TypedDict):
@@ -36,6 +37,7 @@ class Node(TypedDict):
     num: str | None
     title: str
     role: str
+    doc: str
     steps: list[Step]
     technical: NotRequired[bool]
 
@@ -48,6 +50,7 @@ class Affluent(TypedDict):
     title: str
     text: str
     feeds: list[str]
+    doc: NotRequired[str]
     groups: NotRequired[list[Group]]
     steps: NotRequired[list[Step]]
 
@@ -92,6 +95,7 @@ def step(
     text: str | None,
     groups: list[Group] | None = None,
     steps: list[Step] | None = None,
+    doc: str | None = None,
 ) -> Step:
     return {
         "id": step_id,
@@ -99,6 +103,7 @@ def step(
         "text": text,
         "groups": groups or [],
         "steps": steps or [],
+        "doc": doc,
     }
 
 
@@ -118,34 +123,39 @@ NODES: list[Node] = [
         "id": "n1",
         "num": "1",
         "title": "Moissonnage",
-        "role": "Interroge les sources et garde les documents tels quels.",
+        "role": "Interroge les sources et garde chaque document tel que la source le renvoie.",
+        "doc": "02-harvest.md",
         "steps": [
             step(
                 "s1-1",
                 "Recherche par affiliation",
-                "Documents qui mentionnent une structure du périmètre.",
+                "Interroge chaque source sur les structures du périmètre.",
                 [group(phase("harvest"), "harvest")],
+                doc="02-harvest.md#moissonnage-par-affiliation-harvest",
             ),
             step(
                 "s1-2",
                 "Recherche par personne",
-                "Documents des personnes RH, par ORCID, idHAL et IdRef.",
+                "Interroge les sources sur les identifiants ORCID, idHAL et IdRef des personnes du référentiel RH.",
                 [group(phase("harvest_by_person"), "harvest_by_person")],
+                doc="02-harvest.md#moissonnage-par-personne-harvest_by_person",
             ),
             step(
                 "s1-3",
                 "Recherche croisée",
-                "Documents trouvés dans une autre source : hal-id, NNT, brevet, DOI.",
+                "Cherche dans chaque source les documents trouvés dans une autre, par hal-id, NNT, numéro de brevet ou DOI.",
                 [group(phase("fetch_missing"), "fetch_missing")],
+                doc="02-harvest.md#documents-absents-dune-source-fetch_missing",
             ),
             step(
                 "s1-4",
                 "Mise à jour",
-                "Documents non revus, disparus, ou aux auteurs tronqués.",
+                "Cherche de nouveau les documents non revus depuis un délai, repère les documents disparus et complète les listes d'auteurs tronquées.",
                 [
                     group(phase("fetch_stale"), "fetch_stale"),
                     group(phase("fetch_truncated"), "fetch_truncated"),
                 ],
+                doc="02-harvest.md#documents-périmés-et-disparus-fetch_stale",
             ),
         ],
     },
@@ -153,7 +163,8 @@ NODES: list[Node] = [
         "id": "n2",
         "num": "2",
         "title": "Normalisation",
-        "role": "Passage du JSON au SQL : enregistrements sources, contributions sources, adresses.",
+        "role": "Convertit chaque document brut (JSON) en lignes SQL : enregistrement source, contributions sources, adresses.",
+        "doc": "03-normalize.md",
         "steps": [
             step(
                 "s2-1",
@@ -172,18 +183,19 @@ NODES: list[Node] = [
         "id": "n3",
         "num": "3",
         "title": "Affiliations",
-        "role": "Relie les contributions sources aux structures et repère celles du périmètre.",
+        "role": "Relie les contributions sources aux structures, et décide lesquelles entrent dans le périmètre.",
+        "doc": "04-affiliations.md#affiliations-affiliations",
         "steps": [
             step(
                 "s3-1",
                 "Reconnaissance des structures",
-                "Noms de structures dans les adresses et les partenaires de thèse.",
+                "Cherche les noms des structures dans les adresses et dans les laboratoires partenaires des thèses.",
                 [group(phase("affiliations", exclude=("decide_source_contribution_perimeter",)))],
             ),
             step(
                 "s3-2",
                 "Décision du périmètre",
-                "Par une structure du périmètre, ou l'identifiant d'une personne RH.",
+                "Fait entrer une contribution source dans le périmètre quand elle atteint une structure du périmètre, ou porte l'identifiant d'une personne du référentiel RH.",
                 [group(phase("affiliations", only=("decide_source_contribution_perimeter",)))],
             ),
         ],
@@ -192,24 +204,25 @@ NODES: list[Node] = [
         "id": "n4",
         "num": "4",
         "title": "Métadonnées",
-        "role": "Corrige les métadonnées pour la réconciliation et la consolidation.",
+        "role": "Corrige les métadonnées des enregistrements sources avant la réconciliation et la consolidation.",
+        "doc": "06-metadata-correction.md",
         "steps": [
             step(
                 "s4-1",
                 "Correction des enregistrements",
-                "Type de document, identifiants des dépôts HAL introuvables.",
+                "Corrige le type de document, et retire les identifiants des dépôts HAL introuvables.",
                 [group(phase("metadata_correction", only=("correct_source_records",)))],
             ),
             step(
                 "s4-2",
                 "Nettoyage des DOI",
-                "Cibles des DOI secondaires, retrait des DOI partagés ou inconnus.",
+                "Relie le DOI d'une forme secondaire à celui de l'œuvre, et retire les DOI partagés par des œuvres distinctes ou inconnus de doi.org.",
                 [group(phase("metadata_correction", only=("doi_targets", "remove_identifiers")))],
             ),
             step(
                 "s4-3",
                 "Admission à la réconciliation",
-                "Enregistrements sources écartés de la réconciliation.",
+                "Écarte de la réconciliation les paratextes, les doublons retirés par l'éditeur, les formes secondaires et les enregistrements OpenAlex ou ScanR sans clé.",
                 [group(phase("metadata_correction", only=("decide_matchability",)))],
             ),
         ],
@@ -218,19 +231,22 @@ NODES: list[Node] = [
         "id": "n5",
         "num": "5",
         "title": "Publications",
-        "role": "Réconcilie les enregistrements sources et constitue le référentiel des publications.",
+        "role": "Regroupe les enregistrements sources d'un même document en une publication, et calcule ses métadonnées.",
+        "doc": "07-publications.md",
         "steps": [
             step(
                 "s5-1",
                 "Réconciliation",
-                "Même document : DOI, NNT, hal-id, ou type, titre et année.",
+                "Regroupe les enregistrements sources d'un même document, reconnu par DOI, NNT, hal-id, ou type, titre et année.",
                 [group(phase("publications", only=("reconcile",)))],
+                doc="07-publications.md#reconnaître-la-même-publication",
             ),
             step(
                 "s5-2",
                 "Consolidation",
-                "Métadonnées de chaque publication, tirées de ses enregistrements sources.",
+                "Calcule les métadonnées de chaque publication à partir de ses enregistrements sources : DOI, date, éditeur, pays…",
                 [group(phase("publications", only=("consolidate_publications",)))],
+                doc="07-publications.md#recalcul-des-métadonnées",
             ),
         ],
     },
@@ -238,25 +254,29 @@ NODES: list[Node] = [
         "id": "n6",
         "num": "6",
         "title": "Personnes",
-        "role": "Attribue les contributions aux personnes et constitue le référentiel des personnes.",
+        "role": "Attribue chaque contribution à une personne du référentiel.",
+        "doc": "09-persons.md",
         "steps": [
             step(
                 "s6-1",
                 "Alignement des auteurs",
-                "Les contributions sources d'un même auteur forment une contribution.",
+                "Aligne les listes d'auteurs des enregistrements sources d'une même publication : chaque auteur devient une contribution.",
                 [group(phase("author_grouping"))],
+                doc="08-author-grouping.md",
             ),
             step(
                 "s6-2",
                 "Attribution",
-                "Par identifiant ou par forme de nom.",
+                "Rattache chaque contribution à une personne : par épinglage manuel, par identifiant (ORCID, compte HAL, IdRef), puis par forme de nom. Le contexte de la publication départage les homonymes : coauteurs, laboratoires, revue, années. Une contribution du périmètre au nom inconnu crée une personne.",
                 [group(phase("persons"))],
+                doc="09-persons.md#rattacher-une-contribution-à-une-personne",
             ),
             step(
                 "s6-3",
                 "Attributions suspectes",
-                "Publications probablement signées par un homonyme.",
+                "Repère les publications d'une personne qui s'écartent du reste de sa production ou ressemblent à des publications rejetées, et les signale pour vérification.",
                 [group(phase("suspect_attributions"))],
+                doc="09-persons.md#attributions-suspectes-suspect_attributions",
             ),
         ],
     },
@@ -264,13 +284,14 @@ NODES: list[Node] = [
         "id": "nF",
         "num": None,
         "title": "Finalisation",
-        "role": "Purges, données dérivées, compteurs.",
+        "role": "Purge les publications et les référentiels vides, puis recalcule les données dérivées et les compteurs.",
+        "doc": "10-finalize.md",
         "technical": True,
         "steps": [
             step(
                 "sF-1",
                 "Purges",
-                "Publications sans enregistrement source ou sans personne, référentiels éditoriaux vides.",
+                "Supprime les publications sans enregistrement source ou sans personne, puis les monographies, revues et éditeurs devenus vides.",
                 [
                     group(
                         phase(
@@ -288,7 +309,7 @@ NODES: list[Node] = [
             step(
                 "sF-2",
                 "Données dérivées",
-                "Périmètre des publications, liens aux structures, éditeur des revues.",
+                "Décide le périmètre des publications, les relie à leurs structures et donne à chaque revue son éditeur.",
                 [
                     group(
                         phase(
@@ -305,7 +326,7 @@ NODES: list[Node] = [
             step(
                 "sF-3",
                 "Compteurs",
-                "Publications des adresses, revues et éditeurs, usage des sujets.",
+                "Recompte les publications des adresses, revues et éditeurs, et l'usage des sujets.",
                 [group(phase("finalize", only=("publication_counts", "count_subject_usage")))],
             ),
         ],
@@ -317,7 +338,7 @@ AFFLUENTS: list[Affluent] = [
         "id": "a-per",
         "kind": "in",
         "title": "Structures du périmètre",
-        "text": "Structures de chaque périmètre.",
+        "text": "Dresse la liste des structures de chaque périmètre.",
         "groups": [group(["perimeter_structures"])],
         "feeds": ["Recherche par affiliation", "Décision du périmètre"],
     },
@@ -325,7 +346,8 @@ AFFLUENTS: list[Affluent] = [
         "id": "a-str",
         "kind": "in",
         "title": "Référentiels de structures",
-        "text": "ROR et structures HAL à jour.",
+        "text": "Met à jour les organisations ROR et les structures HAL.",
+        "doc": "04-affiliations.md#référentiels-ror-et-hal-structures",
         "groups": [group(phase("structures"), "structures")],
         "feeds": ["Décision du périmètre", "Pays"],
     },
@@ -333,7 +355,8 @@ AFFLUENTS: list[Affluent] = [
         "id": "a-doi",
         "kind": "in",
         "title": "Résolution des DOI",
-        "text": "Agence des préfixes, existence et URL des DOI chez doi.org.",
+        "text": "Demande à doi.org l'agence de chaque préfixe, l'existence et l'URL de chaque DOI.",
+        "doc": "05-publishing.md#référentiel-des-doi-dois",
         "groups": [group(phase("dois"), "dois")],
         "feeds": ["Éditeurs", "Nettoyage des DOI"],
     },
@@ -341,12 +364,13 @@ AFFLUENTS: list[Affluent] = [
         "id": "a-edi",
         "kind": "in",
         "title": "Référentiels éditoriaux",
-        "text": "Éditeurs, revues et monographies des enregistrements sources.",
+        "text": "Rattache chaque enregistrement source à son éditeur, sa revue et sa monographie.",
+        "doc": "05-publishing.md#référentiels-de-lédition-publishing",
         "steps": [
             step(
                 "e-pub",
                 "Éditeurs",
-                "Titulaire de chaque préfixe DOI, puis éditeur de chaque enregistrement source.",
+                "Trouve l'éditeur titulaire de chaque préfixe DOI, puis rattache chaque enregistrement source à son éditeur.",
                 [
                     group(
                         phase(
@@ -360,6 +384,7 @@ AFFLUENTS: list[Affluent] = [
                         )
                     )
                 ],
+                doc="05-publishing.md#éditeurs",
             ),
             step(
                 "e-ser",
@@ -369,7 +394,7 @@ AFFLUENTS: list[Affluent] = [
                     step(
                         "e-ser-1",
                         "Rattachement",
-                        "Par ISSN-L, identifiant OpenAlex ou titre.",
+                        "Rattache chaque enregistrement source à sa revue, par ISSN-L, identifiant OpenAlex ou titre.",
                         [
                             group(
                                 phase(
@@ -387,7 +412,7 @@ AFFLUENTS: list[Affluent] = [
                     step(
                         "e-ser-2",
                         "Qualification",
-                        "Type, DOAJ, modèle open access.",
+                        "Type chaque revue (revue ou actes), et note sa fiche DOAJ et son modèle open access.",
                         [
                             group(
                                 phase(
@@ -406,7 +431,7 @@ AFFLUENTS: list[Affluent] = [
                     step(
                         "e-ser-3",
                         "Revue par le DOI",
-                        "Revue manquante retrouvée par l'espace de noms DOI.",
+                        "Retrouve la revue manquante d'un enregistrement source par l'espace de noms de son DOI.",
                         [
                             group(
                                 phase(
@@ -415,13 +440,15 @@ AFFLUENTS: list[Affluent] = [
                                 )
                             )
                         ],
+                        doc="05-publishing.md#espaces-de-noms-doi",
                     ),
                 ],
+                doc="05-publishing.md#publications-en-série",
             ),
             step(
                 "e-mon",
                 "Monographies",
-                "Monographie et collection de chaque volume, volumes d'actes.",
+                "Rattache chaque volume à sa monographie et à sa collection, et distingue les volumes d'actes.",
                 [
                     group(
                         phase(
@@ -434,6 +461,7 @@ AFFLUENTS: list[Affluent] = [
                         )
                     )
                 ],
+                doc="05-publishing.md#monographies",
             ),
         ],
         "feeds": ["Correction des enregistrements"],
@@ -442,7 +470,8 @@ AFFLUENTS: list[Affluent] = [
         "id": "a-pay",
         "kind": "in",
         "title": "Pays",
-        "text": "Pays des adresses, reportés sur les enregistrements sources.",
+        "text": "Détecte les pays des adresses, et les reporte sur les enregistrements sources.",
+        "doc": "04-affiliations.md#pays-countries",
         "groups": [group(phase("countries"), "countries")],
         "feeds": ["Consolidation"],
     },
@@ -450,7 +479,8 @@ AFFLUENTS: list[Affluent] = [
         "id": "a-rel",
         "kind": "out",
         "title": "Relations",
-        "text": "Versions, errata, rétractations.",
+        "text": "Relie les publications à leurs versions, errata et avis de rétractation.",
+        "doc": "11-enrichissements.md#relations-entre-publications-relations",
         "groups": [group(phase("relations"), "relations")],
         "feeds": [],
     },
@@ -458,7 +488,8 @@ AFFLUENTS: list[Affluent] = [
         "id": "a-oa",
         "kind": "out",
         "title": "Open access",
-        "text": "Verdict d'Unpaywall, statut open access.",
+        "text": "Demande à Unpaywall le statut open access du DOI de chaque publication, puis calcule le statut de la publication.",
+        "doc": "11-enrichissements.md#statut-open-access-open_access",
         "groups": [group(phase("open_access"), "open_access")],
         "feeds": [],
     },
@@ -466,7 +497,8 @@ AFFLUENTS: list[Affluent] = [
         "id": "a-sub",
         "kind": "out",
         "title": "Sujets",
-        "text": "Sujets des sources, reportés sur les publications.",
+        "text": "Reporte sur chaque publication les sujets donnés par les sources.",
+        "doc": "11-enrichissements.md#sujets-subjects",
         "groups": [group(phase("subjects"), "subjects")],
         "feeds": ["Attributions suspectes"],
     },
@@ -519,6 +551,11 @@ def _leaves(steps: list[Step]) -> list[Step]:
     return [leaf for s in steps for leaf in (_leaves(s["steps"]) if s["steps"] else [s])]
 
 
+def _all_steps(steps: list[Step]) -> list[Step]:
+    """Renvoie les étapes et toutes leurs sous-étapes."""
+    return [x for s in steps for x in [s, *_all_steps(s["steps"])]]
+
+
 def placed_tasks() -> list[str]:
     """Renvoie les tâches rangées dans les blocs et les affluents, dans l'ordre de la page."""
     groups = [g for n in NODES for s in _leaves(n["steps"]) for g in s["groups"]]
@@ -527,6 +564,18 @@ def placed_tasks() -> list[str]:
             g for s in _leaves(a.get("steps", [])) for g in s["groups"]
         ]
     return [t for g in groups for t in g["tasks"]]
+
+
+def doc_links() -> dict[str, str]:
+    """Renvoie le lien `doc` de chaque bloc, étape et affluent qui en a un, par identifiant."""
+    links: dict[str, str | None] = {}
+    for n in NODES:
+        links[n["id"]] = n["doc"]
+        links.update({s["id"]: s["doc"] for s in _all_steps(n["steps"])})
+    for a in AFFLUENTS:
+        links[a["id"]] = a.get("doc")
+        links.update({s["id"]: s["doc"] for s in _all_steps(a.get("steps", []))})
+    return {k: v for k, v in links.items() if v}
 
 
 def placement_problems() -> list[str]:

@@ -76,14 +76,8 @@ header.intro { display: grid; gap: 10px; margin-bottom: 28px; max-width: 78ch; }
 .back { font-size: 0.85rem; color: var(--accent); text-decoration: none; }
 .back:hover { text-decoration: underline; }
 h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.015em; margin: 0; text-wrap: balance; }
-.lead { margin: 0; color: var(--muted); }
-.meta { margin: 0; font-size: 0.85rem; color: var(--muted); }
-.legend { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 4px 0 0; padding: 0; list-style: none; font-size: 0.85rem; color: var(--muted); }
-.legend li { display: flex; align-items: center; gap: 8px; }
-.sw { display: inline-block; width: 22px; height: 14px; border-radius: 4px; }
-.sw-node { background: var(--card); border: 1px solid var(--border); box-shadow: 0 1px 2px rgb(0 0 0 / 0.06); }
-.sw-aff { background: var(--surface); border: 1px dashed var(--edge); }
-.sw-line { width: 26px; height: 0; border-top: 2px solid var(--accent-line); border-radius: 0; }
+.doc { color: inherit; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 3px; }
+.doc:hover { text-decoration-color: currentColor; }
 
 #flow { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 #edges { display: none; position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 0; }
@@ -134,8 +128,8 @@ h3 { font-size: 1rem; font-weight: 600; margin: 0; }
 .node .task { background: var(--surface); }
 .technical .task, .aff .task { background: var(--card); }
 .task:hover { border-color: var(--accent-line); }
-.task.static { cursor: default; }
-.task.static:hover { border-color: var(--border); }
+a.task { display: inline-block; text-decoration: none; }
+.detail .code { margin-left: 6px; font-size: 0.8rem; color: var(--accent); }
 .task[aria-expanded="true"] { background: var(--accent-soft); border-color: var(--accent-line); }
 .task:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 1px; }
 .detail { margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: var(--accent-soft); font-size: 0.88rem; }
@@ -182,12 +176,6 @@ h4 { font-size: 0.88rem; font-weight: 600; margin: 0; }
   <header class="intro">
     <!--RETOUR-->
     <h1>Déroulement du pipeline</h1>
-    <ul class="legend">
-      <li><span class="sw sw-node"></span>bloc du circuit principal</li>
-      <li><span class="sw sw-aff"></span>affluent ou sortie</li>
-      <li><span class="sw sw-line"></span>circuit principal</li>
-      <li>clic sur une tâche : sa description</li>
-    </ul>
   </header>
   <main id="flow">
     <svg id="edges" aria-hidden="true">
@@ -238,13 +226,18 @@ function groupsHtml(groups, blockId, clickable) {
   const chip = (t) =>
     clickable
       ? `<button type="button" class="task" data-task="${esc(t)}" data-block="${blockId}" aria-expanded="false" aria-controls="d-${blockId}" title="${esc(t)}">${esc(shortName(t))}</button>`
-      : `<span class="task static" title="${esc(t)}">${esc(shortName(t))}</span>`;
+      : `<a class="task" href="${esc(DATA.code[t])}" title="${esc(t)} : code">${esc(shortName(t))}</a>`;
   const rows = groups.map((g) => {
     const label = g.label ? `<span class="glabel">${esc(g.label)}</span>` : "";
     return `<div class="grp">${label}${g.tasks.map(chip).join("")}</div>`;
   });
   const detail = clickable ? `<div class="detail" id="d-${blockId}" hidden></div>` : "";
   return `<div class="groups">${rows.join("")}</div>${detail}`;
+}
+
+function linked(id, text) {
+  const href = DATA.docs[id];
+  return href ? `<a class="doc" href="${esc(href)}">${esc(text)}</a>` : esc(text);
 }
 
 function nodeHtml(n) {
@@ -257,11 +250,11 @@ function nodeHtml(n) {
     body = `<div class="step solo" id="${s.id}">${tasksHtml(s)}</div>`;
   } else {
     body = `<ol class="steps">${n.steps
-      .map((s) => `<li class="step" id="${s.id}"><div class="step-head"><h3>${esc(s.title)}</h3>${countLabel(s)}</div>${s.text ? `<p class="step-text">${esc(s.text)}</p>` : ""}${tasksHtml(s)}</li>`)
+      .map((s) => `<li class="step" id="${s.id}"><div class="step-head"><h3>${linked(s.id, s.title)}</h3>${countLabel(s)}</div>${s.text ? `<p class="step-text">${esc(s.text)}</p>` : ""}${tasksHtml(s)}</li>`)
       .join("")}</ol>`;
   }
   return `<section class="node${n.technical ? " technical" : ""}" id="${n.id}" aria-labelledby="h-${n.id}">
-    <div class="node-head">${badge}<div><h2 id="h-${n.id}">${esc(n.title)}</h2><p class="role">${esc(n.role)}</p></div>${headCount}</div>
+    <div class="node-head">${badge}<div><h2 id="h-${n.id}">${linked(n.id, n.title)}</h2><p class="role">${esc(n.role)}</p></div>${headCount}</div>
     ${body}
   </section>`;
 }
@@ -269,7 +262,7 @@ function nodeHtml(n) {
 function affStepHtml(s) {
   const text = s.text ? `<p class="astep-text">${esc(s.text)}</p>` : "";
   const inner = isLeaf(s) ? tasksHtml(s) : `<div class="substeps">${s.steps.map(affStepHtml).join("")}</div>`;
-  return `<div class="astep" id="${s.id}"><div class="step-head"><h4>${esc(s.title)}</h4>${countLabel(s)}</div>${text}${inner}</div>`;
+  return `<div class="astep" id="${s.id}"><div class="step-head"><h4>${linked(s.id, s.title)}</h4>${countLabel(s)}</div>${text}${inner}</div>`;
 }
 
 function affHtml(a) {
@@ -278,7 +271,7 @@ function affHtml(a) {
   const body = isLeaf(a) ? tasksHtml(a) : `<div class="asteps">${a.steps.map(affStepHtml).join("")}</div>`;
   return `<aside class="aff" id="${a.id}" aria-labelledby="h-${a.id}">
     <div class="aff-top"><span class="kind">${kind}</span>${countLabel(a)}</div>
-    <h3 id="h-${a.id}">${esc(a.title)}</h3>
+    <h3 id="h-${a.id}">${linked(a.id, a.title)}</h3>
     <p>${esc(a.text)}</p>
     ${body}
     ${feeds}
@@ -312,7 +305,7 @@ function toggleDetail(button) {
   } else {
     const task = button.dataset.task;
     const text = DATA.descriptions[task] || "Pas de description.";
-    panel.innerHTML = `<b>${esc(task)}</b>${rich(text)}`;
+    panel.innerHTML = `<b>${esc(task)}</b>${rich(text)}<a class="code" href="${esc(DATA.code[task])}">code</a>`;
     panel.hidden = false;
     button.setAttribute("aria-expanded", "true");
   }
