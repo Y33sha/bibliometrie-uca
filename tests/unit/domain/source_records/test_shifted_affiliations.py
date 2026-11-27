@@ -56,7 +56,7 @@ def test_auteur_insere_plus_loin_et_ecritures_differentes():
 
 
 def test_auteur_manquant_sans_collectif():
-    """W4310125553 : un auteur manque avant le cinquième ; chaque auteur reçoit la sienne et celle du précédent. Le premier auteur décalé garde celle de l'auteur manquant."""
+    """W4310125553 : un auteur manque avant le cinquième ; chaque auteur reçoit la sienne et celle du précédent. Le cinquième auteur perd celle de l'auteur manquant."""
     affiliations = [
         ["1 Bordeaux"],
         ["2 Paris"],
@@ -73,8 +73,35 @@ def test_auteur_manquant_sans_collectif():
     kept = unshifted_affiliations(affiliations, collective)
 
     assert kept is not None
-    assert kept[:5] == affiliations[:5]
+    assert kept[:4] == affiliations[:4]
+    assert kept[4] == ["6 Lyon Sud"]
     assert kept[5:] == [[f"{n} Hôpital {n}"] for n in range(7, 13)]
+
+
+def test_decalage_avant_le_collectif():
+    """W3197636785 : le décalage précède le collectif, sans affiliation, placé en fin de liste."""
+    affiliations = [
+        ["X"],
+        ["A", "B"],
+        ["B", "C"],
+        ["C", "D"],
+        ["D", "E"],
+        ["E", "F"],
+        ["G"],
+        [],
+    ]
+    collective = [False] * 7 + [True]
+
+    assert unshifted_affiliations(affiliations, collective) == [
+        ["X"],
+        ["A"],
+        ["B"],
+        ["C"],
+        ["D"],
+        ["E"],
+        ["G"],
+        [],
+    ]
 
 
 def test_equipe_aux_affiliations_partagees():
@@ -87,7 +114,7 @@ def test_equipe_aux_affiliations_partagees():
 
 
 def test_auteur_sans_affiliation_au_milieu():
-    """Après un auteur sans affiliation, l'auteur suivant garde les siennes."""
+    """Après un auteur sans affiliation, l'auteur suivant garde ses affiliations moins celles du suivant."""
     affiliations = [
         ["A"],
         ["A", "B"],
@@ -106,7 +133,7 @@ def test_auteur_sans_affiliation_au_milieu():
         ["B"],
         ["C"],
         [],
-        ["E", "F"],
+        ["E"],
         ["F"],
         ["G"],
     ]
