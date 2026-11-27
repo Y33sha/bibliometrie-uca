@@ -2,17 +2,17 @@
 
 ## Contexte
 
-Dans certains enregistrements sources OpenAlex, chaque contribution source reçoit son adresse et celle de la contribution source précédente. Le décalage commence après un auteur collectif de la liste des auteurs. Il touche les chaînes d'affiliation (`raw_affiliation_strings`) et les institutions, donc les ROR. Exemple, l'œuvre W2982537460 de la publication 184877 :
+Dans certains enregistrements sources OpenAlex, le décalage commence à un auteur collectif de la liste des auteurs. L'auteur collectif reçoit l'adresse de la contribution source suivante. Chaque contribution source suivante reçoit son adresse et celle de la contribution source d'après. Le décalage touche les chaînes d'affiliation (`raw_affiliation_strings`) et les institutions, donc les ROR. Exemple, l'œuvre W2982537460 de la publication 184877 :
 
-| Position | Auteur | Adresses OpenAlex |
-|---|---|---|
-| 0 | « on behalf of the Société… » (collectif) | CHU Grenoble |
-| 1 | C. Deteix | CHU Grenoble, Agence de la biomédecine |
-| 2 | F. Mesnil | Agence de la biomédecine, Institut Paoli-Calmettes |
-| 3 | S. Fürst | Institut Paoli-Calmettes, CHU Bordeaux |
-| 4 | N. Milpied | CHU Bordeaux, CHRU Lille |
+| Position OpenAlex | Auteur | Adresses OpenAlex | Adresse WoS |
+|---|---|---|---|
+| 0 | « on behalf of the Société… » (collectif) | CHU Grenoble | |
+| 1 | C. Deteix | CHU Grenoble, Agence de la biomédecine | CHU Grenoble |
+| 2 | F. Mesnil | Agence de la biomédecine, Institut Paoli-Calmettes | Agence de la biomédecine |
+| 3 | S. Fürst | Institut Paoli-Calmettes, CHU Bordeaux | Institut Paoli-Calmettes |
+| 4 | N. Milpied | CHU Bordeaux, CHRU Lille | CHU Bordeaux |
 
-WoS donne à chaque auteur sa seule adresse. Crossref ne donne aucune affiliation pour cet article.
+Crossref ne donne aucune affiliation pour cet article.
 
 Un second défaut donne à chaque contribution source toutes les adresses de l'article, notes de bas de page comprises (« Submitted for publication… », « Address correspondence to… »).
 
@@ -20,7 +20,7 @@ Un second défaut donne à chaque contribution source toutes les adresses de l'a
 
 Scripts dans `data/experiments/decalage-adresses-openalex/` : `decalage.py` (mesure), `detail.py` (adresses d'un enregistrement source), `payload.py` (payload brut d'une œuvre). Enregistrements sources décalés dans `decales.csv`.
 
-Critère du décalage. L'adresse propre se calcule de proche en proche : la contribution source 0 garde toutes ses adresses brutes ; la contribution source i garde les siennes moins l'adresse propre de i − 1, à défaut l'adresse propre de i − 1. Une paire de contributions sources consécutives est décalée quand i contient l'adresse propre de i − 1 et une autre adresse, contraire quand i perd l'adresse propre de i − 1. Un enregistrement source est décalé quand 80 % de ses paires décalées ou contraires sont décalées, sur 3 paires au moins, et quand une contribution source reçoit en moyenne moins de la moitié des adresses de l'enregistrement source. Toutes les adresses vont à chacun quand une contribution source en reçoit en moyenne 90 % au moins, sur 4 adresses au moins.
+Critère du décalage. L'adresse reportée se calcule de proche en proche : la contribution source 0 reporte toutes ses adresses brutes ; la contribution source i reporte les siennes moins l'adresse reportée par i − 1, à défaut l'adresse reportée par i − 1. Dans un enregistrement source décalé, l'adresse de la contribution source i est celle reportée par i − 1. Une paire de contributions sources consécutives est décalée quand i contient l'adresse reportée par i − 1 et une autre adresse, contraire quand i perd l'adresse reportée par i − 1. Un enregistrement source est décalé quand 80 % de ses paires décalées ou contraires sont décalées, sur 3 paires au moins, et quand une contribution source reçoit en moyenne moins de la moitié des adresses de l'enregistrement source. Toutes les adresses vont à chacun quand une contribution source en reçoit en moyenne 90 % au moins, sur 4 adresses au moins.
 
 Enregistrements sources de 4 à 200 auteurs :
 
@@ -32,12 +32,12 @@ Enregistrements sources de 4 à 200 auteurs :
 
 - 24 des 47 enregistrements sources décalés ont un auteur collectif en position 0. Un quart des 96 enregistrements sources OpenAlex à auteur collectif en position 0 sont décalés.
 - Dans d'autres, le décalage commence après un auteur collectif placé plus loin, non reconnu comme collectif (`collective`) : « MacaqueNet » en position 2 de W4407421416.
-- 48 contributions sources sont du périmètre par la seule adresse propre de la contribution source précédente, dans 39 enregistrements sources décalés.
+- 46 contributions sources sont du périmètre par la seule adresse de la contribution source suivante, dans 38 enregistrements sources décalés.
 - Les enregistrements sources à toutes les adresses pour chacun contiennent 165 contributions sources du périmètre, légitimes ou non.
 
 ## Décisions
 
-- Les adresses décalées se corrigent : chaque contribution source garde son adresse propre.
+- Les adresses décalées se corrigent : chaque contribution source garde sa seule adresse.
 - Le défaut est signalé à OpenAlex, avec la méthode de correction.
 
 ## Phasage
@@ -50,7 +50,7 @@ Enregistrements sources de 4 à 200 auteurs :
 
 ### Phase 2 — Correction à la normalisation d'OpenAlex
 
-- [ ] Adresses brutes : adresse propre de chaque contribution source.
+- [ ] Adresses brutes : chaque contribution source garde l'adresse reportée par la précédente ; l'auteur collectif n'en garde aucune.
 - [ ] Institutions et ROR : même correction.
 - [ ] Effet sur le stock : contributions sources et publications qui sortent du périmètre.
 - [ ] Reprise du stock : réhydratation des seuls enregistrements sources concernés (`rehydrate_staging_from_raw_store.py --resync-contributions`), puis normalisation. Le script sélectionne par préfixe d'identifiant ou par type de document : une sélection par liste est à ajouter.
