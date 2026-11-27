@@ -1,4 +1,4 @@
-"""Phase `structure_referentials` : référentiels ROR et HAL, lus par la reconnaissance des structures et par les pays.
+"""Phase `structures` : référentiels ROR et HAL, lus par la reconnaissance des structures et par les pays.
 
 - **Référentiel ROR** (`refresh_ror`) : importe la dernière version du dump ROR, si elle reste à importer.
 - **Référentiel des structures HAL** (`refresh_hal_structures`) : charge les structures HAL citées et absentes du référentiel.
@@ -87,7 +87,7 @@ def assemble(by_task: Mapping[str, PhaseMetrics]) -> PhaseMetrics:
 
 
 PHASE = Phase(
-    "structure_referentials",
+    "structures",
     "Référentiels ROR et HAL",
     (REFRESH_ROR, REFRESH_HAL_STRUCTURES),
     Block.REFERENTIALS,

@@ -30,7 +30,7 @@ Les phases s'exécutent dans cet ordre, qui suit les dépendances entre tâches.
 
 **Référentiels**
 
-- [`structure_referentials`](04-affiliations.md#référentiels-ror-et-hal-structure_referentials) tient à jour les référentiels ROR et HAL.
+- [`structures`](04-affiliations.md#référentiels-ror-et-hal-structures) tient à jour les référentiels ROR et HAL.
 - [`dois`](05-publishing.md#référentiel-des-doi-dois) tient le référentiel des DOI connus : agence de chaque préfixe, existence et URL de résolution chez doi.org.
 - [`publishing`](05-publishing.md) complète les référentiels de l'édition.
 
