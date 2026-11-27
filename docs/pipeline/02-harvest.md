@@ -42,7 +42,7 @@ Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, Sca
 
 Crossref et DataCite reçoivent seulement les DOI à préfixe enregistré chez eux, d'après l'agence résolue par la phase [dois](05-publishing.md#référentiel-des-doi-dois). Un DOI à préfixe sans agence attend le run suivant.
 
-**Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`. L'échec est définitif auprès du registre qui attribue l'identifiant (HAL pour un hal-id, theses.fr pour un NNT). Ailleurs, l'identifiant est cherché de nouveau après le délai `fetch_missing_retry_after_days`. Un DOI inconnu de doi.org (`dois.registered`) sort définitivement de la sélection. La phase `metadata_correction` retire les DOI inconnus de doi.org et les hal-id introuvables dans HAL.
+**Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`. L'échec est définitif auprès du registre qui attribue l'identifiant (HAL pour un hal-id, theses.fr pour un NNT). Ailleurs, l'identifiant est cherché de nouveau après le délai `fetch_missing_retry_after_days`. Un DOI inconnu de doi.org (`dois.registered`) sort de la sélection. La phase `metadata_correction` retire les DOI inconnus de doi.org et les hal-id introuvables dans HAL.
 
 ## Documents périmés et disparus (`fetch_stale`)
 

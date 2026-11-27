@@ -9,6 +9,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierRole,
     SourceIdentifierType,
 )
+from domain.source_records.metadata_correction.shared_doi import DoiClusterCase
 from infrastructure.db.queues import Queue
 from pipeline.transformation.dois.lookups import DOI_ORG, UNPAYWALL, Answer, DoiAnswerStore
 from tests.integration.helpers.publications import insert_publication
@@ -83,7 +84,7 @@ class TestPublicationDois:
 
 
 class TestKnownDois:
-    """doi.org reçoit tous les DOI connus (vue `known_dois`), et la forme sans version des DOI à suffixe de version."""
+    """doi.org reçoit tous les DOI connus (vue `known_dois`), les DOI retirés des enregistrements sources, et la forme sans version des DOI à suffixe de version."""
 
     def test_un_doi_secondaire_parmi_d_autres_est_interroge(self, sa_sync_conn):
         _record_with_dois(sa_sync_conn, insert_publication(sa_sync_conn), "10.1/a", "10.1/b")
@@ -102,6 +103,19 @@ class TestKnownDois:
         )
 
         assert "10.1/cible" in _to_query(sa_sync_conn, DOI_ORG)
+
+    def test_un_doi_retire_comme_inconnu_de_doi_org_est_interroge(self, sa_sync_conn):
+        """Le DOI a pu être enregistré chez doi.org depuis son retrait."""
+        record = _record_with_dois(sa_sync_conn, insert_publication(sa_sync_conn), "10.1/tardif")
+        sa_sync_conn.execute(
+            text(
+                "UPDATE source_record_identifiers SET removed_by = :case"
+                " WHERE source_record_id = :record"
+            ),
+            {"case": DoiClusterCase.UNRESOLVED_DOI_TO_NULL, "record": record},
+        )
+
+        assert "10.1/tardif" in _to_query(sa_sync_conn, DOI_ORG)
 
     def test_la_forme_sans_version_est_interrogee(self, sa_sync_conn):
         _candidate(sa_sync_conn, "10.6084/m9.figshare.123.v2")
