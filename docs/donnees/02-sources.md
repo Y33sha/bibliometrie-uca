@@ -15,7 +15,7 @@ Schéma PostgreSQL `sources`.
 | Table | Contenu | Contrainte |
 |---|---|---|
 | `staging` | Document moissonné : identifiant dans la source, payload brut, empreinte (`raw_hash`), date de disparition de la source (`disappeared_at`). Le payload est vidé après la normalisation | Un document par source et identifiant |
-| `failed_lookups` | Identifiant (DOI, identifiant HAL, NNT) cherché en vain dans une source ou auprès de doi.org, avec la date de l'échec | |
+| `failed_lookups` | Identifiant (DOI, identifiant HAL, NNT) cherché en vain dans une source, avec la date de l'échec | |
 
 **DOI**
 
