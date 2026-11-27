@@ -37,11 +37,12 @@ Enregistrements sources de 4 à 200 auteurs :
 
 - Sur les payloads bruts (`decalage_payloads.py`), 3 des 3 057 œuvres d'une publication à enregistrement source INSPIRE-HEP et 4 des 730 œuvres de plus de 200 auteurs sont décalées. Ces œuvres sont hors de la mesure en base : sans contribution source pour les premières, au-delà de 200 auteurs pour les secondes.
 - 24 des 47 enregistrements sources décalés ont un auteur collectif en position 0. Un quart des 96 enregistrements sources OpenAlex à auteur collectif en position 0 sont décalés.
-- Dans d'autres, le décalage commence à un auteur collectif placé plus loin, non reconnu comme collectif (`is_collective_name`) : « MacaqueNet » en position 2 de W4407421416.
+- Dans d'autres, le décalage commence à un auteur collectif placé plus loin : « MacaqueNet » en position 2 de W4407421416.
+- Les noms restent alignés (`noms_decales.py`) : dans les 47 enregistrements sources décalés, `raw_author_name` concorde avec `author.display_name` de la même position pour les 1 341 contributions.
 - Sens d'après les adresses WoS des mêmes auteurs (`sens.py`) : auteur inséré pour 23 des 47 enregistrements sources décalés, auteur manquant pour 9, sens mixte pour 5. Les 10 autres sont sans enregistrement WoS ou sans auteur comparable.
 - 22 des 23 enregistrements sources à auteur inséré contiennent un auteur collectif reconnu. 8 des 9 à auteur manquant n'en contiennent aucun, et 4 de ces 9 ont des affiliations numérotées.
 - Signaux du sens tirés des seules données d'OpenAlex (`sens_interne.py`), sur les 32 enregistrements sources de sens établi : la présence d'un auteur collectif donne le sens de 30 ; une affiliation propre au premier ou au dernier auteur de la suite décalée, celui de 19.
-- Auteurs collectifs non reconnus (`noms_collectifs.py`, `collectifs_effet.sql`). Parmi les enregistrements sources décalés sans auteur collectif reconnu, seul W4407421416 cache un collectif (« MacaqueNet »). Mots candidats : « scientists », « expedition », « participants », « project », « cohort », sigles d'organismes (INRAE, CIRAD, CNRS, INSERM, OECD), locutions « advisory board » et « panel on », mot à capitale interne terminé par « Net » (MacaqueNet, WellBeNet). Ils feraient reconnaître 137 contributions sources comme collectives, 95 d'OpenAlex et 42 de ScanR, dont 16 rattachées à une personne. « portal », « panel » et « board » seuls sont aussi des noms de famille.
+- Auteurs collectifs mal reconnus (`noms_collectifs.py`, `collectifs_effet.sql`). Parmi les enregistrements sources décalés, seul W4407421416 contenait un collectif ignoré de `is_collective_name` (« MacaqueNet »). Mots ajoutés : « scientists », « expedition », « participants », « project », « cohort », sigles d'organismes (INRAE, CIRAD, CNRS, INSERM, OECD), locutions « advisory board » et « panel on », mot à capitale interne terminé par « Net » (MacaqueNet, WellBeNet). Ils rendent collectives 137 contributions sources, 95 d'OpenAlex et 42 de ScanR, dont 16 rattachées à une personne. « portal », « panel » et « board » seuls sont aussi des noms de famille.
 - 46 contributions sources sont du périmètre par la seule adresse d'une voisine, dans 38 enregistrements sources décalés. Le sens retenu : auteur inséré avec un auteur collectif, auteur manquant sinon.
 - Les enregistrements sources à toutes les adresses pour chacun contiennent 165 contributions sources du périmètre, légitimes ou non.
 
@@ -57,6 +58,7 @@ Enregistrements sources de 4 à 200 auteurs :
 
 - [x] Sens du décalage d'après WoS.
 - [x] Signaux du sens tirés des seules données d'OpenAlex.
+- [x] Reconnaissance des auteurs collectifs : mots, locutions et noms de réseau ajoutés à `is_collective_name`.
 - [ ] Règle du domaine : détection et sens du décalage sur les adresses brutes d'un enregistrement source, par position.
 - [ ] Revue des enregistrements sources de sens mixte ou sans enregistrement WoS, et des enregistrements sources de score 0,5 à 0,8.
 
@@ -65,7 +67,7 @@ Enregistrements sources de 4 à 200 auteurs :
 - [ ] Adresses brutes : chaque contribution source garde sa seule adresse, selon le sens du décalage ; l'auteur inséré n'en garde aucune.
 - [ ] Institutions et ROR : même correction.
 - [ ] Effet sur le stock : contributions sources et publications qui sortent du périmètre.
-- [ ] Reprise du stock : réhydratation des seuls enregistrements sources concernés (`rehydrate_staging_from_raw_store.py --resync-contributions`), puis normalisation. Le script sélectionne par préfixe d'identifiant ou par type de document : une sélection par liste est à ajouter.
+- [ ] Reprise du stock : réhydratation des seuls enregistrements sources concernés (`rehydrate_staging_from_raw_store.py --resync-contributions`), puis normalisation. Les enregistrements sources aux contributions sources rendues collectives par `is_collective_name` en font partie. Le script sélectionne par préfixe d'identifiant ou par type de document : une sélection par liste est à ajouter.
 
 ### Phase 3 — Toutes les adresses à chacun
 
@@ -82,5 +84,4 @@ Enregistrements sources de 4 à 200 auteurs :
 
 ## Questions ouvertes
 
-- Reconnaissance des auteurs collectifs : « MacaqueNet » et noms de réseaux semblables.
 - Sens d'un enregistrement source décalé sans auteur collectif reconnu : auteur manquant, ou auteur collectif non reconnu.
