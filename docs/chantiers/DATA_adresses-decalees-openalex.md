@@ -48,11 +48,14 @@ Enregistrements sources de 4 à 200 auteurs :
 - Revue à l'œil (`revue.py`, une lettre par affiliation). Les 10 enregistrements sources décalés sans enregistrement WoS comparable sont décalés. 6 des 47 sont des faux positifs : des équipes de 5 à 10 auteurs aux affiliations partagées (A, A, BA, BA…), dont les 5 de sens mixte.
 - Une même affiliation figure chez deux auteurs voisins sous deux écritures, avec ou sans virgules (W4407421416). Les affiliations se comparent normalisées (`normalize_text`), comme les adresses en base.
 - Critère des chaînons (`chainons.py`, `chainons_base.py`) : un auteur intérieur partage une adresse avec le précédent et une autre, différente, avec le suivant. Avec 40 % de chaînons parmi les auteurs intérieurs, sur 3 chaînons au moins, 78 enregistrements sources OpenAlex sont retenus, contre 1 pour WoS. Ils comprennent les 41 décalés de la revue et 36 autres. 6 de ces 36, tirés au hasard, sont décalés, avec plusieurs affiliations par auteur et souvent un auteur collectif plus loin dans la liste. Les 6 faux positifs restent sous 40 % de chaînons, sauf un à 50 %.
+- Évaluation de la règle (`evaluation_regle.py`) sur les 83 œuvres des deux critères, d'après les adresses WoS des mêmes auteurs. La règle corrige 78 œuvres. Correction juste pour 45, fausse pour 2, mixte pour 5 ; 26 sont sans enregistrement WoS ou sans auteur comparable. Auteur par auteur, les affiliations gardées s'accordent mieux avec WoS 902 fois, les affiliations retirées 75 fois. Les deux corrections fausses : un faux positif, et W2945364877, décalé dans le sens d'un auteur inséré sans auteur collectif dans la liste.
+- Dans W3197636785, l'auteur collectif est en position 27 et le décalage commence en position 0 : la règle corrige seulement les auteurs après le collectif.
 
 ## Décisions
 
 - Les adresses décalées se corrigent : chaque contribution source garde sa seule adresse.
 - La détection et le sens du décalage s'appuient sur les seules données d'OpenAlex. WoS, source sans moissonnage, sert seulement à évaluer les mesures.
+- Détection par les chaînons. Sens : auteur inséré avec un auteur collectif, auteur manquant sinon.
 - Le défaut est signalé à OpenAlex, avec la méthode de correction.
 
 ## Phasage
@@ -62,9 +65,9 @@ Enregistrements sources de 4 à 200 auteurs :
 - [x] Sens du décalage d'après WoS.
 - [x] Signaux du sens tirés des seules données d'OpenAlex.
 - [x] Reconnaissance des auteurs collectifs : mots, locutions et noms de réseau ajoutés à `is_collective_name`.
-- [ ] Règle du domaine : détection et sens du décalage sur les adresses brutes d'un enregistrement source, par position.
 - [x] Revue des enregistrements sources de sens mixte ou sans enregistrement WoS.
 - [x] Critère des chaînons sur la base, revue d'un échantillon des enregistrements sources retenus.
+- [x] Règle du domaine (`domain/source_records/shifted_affiliations.py`) : détection, sens et affiliations gardées par chaque auteur.
 
 ### Phase 2 — Correction à la normalisation d'OpenAlex
 
@@ -88,4 +91,4 @@ Enregistrements sources de 4 à 200 auteurs :
 
 ## Questions ouvertes
 
-- Sens d'un enregistrement source décalé sans auteur collectif reconnu : auteur manquant, ou auteur collectif non reconnu.
+- Départ du décalage avant l'auteur collectif (W3197636785).
