@@ -30,6 +30,7 @@ Enregistrements sources de 4 à 200 auteurs :
 | Décalés | 47 | 2 |
 | Toutes les adresses à chacun | 46 | 3 |
 
+- Sur les payloads bruts (`decalage_payloads.py`), 3 des 3 057 œuvres d'une publication à enregistrement source INSPIRE-HEP et 4 des 730 œuvres de plus de 200 auteurs sont décalées. Ces œuvres sont hors de la mesure en base : sans contribution source pour les premières, au-delà de 200 auteurs pour les secondes.
 - 24 des 47 enregistrements sources décalés ont un auteur collectif en position 0. Un quart des 96 enregistrements sources OpenAlex à auteur collectif en position 0 sont décalés.
 - Dans d'autres, le décalage commence après un auteur collectif placé plus loin, non reconnu comme collectif (`collective`) : « MacaqueNet » en position 2 de W4407421416.
 - 46 contributions sources sont du périmètre par la seule adresse de la contribution source suivante, dans 38 enregistrements sources décalés.
